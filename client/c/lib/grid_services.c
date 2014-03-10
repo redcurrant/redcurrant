@@ -1,5 +1,5 @@
 #include "./gs_internals.h"
-#include "../../../meta2/remote/meta2_services_remote.h"
+#include <meta2/remote/meta2_services_remote.h>
 
 // TODO factorizes with GLib macros
 #define GSERR_EINVAL(err) do { if (err) { *err = gs_error_new(EINVAL, "<%s> Invalid parameter", __FUNCTION__); } } while (0)
