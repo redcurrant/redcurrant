@@ -1,36 +1,15 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metautils"
 #endif
 
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metautils"
-#endif
-
-#include "./metatypes.h"
-#include "./metautils.h"
+#include "metautils.h"
 
 
-struct key_value_pair_s*
-key_value_pair_create(const gchar *k, const guint8 *v, gsize vs)
+struct key_value_pair_s *
+key_value_pair_create(const gchar * k, const guint8 * v, gsize vs)
 {
 	struct key_value_pair_s *kv;
+
 	kv = g_malloc0(sizeof(*kv));
 	kv->key = g_strdup(k);
 	kv->value = g_byte_array_append(g_byte_array_new(), v, vs);
@@ -44,14 +23,15 @@ key_value_pairs_convert_to_map(GSList * pairs, gboolean copy, GError ** err)
 	GHashTable *result;
 
 	result = g_hash_table_new_full(g_str_hash, g_str_equal,
-			copy ? g_free : NULL,
-			copy ? metautils_gba_clean : NULL);
+		copy ? g_free : NULL, copy ? metautils_gba_clean : NULL);
 	if (!result) {
 		GSETERROR(err, "Memory allocation failure");
 		return NULL;
 	}
 
 	for (pair = pairs; pair; pair = g_slist_next(pair)) {
+		if (!pair->data)
+			continue;
 		key_value_pair_t *p = (key_value_pair_t *) pair->data;
 		gchar *key = p->key;
 		GByteArray *value = p->value;
@@ -148,4 +128,3 @@ key_value_pair_gclean(gpointer p, gpointer u)
 	(void) u;
 	key_value_pair_clean((key_value_pair_t *) p);
 }
-

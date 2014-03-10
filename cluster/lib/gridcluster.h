@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file gridcluster.h
  * Cluster information access library
@@ -28,9 +11,9 @@
  * @{
  */
 
-#include <metatypes.h>
-#include <gridagent.h>
-#include <gridcluster_eventhandler.h>			
+#include <metautils/lib/metatypes.h>
+#include <cluster/agent/gridagent.h>
+#include <cluster/events/gridcluster_eventhandler.h>
 
 /** The path to the grid config file */
 #define CONFIG_FILE_PATH "/etc/gridstorage.conf"
@@ -42,7 +25,7 @@
 #define NS_ACL_DENY_OPTION "deny"
 
 #ifndef GCLUSTER_CONFIG_DIR_PATH
-# define GCLUSTER_CONFIG_DIR_PATH "/etc/gridstorage.conf.d"
+#define GCLUSTER_CONFIG_DIR_PATH "/etc/gridstorage.conf.d"
 #endif
 
 /**
@@ -59,7 +42,8 @@
 /**
  * Struct to store an agent task description
  */
-struct task_s {
+struct task_s
+{
 	char id[MAX_TASKID_LENGTH];	/**< The task id */
 	long next_schedule;		/**< The date of the next execution of the task */
 	gboolean busy;			/**< A flag set to TRUE if the task is running */
@@ -74,7 +58,7 @@ struct task_s {
  * @return an allocated namespace_info_t or NULL if an error occured (error is set).
  * The returned namespace_info_t should be freed with namespace_info_free()
  */
-namespace_info_t *get_namespace_info(const char *ns_name, GError **error);
+namespace_info_t *get_namespace_info(const char *ns_name, GError ** error);
 
 /**
  * Get the META0 infos
@@ -84,7 +68,7 @@ namespace_info_t *get_namespace_info(const char *ns_name, GError **error);
  * @return an allocated meta0_info_t or NULL if an error occured (error is set).
  * The returned meta0_info_t should be freed with g_free()
  */
-meta0_info_t *get_meta0_info(const char *ns_name, GError **error);
+meta0_info_t *get_meta0_info(const char *ns_name, GError ** error);
 
 /**
  * Get the META0 infos, and the network operations should not take longer
@@ -98,7 +82,8 @@ meta0_info_t *get_meta0_info(const char *ns_name, GError **error);
  * @return an allocated meta0_info_t or NULL if an error occured (error is set).
  * The returned meta0_info_t should be freed with g_free()
  */
-meta0_info_t *get_meta0_info2(const char *ns_name, long timeout_cnx, long timeout_req, GError **error);
+meta0_info_t *get_meta0_info2(const char *ns_name, long timeout_cnx,
+	long timeout_req, GError ** error);
 
 /**
  * Count the number of service of a given type in a namespace
@@ -106,10 +91,11 @@ meta0_info_t *get_meta0_info2(const char *ns_name, long timeout_cnx, long timeou
  * @param ns_name the namespace name
  * @param type the type of service to count
  * @param error
- * 
+ *
  * @return the number of service or -1 if an error occured (error is set)
  */
-gint count_namespace_services(const char *ns_name, const char *type, GError **error);
+gint count_namespace_services(const char *ns_name, const char *type,
+	GError ** error);
 
 /**
  * List services of a given type in a namespace
@@ -120,8 +106,10 @@ gint count_namespace_services(const char *ns_name, const char *type, GError **er
  *
  * @return a list of service_info_t or NULL if an error occured (error is set)
  */
-GSList* list_namespace_services(const char *ns_name, const char *type, GError **error);
-GSList* list_namespace_services2(const char *ns_name, const char *type, GError **error);
+GSList *list_namespace_services(const char *ns_name, const char *type,
+	GError ** error);
+GSList *list_namespace_services2(const char *ns_name, const char *type,
+	GError ** error);
 
 /**
  * Get the first service of a given type in a namespace
@@ -133,7 +121,8 @@ GSList* list_namespace_services2(const char *ns_name, const char *type, GError *
  * @return an allocated service_info_s or NULL if an error occured (error is set)
  * The returned service_info_s should be freed with service_info_clean()
  */
-struct service_info_s* get_one_namespace_service(const gchar *ns_name, const gchar *type_name, GError **error);
+struct service_info_s *get_one_namespace_service(const gchar * ns_name,
+	const gchar * type_name, GError ** error);
 
 /**
  * List the types of services available in a namespace
@@ -143,7 +132,7 @@ struct service_info_s* get_one_namespace_service(const gchar *ns_name, const gch
  *
  * @return a list of type names in string format or NULL if an error occured (error is set)
  */
-GSList* list_namespace_service_types(const char *ns_name, GError **error);
+GSList *list_namespace_service_types(const char *ns_name, GError ** error);
 
 /**
  * Register a service in a namespace
@@ -153,7 +142,8 @@ GSList* list_namespace_service_types(const char *ns_name, GError **error);
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-int register_namespace_service(const struct service_info_s *si, GError **error);
+int register_namespace_service(const struct service_info_s *si,
+	GError ** error);
 
 /**
  * List all services running locally on the server
@@ -162,7 +152,7 @@ int register_namespace_service(const struct service_info_s *si, GError **error);
  *
  * @return a list of service_info_s or NULL if an error occured (error is set)
  */
-GSList *list_local_services(GError **error);
+GSList *list_local_services(GError ** error);
 
 /**
  * Unregister all services of a given type from a namespace
@@ -173,7 +163,8 @@ GSList *list_local_services(GError **error);
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-int clear_namespace_services(const char *ns_name, const char *type, GError **error);
+int clear_namespace_services(const char *ns_name, const char *type,
+	GError ** error);
 
 /**
  * Store an erroneous META1 alert in the conecience of a namespace
@@ -184,7 +175,8 @@ int clear_namespace_services(const char *ns_name, const char *type, GError **err
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-int store_erroneous_meta1( const char *ns_name, const addr_info_t *m1_addr, GError **error );
+int store_erroneous_meta1(const char *ns_name, const addr_info_t * m1_addr,
+	GError ** error);
 
 /**
  * Store an erroneous container alert in the conecience of a namespace
@@ -196,8 +188,8 @@ int store_erroneous_meta1( const char *ns_name, const addr_info_t *m1_addr, GErr
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-int store_erroneous_container( const char *ns_name, const container_id_t cID,
-	addr_info_t *src_addr, GError **error );
+int store_erroneous_container(const char *ns_name, const container_id_t cID,
+	addr_info_t * src_addr, GError ** error);
 
 /**
  * Store an erroneous content alert in the conecience of a namespace
@@ -211,8 +203,9 @@ int store_erroneous_container( const char *ns_name, const container_id_t cID,
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-int store_erroneous_content( const char *ns_name, const container_id_t cID,
-	addr_info_t *src_addr, GError **error, const gchar *path, const gchar *cause );
+int store_erroneous_content(const char *ns_name, const container_id_t cID,
+	addr_info_t * src_addr, GError ** error, const gchar * path,
+	const gchar * cause);
 
 /**
  * Tell the conscience of a namespace that everything was done locally to fix a META1
@@ -223,7 +216,8 @@ int store_erroneous_content( const char *ns_name, const container_id_t cID,
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-int fixed_erroneous_meta1( const char *ns_name, GError **error, addr_info_t *m1_addr);
+int fixed_erroneous_meta1(const char *ns_name, GError ** error,
+	addr_info_t * m1_addr);
 
 /**
  * Tell the conscience of a namespace that everything was done locally to fix a container / content
@@ -235,7 +229,8 @@ int fixed_erroneous_meta1( const char *ns_name, GError **error, addr_info_t *m1_
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-int fixed_erroneous_content( const char *ns_name, const container_id_t cID, GError **error, const gchar *path);
+int fixed_erroneous_content(const char *ns_name, const container_id_t cID,
+	GError ** error, const gchar * path);
 
 /**
  * Tells the conscience of a namespace to remove all broken alerts from its memory
@@ -245,7 +240,7 @@ int fixed_erroneous_content( const char *ns_name, const container_id_t cID, GErr
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-int flush_erroneous_elements( const char *ns_name, GError **error );
+int flush_erroneous_elements(const char *ns_name, GError ** error);
 
 /**
  * Tells the conscience of a namespace to remove all broken containers alerts from its memory
@@ -255,7 +250,7 @@ int flush_erroneous_elements( const char *ns_name, GError **error );
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-GSList* fetch_erroneous_containers( const char *ns_name, GError **error );
+GSList *fetch_erroneous_containers(const char *ns_name, GError ** error);
 
 /**
  * Parse the grid config file CONFIG_FILE_PATH
@@ -265,7 +260,7 @@ GSList* fetch_erroneous_containers( const char *ns_name, GError **error );
  *
  * @return 1 or 0 if an error occured (error is set)
  */
-int parse_cluster_config(GHashTable *ns_hash, GError **error);
+int parse_cluster_config(GHashTable * ns_hash, GError ** error);
 
 /**
  * List internal tasks of the agent
@@ -274,7 +269,7 @@ int parse_cluster_config(GHashTable *ns_hash, GError **error);
  *
  * @return a list of task_s or NULL if an error occured
  */
-GSList *list_tasks(GError **error);
+GSList *list_tasks(GError ** error);
 
 /**
  * Encodes the event in a agent-suitable form and then call
@@ -286,7 +281,8 @@ GSList *list_tasks(GError **error);
  *
  * @return TRUE or FALSE if an error occured
  */
-gboolean event_send_to_agent( const gchar *ns_name, gridcluster_event_t *event, GError **err );
+gboolean event_send_to_agent(const gchar * ns_name, gridcluster_event_t * event,
+	GError ** err);
 
 /**
  * Ask to the local agent the list of sercice-type names that have
@@ -299,7 +295,7 @@ gboolean event_send_to_agent( const gchar *ns_name, gridcluster_event_t *event, 
  *
  * @return a list of service types names or NULL if an error occured (err is set)
  */
-GSList* event_get_managed_patterns(const gchar *ns_name, GError **err);
+GSList *event_get_managed_patterns(const gchar * ns_name, GError ** err);
 
 /**
  * Get the event handler configuration for a namespace
@@ -309,12 +305,13 @@ GSList* event_get_managed_patterns(const gchar *ns_name, GError **err);
  *
  * @return the configuration in string format
  */
-GByteArray* event_get_configuration(const gchar *ns_name, GError **err);
+GByteArray *event_get_configuration(const gchar * ns_name, GError ** err);
 
 /**
  * UNUSED !!!
  */
-GByteArray* get_srvtype_configuration(const gchar *ns_name, const gchar *type_name, GError **error);
+GByteArray *get_srvtype_configuration(const gchar * ns_name,
+	const gchar * type_name, GError ** error);
 
 /**
  * Extract mode worm state from namespace_info
@@ -323,7 +320,7 @@ GByteArray* get_srvtype_configuration(const gchar *ns_name, const gchar *type_na
  *
  * @return TRUE if namespace is in mode worm, FALSE otherwise
  */
-gboolean namespace_in_worm_mode(namespace_info_t* ns_info);
+gboolean namespace_in_worm_mode(namespace_info_t * ns_info);
 
 /**
  * Extract container max size allowed from namespace_info
@@ -332,7 +329,7 @@ gboolean namespace_in_worm_mode(namespace_info_t* ns_info);
  *
  * @return the container max size allowed
  */
-gint64 namespace_container_max_size(namespace_info_t* ns_info);
+gint64 namespace_container_max_size(namespace_info_t * ns_info);
 
 /**
  * Extract namespace defined storage_policy from namespace_info
@@ -341,7 +338,8 @@ gint64 namespace_container_max_size(namespace_info_t* ns_info);
  *
  * @return the storage_policy defined
  */
-gchar* namespace_storage_policy(const namespace_info_t* ns_info);
+gchar *namespace_storage_policy(const namespace_info_t * ns_info,
+	const char *ns_name);
 
 /**
  * Check if a storage policy exist for a namespace
@@ -352,7 +350,8 @@ gchar* namespace_storage_policy(const namespace_info_t* ns_info);
  *
  * @return TRUE if the storage policy exist, FALSE otherwise
  */
-gboolean namespace_is_storage_policy_valid(const namespace_info_t* ns_info, const gchar *storage_policy);
+gboolean namespace_is_storage_policy_valid(const namespace_info_t * ns_info,
+	const gchar * storage_policy);
 
 /**
  * Return the value of a data security matching a storage policy (the string "DATASEC:PARAM1:PARAM2:...")
@@ -363,7 +362,8 @@ gboolean namespace_is_storage_policy_valid(const namespace_info_t* ns_info, cons
  *
  * @return the data security "value"
  */
-gchar* namespace_data_security_value(const namespace_info_t *ns_info, const gchar *wanted_policy);
+gchar *namespace_data_security_value(const namespace_info_t * ns_info,
+	const gchar * wanted_policy);
 
 /**
  * Return the "value" of a storage policy (the string "STG_CLASS:DATA_SEC:DATA_THREAT")
@@ -374,7 +374,8 @@ gchar* namespace_data_security_value(const namespace_info_t *ns_info, const gcha
  *
  * @return the storage_policy "value"
  */
-gchar* namespace_storage_policy_value(const namespace_info_t *ns_info, const gchar *wanted_policy);
+gchar *namespace_storage_policy_value(const namespace_info_t * ns_info,
+	const gchar * wanted_policy);
 
 /**
  * Extract mode compression state from namespace_info
@@ -383,32 +384,32 @@ gchar* namespace_storage_policy_value(const namespace_info_t *ns_info, const gch
  *
  * @return TRUE if namespace is in mode compression, FALSE otherwise
  */
-gboolean namespace_in_compression_mode(namespace_info_t* ns_info);
+gboolean namespace_in_compression_mode(namespace_info_t * ns_info);
 
 /**
  * @param ns_info
  * @return
  */
-gsize namespace_get_autocontainer_src_offset(namespace_info_t* ns_info);
+gsize namespace_get_autocontainer_src_offset(namespace_info_t * ns_info);
 
 /**
  * @param ns_info
  * @return
  */
-gsize namespace_get_autocontainer_src_size(namespace_info_t* ns_info);
+gsize namespace_get_autocontainer_src_size(namespace_info_t * ns_info);
 
 /**
  * @param ns_info
  * @return
  */
-gsize namespace_get_autocontainer_dst_bits(namespace_info_t* ns_info);
+gsize namespace_get_autocontainer_dst_bits(namespace_info_t * ns_info);
 
 /**
  * Only used by gridd
  * @param error
  * @return
  */
-typedef namespace_info_t* (*get_namespace_info_f) (GError **error);
+typedef namespace_info_t *(*get_namespace_info_f) (GError ** error);
 
 /**
  * Get the rules path from conscience
@@ -418,8 +419,8 @@ typedef namespace_info_t* (*get_namespace_info_f) (GError **error);
  * @param err
  * @return
  */
-gboolean namespace_get_rules_path(const gchar *ns, const gchar *srvtype,
-		gchar **path, GError **err);
+gboolean namespace_get_rules_path(const gchar * ns, const gchar * srvtype,
+	gchar ** path, GError ** err);
 
 /**
  * Get namespace rules
@@ -428,8 +429,8 @@ gboolean namespace_get_rules_path(const gchar *ns, const gchar *srvtype,
  * @param err
  * @return
  */
-GByteArray* namespace_get_rules(const gchar *ns, const gchar *srvtype,
-		GError **err);
+GByteArray *namespace_get_rules(const gchar * ns, const gchar * srvtype,
+	GError ** err);
 
 /**
  * @param ns
@@ -437,23 +438,23 @@ GByteArray* namespace_get_rules(const gchar *ns, const gchar *srvtype,
  * @param how
  * @return NULL if the NS was not found or the key not defined for the NS
  */
-gchar* gridcluster_get_config(const gchar *ns, const gchar *what, gint how);
+gchar *gridcluster_get_config(const gchar * ns, const gchar * what, gint how);
 
 
 /** List all the configuration variables locally set.
  * @return
  */
-GHashTable* gridcluster_parse_config(void);
+GHashTable *gridcluster_parse_config(void);
 
 
 /** List all the namespaces locally known
  * @return
  */
-gchar** gridcluster_list_ns(void);
+gchar **gridcluster_list_ns(void);
 
 
 /** Returns the services update's configuration when the Load-Balancing
- * is performed by a servce of type srvtype.
+ * is performed by a servce of type srvtype for each namespace and virtual namespace.
  *
  * Thus 'srvtype' is not the service type that is being load-balanced, but
  * the service doing the LB.
@@ -462,15 +463,51 @@ gchar** gridcluster_list_ns(void);
  * @param srvtype
  * @return
  */
-gchar* gridcluster_get_service_update_policy(struct namespace_info_s *nsinfo,
-		const gchar *srvtype);
+GHashTable *gridcluster_get_service_update_policy(struct namespace_info_s
+	*nsinfo, const gchar * srvtype);
+
+/**
+ *
+ *
+ *
+ */
+GHashTable *gridcluster_get_event_config(struct namespace_info_s *nsinfo,
+	const gchar * srvtype);
 
 /*!
  * @params nsinfo
- * @return 
+ * @return
  */
 gint64 gridcluster_get_container_max_versions(struct namespace_info_s *nsinfo);
 
+struct grid_lbpool_s;
+
+/*!
+ * @param glp
+ * @return NULL in case of successes
+ */
+GError *gridcluster_reload_lbpool(struct grid_lbpool_s *glp);
+
+/*!
+ * @param glp
+ * @return
+ */
+GError *gridcluster_reconfigure_lbpool(struct grid_lbpool_s *glp);
+
+/**
+ * Get the delay before actually removing contents marked as deleted.
+ *
+ * @param nsinfo A pointer to the namespace infos
+ * @return The delay in seconds, or -1 if disabled (never delete)
+ */
+gint64 gridcluster_get_keep_deleted_delay(struct namespace_info_s *nsinfo);
+
+gchar *gridcluster_get_nsinfo_strvalue(struct namespace_info_s *nsinfo,
+	const gchar * key, const gchar * def);
+
+gint64 gridcluster_get_nsinfo_int64(struct namespace_info_s *nsinfo,
+	const gchar * key, gint64 def);
+
 /** @} */
 
-#endif	/* _GRIDCLUSTER_H */
+#endif /* _GRIDCLUSTER_H */

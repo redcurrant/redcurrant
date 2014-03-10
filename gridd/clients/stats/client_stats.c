@@ -1,34 +1,8 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../../config.h"
-#endif
-
-#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <glib.h>
-
-#include <metatypes.h>
-#include <metautils.h>
-#include <common_main.h>
+#include <metautils/lib/metautils.h>
 
 #include "./stats_remote.h"
 
@@ -53,15 +27,15 @@ main_specific_fini(void)
 	addresses = NULL;
 }
 
-static struct grid_main_option_s*
+static struct grid_main_option_s *
 main_get_options(void)
 {
 	static struct grid_main_option_s options[] = {
-		{ "OutputXML", OT_BOOL, {.b=&flag_xml},
+		{"OutputXML", OT_BOOL, {.b = &flag_xml},
 			"Write XML instead of the default key=value output"},
-		{ "Pattern",   OT_STRING, {.str=&pattern},
+		{"Pattern", OT_STRING, {.str = &pattern},
 			"specific pattern (fnmatch) instead of '*'"},
-		{NULL, 0, {.b=0}, NULL}
+		{NULL, 0, {.b = 0}, NULL}
 	};
 
 	return options;
@@ -75,19 +49,18 @@ main_set_defaults(void)
 	GRID_DEBUG("Defaults set");
 }
 
-static const gchar*
+static const gchar *
 main_get_usage(void)
 {
 	static const gchar usage[] =
 		"(<URL>|<SRV>)...\n"
 		"  with:\n"
-		"   <URL> : IP ':' PORT\n"
-		"   <SRV> : NS '|' TYPE '|' IP ':' PORT\n";
+		"   <URL> : IP ':' PORT\n" "   <SRV> : NS '|' TYPE '|' IP ':' PORT\n";
 	return usage;
 }
 
 static gboolean
-_config_single_address(const gchar *arg)
+_config_single_address(const gchar * arg)
 {
 	addr_info_t ai;
 	GError *err = NULL;
@@ -108,7 +81,7 @@ _config_single_address(const gchar *arg)
 }
 
 static gboolean
-_config_single_service(const gchar *arg)
+_config_single_service(const gchar * arg)
 {
 	gchar **strv = g_strsplit(arg, "|", 4);
 
@@ -136,7 +109,7 @@ main_configure(int argc, char **args)
 		return FALSE;
 	}
 
-	for (i=0; i<argc ;i++) {
+	for (i = 0; i < argc; i++) {
 		gchar *arg = args[i];
 
 		if (strchr(arg, '|')) {
@@ -157,7 +130,7 @@ main_configure(int argc, char **args)
 
 
 static void
-_stat_addr(addr_info_t *ai)
+_stat_addr(addr_info_t * ai)
 {
 	gchar *escaped_format;
 	GHashTableIter iter;
@@ -175,10 +148,10 @@ _stat_addr(addr_info_t *ai)
 		return;
 	}
 
-	escaped_format = g_strescape(pattern->str,"");
+	escaped_format = g_strescape(pattern->str, "");
 	if (flag_xml)
 		g_print("<stats addr=\"%s\" pattern=\"%s\">\n",
-				str_addr, escaped_format);
+			str_addr, escaped_format);
 	else {
 		g_print("STAT_ADDRESS='%s'\n", str_addr);
 		g_print("STAT_FORMAT=\"%s\"\n", escaped_format);
@@ -186,11 +159,13 @@ _stat_addr(addr_info_t *ai)
 
 	g_hash_table_iter_init(&iter, ht);
 	while (g_hash_table_iter_next(&iter, &k, &v)) {
-		gchar *escaped_name = g_strescape((gchar*)k,"");
+		gchar *escaped_name = g_strescape((gchar *) k, "");
+
 		if (flag_xml)
-			g_print("\t<stat name=\"%s\" value=\"%f\"/>\n", escaped_name, *((gdouble*)v));
+			g_print("\t<stat name=\"%s\" value=\"%f\"/>\n", escaped_name,
+				*((gdouble *) v));
 		else
-			g_print("%s=%f\n", (char*)k, *((gdouble*)v));
+			g_print("%s=%f\n", (char *) k, *((gdouble *) v));
 		g_free(escaped_name);
 	}
 
@@ -206,14 +181,13 @@ main_action(void)
 	guint i;
 	addr_info_t *ai;
 
-	for (i=0; i < addresses->len ;i++) {
+	for (i = 0; i < addresses->len; i++) {
 		ai = &g_array_index(addresses, addr_info_t, i);
 		_stat_addr(ai);
 	}
 }
 
-static struct grid_main_callbacks cb =
-{
+static struct grid_main_callbacks cb = {
 	.options = main_get_options,
 	.action = main_action,
 	.set_defaults = main_set_defaults,
@@ -228,4 +202,3 @@ main(int argc, char **argv)
 {
 	return grid_main_cli(argc, argv, &cb);
 }
-

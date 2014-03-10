@@ -1,22 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "grid.utils.transport.gridd"
+#define G_LOG_DOMAIN "grid.utils.transport.gridd"
 #endif
 
 #include <stddef.h>
@@ -25,15 +8,13 @@
 #include <string.h>
 #include <math.h>
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
 
-#include <metacomm.h>
-
-#include "./internals.h"
-#include "./hashstr.h"
-#include "./stats_holder.h"
-#include "./network_server.h"
-#include "./transport_gridd.h"
+#include "internals.h"
+#include "stats_holder.h"
+#include "network_server.h"
+#include "transport_gridd.h"
 
 struct cnx_data_s
 {
@@ -57,8 +38,10 @@ struct gridd_request_handler_s
 	const gchar *name;
 	gpointer hdata;
 	gpointer gdata;
-	gboolean (*handler) (struct gridd_reply_ctx_s *reply,
-			gpointer gdata, gpointer hdata);
+	     
+		 
+		 gboolean(*handler) (struct gridd_reply_ctx_s * reply,
+		gpointer gdata, gpointer hdata);
 	gchar stat_name_req[256];
 	gchar stat_name_time[256];
 };
@@ -95,7 +78,8 @@ static void transport_gridd_notify_error(struct network_client_s *clt);
 
 static void transport_gridd_clean_context(struct transport_client_context_s *);
 
-static gboolean _client_manage_l4v(struct network_client_s *clt, GByteArray *gba);
+static gboolean _client_manage_l4v(struct network_client_s *clt,
+	GByteArray * gba);
 
 /* -------------------------------------------------------------------------- */
 
@@ -103,24 +87,25 @@ static GQuark gquark_log = 0;
 
 void
 gridd_register_requests_stats(struct grid_stats_holder_s *stats,
-		struct gridd_request_dispatcher_s *disp)
+	struct gridd_request_dispatcher_s *disp)
 {
-	SERVER_ASSERT(stats != NULL);
-	SERVER_ASSERT(disp != NULL);
+	EXTRA_ASSERT(stats != NULL);
+	EXTRA_ASSERT(disp != NULL);
 
-	gboolean _traverser(gpointer k, gpointer v, gpointer u) {
-		(void) k; (void) u;
+	gboolean _traverser(gpointer k, gpointer v, gpointer u)
+	{
+		(void) k;
+		(void) u;
 		grid_stats_holder_increment(stats,
-				((struct gridd_request_handler_s*)(v))->stat_name_req, 0LLU,
-				((struct gridd_request_handler_s*)(v))->stat_name_time, 0LLU,
-				NULL);
+			((struct gridd_request_handler_s *) (v))->stat_name_req, 0LLU,
+			((struct gridd_request_handler_s *) (v))->stat_name_time, 0LLU,
+			NULL);
 		return FALSE;
 	}
 
 	grid_stats_holder_increment(stats,
-			INNER_STAT_NAME_REQ_TIME, 0LLU,
-			INNER_STAT_NAME_REQ_COUNTER, 0LLU,
-			NULL);
+		INNER_STAT_NAME_REQ_TIME, 0LLU,
+		INNER_STAT_NAME_REQ_COUNTER, 0LLU, NULL);
 	g_tree_foreach(disp->tree_requests, _traverser, NULL);
 }
 
@@ -140,10 +125,8 @@ gridd_request_dispatcher_clean(struct gridd_request_dispatcher_s *disp)
 }
 
 GError *
-transport_gridd_dispatcher_add_requests(
-		struct gridd_request_dispatcher_s *dispatcher,
-		const struct gridd_request_descr_s *descr,
-		gpointer gdata)
+transport_gridd_dispatcher_add_requests(struct gridd_request_dispatcher_s
+	*dispatcher, const struct gridd_request_descr_s *descr, gpointer gdata)
 {
 	const struct gridd_request_descr_s *d;
 
@@ -155,13 +138,14 @@ transport_gridd_dispatcher_add_requests(
 	if (!descr)
 		return g_error_new(gquark_log, EINVAL, "Invalid request descriptor");
 
-	for (d=descr; d && d->name && d->handler ;d++) {
+	for (d = descr; d && d->name && d->handler; d++) {
 		struct hashstr_s *hname;
 		struct gridd_request_handler_s *handler;
 
 		HASHSTR_ALLOCA(hname, d->name);
 		if (NULL != g_tree_lookup(dispatcher->tree_requests, hname))
-			return g_error_new(gquark_log, 500, "Overriding another request with '%s'", hashstr_str(hname));
+			return g_error_new(gquark_log, 500,
+				"Overriding another request with '%s'", hashstr_str(hname));
 
 		handler = g_malloc0(sizeof(*handler));
 		handler->name = d->name;
@@ -189,44 +173,45 @@ transport_gridd_build_empty_dispatcher(void)
 		gquark_log = g_quark_from_static_string("utils.proto.gridd");
 
 	dispatcher = g_malloc0(sizeof(*dispatcher));
-	dispatcher->tree_requests = g_tree_new_full(
-			hashstr_quick_cmpdata, NULL, g_free, g_free);
+	dispatcher->tree_requests =
+		g_tree_new_full(hashstr_quick_cmpdata, NULL, g_free, g_free);
 	transport_gridd_dispatcher_add_requests(dispatcher,
-			gridd_get_common_requests(), NULL);
+		gridd_get_common_requests(), NULL);
 
 	return dispatcher;
 }
 
 struct gridd_request_dispatcher_s *
-transport_gridd_build_dispatcher( const struct gridd_request_descr_s *descr,
-		gpointer context)
+transport_gridd_build_dispatcher(const struct gridd_request_descr_s *descr,
+	gpointer context)
 {
 	struct gridd_request_dispatcher_s *dispatcher;
 
 	dispatcher = transport_gridd_build_empty_dispatcher();
 	if (descr)
-		(void) transport_gridd_dispatcher_add_requests(dispatcher, descr, context);
+		(void) transport_gridd_dispatcher_add_requests(dispatcher, descr,
+			context);
 	return dispatcher;
 }
 
 void
 transport_gridd_factory0(struct gridd_request_dispatcher_s *dispatcher,
-		struct network_client_s *client)
+	struct network_client_s *client)
 {
 	struct transport_client_context_s *transport_context;
 
 	if (!gquark_log)
 		gquark_log = g_quark_from_static_string("utils.proto.gridd");
 
-	SERVER_ASSERT(dispatcher != NULL);
-	SERVER_ASSERT(client != NULL);
-	SERVER_ASSERT(client->fd >= 0);
+	EXTRA_ASSERT(dispatcher != NULL);
+	EXTRA_ASSERT(client != NULL);
+	EXTRA_ASSERT(client->fd >= 0);
 
 	transport_context = g_malloc0(sizeof(*transport_context));
 	transport_context->dispatcher = dispatcher;
 	transport_context->gba_l4v = NULL;
 	transport_context->cnx_data = g_array_sized_new(FALSE, TRUE,
-			sizeof(struct cnx_data_s), 4);
+		sizeof(struct cnx_data_s), 4);
 
 	client->transport.client_context = transport_context;
 	client->transport.clean_context = transport_gridd_clean_context;
@@ -239,7 +224,7 @@ transport_gridd_factory0(struct gridd_request_dispatcher_s *dispatcher,
 /* -------------------------------------------------------------------------- */
 
 static void
-network_client_log_access(struct req_ctx_s *ctx, const gchar *fmt, ...)
+network_client_log_access(struct req_ctx_s *ctx, const gchar * fmt, ...)
 {
 	struct timeval now, diff;
 	GString *gstr;
@@ -267,14 +252,14 @@ network_client_log_access(struct req_ctx_s *ctx, const gchar *fmt, ...)
 /* -------------------------------------------------------------------------- */
 
 static inline guint32
-_l4v_size(GByteArray *gba)
+_l4v_size(GByteArray * gba)
 {
 	guint32 size;
 
-	SERVER_ASSERT(gba != NULL);
-	SERVER_ASSERT(gba->len >= 4);
+	EXTRA_ASSERT(gba != NULL);
+	EXTRA_ASSERT(gba->len >= 4);
 
-	size = *((guint32*)gba->data);
+	size = *((guint32 *) gba->data);
 	return g_ntohl(size);
 }
 
@@ -286,54 +271,54 @@ _request_get_name(struct message_s *req)
 
 	if (0 >= message_get_NAME(req, &name, &name_len, NULL))
 		return hashstr_create("");
-	if (!name || !name_len || !((guint8*)name))
+	if (!name || !name_len || !((guint8 *) name))
 		return hashstr_create("");
-	if (!*((guint8*)name) || !name_len)
+	if (!*((guint8 *) name) || !name_len)
 		return hashstr_create("");
-	return hashstr_create_len((gchar*)name, name_len);
+	return hashstr_create_len((gchar *) name, name_len);
 }
 
 static gchar *
-_req_get_hex_ID(MESSAGE req, gchar *d, gsize dsize)
+_req_get_hex_ID(MESSAGE req, gchar * d, gsize dsize)
 {
 	void *f;
 	gsize flen = 0;
 
-	*((int*)d) = 0;
-	
+	*((int *) d) = 0;
+
 	if (0 >= message_get_ID(req, &f, &flen, NULL))
 		*d = '-';
 	else {
-		buffer2str(f, MIN(flen,dsize/2), d, dsize);
+		buffer2str(f, MIN(flen, dsize / 2), d, dsize);
 	}
 
 	return d;
 }
 
 static gsize
-gba_read(GByteArray *gba, struct data_slab_s *ds, guint32 max)
+gba_read(GByteArray * gba, struct data_slab_s *ds, guint32 max)
 {
 	guint8 *data = NULL;
 	gsize data_size = 0;
 
-	SERVER_ASSERT(max >= gba->len);
+	EXTRA_ASSERT(max >= gba->len);
 	if (max <= gba->len)
 		return 0;
 
 	data_size = max - gba->len;
-	GRID_TRACE("About to consume a maximum of %"G_GSIZE_FORMAT" bytes among %"G_GSIZE_FORMAT,
-			data_size, data_slab_size(ds));
+	GRID_TRACE("About to consume a maximum of %" G_GSIZE_FORMAT " bytes among %"
+		G_GSIZE_FORMAT, data_size, data_slab_size(ds));
 
 	if (data_slab_consume(ds, &data, &data_size)) {
 		if (data_size > 0 && data)
 			g_byte_array_append(gba, data, data_size);
-		GRID_TRACE("Consumed %"G_GSIZE_FORMAT" bytes (now gba=%u ds=%"G_GSIZE_FORMAT")",
-				data_size, gba->len, data_slab_size(ds));
+		GRID_TRACE("Consumed %" G_GSIZE_FORMAT " bytes (now gba=%u ds=%"
+			G_GSIZE_FORMAT ")", data_size, gba->len, data_slab_size(ds));
 		return data_size;
 	}
 	else {
-		GRID_TRACE("consumed 0 bytes (now gba=%u ds=%"G_GSIZE_FORMAT")",
-				gba->len, data_slab_size(ds));
+		GRID_TRACE("consumed 0 bytes (now gba=%u ds=%" G_GSIZE_FORMAT ")",
+			gba->len, data_slab_size(ds));
 		return 0;
 	}
 }
@@ -361,14 +346,15 @@ _ctx_reset_cnx_data(struct transport_client_context_s *ctx)
 {
 	while (ctx->cnx_data->len > 0) {
 		register guint i = ctx->cnx_data->len - 1;
-		_cnx_data_reset(&g_array_index(ctx->cnx_data, struct cnx_data_s, i), FALSE);
+		_cnx_data_reset(&g_array_index(ctx->cnx_data, struct cnx_data_s, i),
+			FALSE);
 		g_array_remove_index_fast(ctx->cnx_data, i);
 	}
 }
 
 static void
 _ctx_append_cnx_data(struct transport_client_context_s *ctx,
-		const gchar *key, gpointer data, GDestroyNotify cleanup)
+	const gchar * key, gpointer data, GDestroyNotify cleanup)
 {
 	struct cnx_data_s cd;
 
@@ -380,13 +366,14 @@ _ctx_append_cnx_data(struct transport_client_context_s *ctx,
 
 static gboolean
 _ctx_replace_cnx_data(struct transport_client_context_s *ctx,
-		const gchar *key, gpointer data, GDestroyNotify cleanup)
+	const gchar * key, gpointer data, GDestroyNotify cleanup)
 {
 	guint i, max;
 	struct cnx_data_s *pdata;
 
-	for (i=0,max=ctx->cnx_data->len; i<max ;i++) {
+	for (i = 0, max = ctx->cnx_data->len; i < max; i++) {
 		pdata = &g_array_index(ctx->cnx_data, struct cnx_data_s, i);
+
 		if (!strcmp(pdata->key, key)) {
 			if (pdata->data && pdata->cleanup)
 				pdata->cleanup(pdata->data);
@@ -401,23 +388,24 @@ _ctx_replace_cnx_data(struct transport_client_context_s *ctx,
 
 static void
 _ctx_store_cnx_data(struct transport_client_context_s *ctx,
-		const gchar *key, gpointer data, GDestroyNotify cleanup)
+	const gchar * key, gpointer data, GDestroyNotify cleanup)
 {
 	if (!_ctx_replace_cnx_data(ctx, key, data, cleanup))
 		_ctx_append_cnx_data(ctx, key, data, cleanup);
 }
 
 static gboolean
-_ctx_forget_cnx_data(struct transport_client_context_s *ctx,
-		const gchar *key)
+_ctx_forget_cnx_data(struct transport_client_context_s *ctx, const gchar * key)
 {
 	guint i, max;
 	struct cnx_data_s *pdata;
 
-	for (i=0,max=ctx->cnx_data->len; i<max ;i++) {
+	for (i = 0, max = ctx->cnx_data->len; i < max; i++) {
 		pdata = &g_array_index(ctx->cnx_data, struct cnx_data_s, i);
+
 		if (!strcmp(pdata->key, key)) {
-			_cnx_data_reset(&g_array_index(ctx->cnx_data, struct cnx_data_s, i), TRUE);
+			_cnx_data_reset(&g_array_index(ctx->cnx_data, struct cnx_data_s, i),
+				TRUE);
 			g_array_remove_index_fast(ctx->cnx_data, i);
 			return TRUE;
 		}
@@ -427,13 +415,14 @@ _ctx_forget_cnx_data(struct transport_client_context_s *ctx,
 }
 
 static gpointer
-_ctx_get_cnx_data(struct transport_client_context_s *ctx, const gchar *key)
+_ctx_get_cnx_data(struct transport_client_context_s *ctx, const gchar * key)
 {
 	guint i, max;
 	struct cnx_data_s *pdata;
 
-	for (i=0,max=ctx->cnx_data->len; i<max ;i++) {
+	for (i = 0, max = ctx->cnx_data->len; i < max; i++) {
 		pdata = &g_array_index(ctx->cnx_data, struct cnx_data_s, i);
+
 		if (!strcmp(pdata->key, key))
 			return pdata->data;
 	}
@@ -446,8 +435,7 @@ _ctx_get_cnx_data(struct transport_client_context_s *ctx, const gchar *key)
 static void
 transport_gridd_notify_error(struct network_client_s *clt)
 {
-	SERVER_ASSERT(clt != NULL);
-	GRID_TRACE("Transport: error on fd=%d", clt->fd);
+	EXTRA_ASSERT(clt != NULL);
 	_ctx_reset_cnx_data(clt->transport.client_context);
 }
 
@@ -456,10 +444,8 @@ transport_gridd_notify_input(struct network_client_s *clt)
 {
 	struct transport_client_context_s *ctx;
 
-	SERVER_ASSERT(clt != NULL);
-	SERVER_ASSERT(clt->fd >= 0);
-	GRID_TRACE("fd=%d %s << Input ready (%"G_GSIZE_FORMAT")",
-			clt->fd, __FUNCTION__, data_slab_sequence_size(&(clt->input)));
+	EXTRA_ASSERT(clt != NULL);
+	EXTRA_ASSERT(clt->fd >= 0);
 
 	ctx = clt->transport.client_context;
 	/* read the data */
@@ -473,15 +459,12 @@ transport_gridd_notify_input(struct network_client_s *clt)
 		if (!(ds = data_slab_sequence_shift(&(clt->input))))
 			break;
 
-		data_slab_trace("CURRENT", ds);
-
 		if (!data_slab_has_data(ds)) {
 			data_slab_free(ds);
 			continue;
 		}
 
-		if (ctx->gba_l4v->len < 4) { /* read the size */
-			GRID_TRACE("fd=%d reading the size", clt->fd);
+		if (ctx->gba_l4v->len < 4) {	/* read the size */
 			gba_read(ctx->gba_l4v, ds, 4);
 			data_slab_sequence_unshift(&(clt->input), ds);
 			continue;
@@ -489,14 +472,13 @@ transport_gridd_notify_input(struct network_client_s *clt)
 
 		guint32 payload_size = _l4v_size(ctx->gba_l4v);
 
-		if (!payload_size) { /* empty message : reset the buffer */
-			GRID_TRACE("fd=%d empty message", clt->fd);
+		if (!payload_size) {	/* empty message : reset the buffer */
 			data_slab_sequence_unshift(&(clt->input), ds);
 			_ctx_reset(ctx);
 			continue;
 		}
 
-		if (payload_size > (1024 * 1024 * 1024)) { /* to big */
+		if (payload_size > (1024 * 1024 * 1024)) {	/* to big */
 			GRID_WARN("fd=%d Request too big (%u)", clt->fd, payload_size);
 			data_slab_sequence_unshift(&(clt->input), ds);
 			_ctx_reset(ctx);
@@ -504,15 +486,12 @@ transport_gridd_notify_input(struct network_client_s *clt)
 			return RC_ERROR;
 		}
 
-		GRID_TRACE("fd=%d reading the body (%"G_GUINT32_FORMAT")",
-				clt->fd, payload_size);
-
 		gba_read(ctx->gba_l4v, ds, payload_size + 4);
 		data_slab_sequence_unshift(&(clt->input), ds);
 		ds = NULL;
-		/*data_slab_sequence_trace(&(clt->input));*/
+		/*data_slab_sequence_trace(&(clt->input)); */
 
-		if (ctx->gba_l4v->len >= 4 + payload_size) { /* complete */
+		if (ctx->gba_l4v->len >= 4 + payload_size) {	/* complete */
 			if (!_client_manage_l4v(clt, ctx->gba_l4v)) {
 				network_client_close_output(clt, FALSE);
 				GRID_WARN("fd=%d Transport error", clt->fd);
@@ -522,7 +501,6 @@ transport_gridd_notify_input(struct network_client_s *clt)
 		}
 	}
 
-	GRID_TRACE("fd=%d input consumed", clt->fd);
 	return clt->transport.waiting_for_close ? RC_NODATA : RC_PROCESSED;
 }
 
@@ -543,7 +521,7 @@ transport_gridd_clean_context(struct transport_client_context_s *ctx)
 
 static inline void
 _notify_request(struct req_ctx_s *ctx,
-		const gchar *name_req, const gchar *name_time)
+	const gchar * name_req, const gchar * name_time)
 {
 	struct timeval tvnow, tvdiff;
 	guint64 e_s, e_us, e_sum;
@@ -556,11 +534,9 @@ _notify_request(struct req_ctx_s *ctx,
 	e_sum = e_s * 1000000LLU + e_us;
 
 	grid_stats_holder_increment(ctx->client->local_stats,
-			name_req, guint_to_guint64(1),
-			INNER_STAT_NAME_REQ_COUNTER, guint_to_guint64(1),
-			name_time, e_sum,
-			INNER_STAT_NAME_REQ_TIME, e_sum,
-			NULL);
+		name_req, guint_to_guint64(1),
+		INNER_STAT_NAME_REQ_COUNTER, guint_to_guint64(1),
+		name_time, e_sum, INNER_STAT_NAME_REQ_TIME, e_sum, NULL);
 }
 
 static gboolean
@@ -572,9 +548,10 @@ _reply_message(struct network_client_s *clt, struct message_s *reply)
 
 	rc = message_marshall(reply, &encoded, &encoded_size, NULL);
 	message_destroy(reply, NULL);
-	
+
 	if (rc) {
-		network_client_send_slab(clt, data_slab_make_buffer(encoded, encoded_size));
+		network_client_send_slab(clt, data_slab_make_buffer(encoded,
+				encoded_size));
 		return TRUE;
 	}
 
@@ -584,15 +561,15 @@ _reply_message(struct network_client_s *clt, struct message_s *reply)
 }
 
 static gboolean
-_client_reply_fixed(struct req_ctx_s *req_ctx, gint code, const gchar *msg)
+_client_reply_fixed(struct req_ctx_s *req_ctx, gint code, const gchar * msg)
 {
 	MESSAGE reply = NULL;
 
-	SERVER_ASSERT(!req_ctx->final_sent);
+	EXTRA_ASSERT(!req_ctx->final_sent);
 	if ((req_ctx->final_sent = is_code_final(code)))
 		network_client_log_access(req_ctx, "%s %s [%s] %d %s",
-				req_ctx->reqid, hashstr_str(req_ctx->reqname),
-				req_ctx->subject, code, msg);
+			req_ctx->reqid, hashstr_str(req_ctx->reqname),
+			req_ctx->subject, code, msg);
 	return metaXServer_reply_simple(&reply, req_ctx->request, code, msg, NULL)
 		&& _reply_message(req_ctx->client, reply);
 }
@@ -604,37 +581,42 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 	GHashTable *headers = NULL;
 	GByteArray *body = NULL;
 
-	void _add_header(const gchar *n, GByteArray *v) {
-		SERVER_ASSERT(!req_ctx->final_sent);
+	void _add_header(const gchar * n, GByteArray * v)
+	{
+		EXTRA_ASSERT(!req_ctx->final_sent);
 		if (v) {
 			if (!n)
 				metautils_gba_unref(v);
 			else {
 				if (!headers)
 					headers = g_hash_table_new_full(g_str_hash, g_str_equal,
-							g_free, metautils_gba_unref);
+						g_free, metautils_gba_unref);
 				g_hash_table_insert(headers, g_strdup(n), v);
 			}
 		}
 	}
-	void _add_body(GByteArray *b) {
-		SERVER_ASSERT(!req_ctx->final_sent);
+	void _add_body(GByteArray * b)
+	{
+		EXTRA_ASSERT(!req_ctx->final_sent);
 		if (body) {
 			metautils_gba_unref(body);
 			body = NULL;
 		}
 		body = b;
 	}
-	void _send_reply(gint code, gchar *msg) {
+	void _send_reply(gint code, gchar * msg)
+	{
 		struct message_s *answer = NULL;
 
-		SERVER_ASSERT(!req_ctx->final_sent);
-		GRID_DEBUG("fd=%d REPLY code=%d message=%s", req_ctx->client->fd, code, msg);
+		EXTRA_ASSERT(!req_ctx->final_sent);
+		GRID_DEBUG("fd=%d REPLY code=%d message=%s", req_ctx->client->fd, code,
+			msg);
 
 		/* Create the request */
-		if (!metaXServer_reply_simple(&answer, req_ctx->request, code, msg, NULL)) {
+		if (!metaXServer_reply_simple(&answer, req_ctx->request, code, msg,
+				NULL)) {
 			g_error("Memory allocation faire");
-			return ;
+			return;
 		}
 
 		/* add the body and the headers */
@@ -646,25 +628,27 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 		if (headers) {
 			GHashTableIter iter;
 			gpointer n, v;
+
 			g_hash_table_iter_init(&iter, headers);
 			while (g_hash_table_iter_next(&iter, &n, &v)) {
 				if (!n || !v)
 					continue;
-				message_add_field(answer, (gchar*)n, strlen((gchar*)n),
-						((GByteArray*)v)->data, ((GByteArray*)v)->len, NULL);
+				message_add_field(answer, (gchar *) n, strlen((gchar *) n),
+					((GByteArray *) v)->data, ((GByteArray *) v)->len, NULL);
 			}
 		}
 
 		/* encode and send */
 		if ((req_ctx->final_sent = is_code_final(code))) {
 			network_client_log_access(req_ctx, "%s %s [%s] %d %s",
-					req_ctx->reqid, hashstr_str(req_ctx->reqname),
-					req_ctx->subject, code, msg);
+				req_ctx->reqid, hashstr_str(req_ctx->reqname),
+				req_ctx->subject, code, msg);
 		}
 		_reply_message(req_ctx->client, answer);
 	}
-	void _send_error(gint code, GError *e) {
-		SERVER_ASSERT(!req_ctx->final_sent);
+	void _send_error(gint code, GError * e)
+	{
+		EXTRA_ASSERT(!req_ctx->final_sent);
 		if (!e) {
 			GRID_WARN("code=%d but no error", code);
 			_send_reply(code, "OK");
@@ -679,32 +663,36 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 			g_clear_error(&e);
 		}
 	}
-	void _subject(const gchar *fmt, ...) {
+	void _subject(const gchar * fmt, ...)
+	{
 		va_list args;
+
 		if (req_ctx->subject)
 			g_free(req_ctx->subject);
 		va_start(args, fmt);
 		req_ctx->subject = g_strdup_vprintf(fmt, args);
 		va_end(args);
 	}
-	void _register_cnx_data(const gchar *key, gpointer data,
-			GDestroyNotify cleanup) {
-		SERVER_ASSERT(key != NULL);
+	void _register_cnx_data(const gchar * key, gpointer data,
+		GDestroyNotify cleanup)
+	{
+		EXTRA_ASSERT(key != NULL);
 		_ctx_store_cnx_data(req_ctx->clt_ctx, key, data, cleanup);
 	}
-	void _forget_cnx_data(const gchar *key) {
-		SERVER_ASSERT(key != NULL);
+	void _forget_cnx_data(const gchar * key)
+	{
+		EXTRA_ASSERT(key != NULL);
 		_ctx_forget_cnx_data(req_ctx->clt_ctx, key);
 	}
-	gpointer _get_cnx_data(const gchar *key) {
-		SERVER_ASSERT(key != NULL);
+	gpointer _get_cnx_data(const gchar * key)
+	{
+		EXTRA_ASSERT(key != NULL);
 		return _ctx_get_cnx_data(req_ctx->clt_ctx, key);
 	}
 
 	gboolean rc = FALSE;
 	struct gridd_request_handler_s *hdl;
 
-	GRID_TRACE2("%s(%p)", __FUNCTION__, req_ctx);
 	/* reply data */
 	ctx.add_header = _add_header;
 	ctx.add_body = _add_body;
@@ -723,11 +711,11 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 	if (!hdl) {
 		rc = _client_reply_fixed(req_ctx, 404, "No handler found");
 		_notify_request(req_ctx,
-				GRID_STAT_PREFIX_REQ ".UNEXPECTED", 
-				GRID_STAT_PREFIX_TIME".UNEXPECTED");
+			GRID_STAT_PREFIX_REQ ".UNEXPECTED",
+			GRID_STAT_PREFIX_TIME ".UNEXPECTED");
 	}
 	else {
-		SERVER_ASSERT(hdl->handler != NULL);
+		EXTRA_ASSERT(hdl->handler != NULL);
 		rc = hdl->handler(&ctx, hdl->gdata, hdl->hdata);
 		_notify_request(req_ctx, hdl->stat_name_req, hdl->stat_name_time);
 	}
@@ -743,7 +731,7 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 }
 
 static gboolean
-_client_manage_l4v(struct network_client_s *client, GByteArray *gba)
+_client_manage_l4v(struct network_client_s *client, GByteArray * gba)
 {
 	gchar hexid[65];
 	struct req_ctx_s req_ctx;
@@ -752,9 +740,8 @@ _client_manage_l4v(struct network_client_s *client, GByteArray *gba)
 	MESSAGE request = NULL;
 	gsize offset;
 
-	GRID_TRACE2("%s(%p,%p)", __FUNCTION__, client, gba);
-	SERVER_ASSERT(gba != NULL);
-	SERVER_ASSERT(client != NULL);
+	EXTRA_ASSERT(gba != NULL);
+	EXTRA_ASSERT(client != NULL);
 	memset(&req_ctx, 0, sizeof(req_ctx));
 
 	if (!message_create(&request, NULL)) {
@@ -762,7 +749,7 @@ _client_manage_l4v(struct network_client_s *client, GByteArray *gba)
 		return FALSE;
 	}
 
-	req_ctx.subject = g_malloc0(sizeof(void*));
+	req_ctx.subject = g_malloc0(sizeof(void *));
 	req_ctx.final_sent = FALSE;
 	req_ctx.client = client;
 	gettimeofday(&(req_ctx.tvstart), NULL);
@@ -773,9 +760,9 @@ _client_manage_l4v(struct network_client_s *client, GByteArray *gba)
 	offset = gba->len;
 	if (!message_unmarshall(request, gba->data, &offset, &err)) {
 		network_client_log_access(&req_ctx,
-				"- - [] 400 Malformed ASN.1/BER Message");
+			"- - [] 400 Malformed ASN.1/BER Message");
 		GRID_INFO("fd=%d ASN.1 decoder error: (%d) %s",
-				client->fd, err->code, err->message);
+			client->fd, err->code, err->message);
 		goto label_exit;
 	}
 
@@ -815,14 +802,16 @@ label_exit:
 
 static gboolean
 dispatch_LISTHANDLERS(struct gridd_reply_ctx_s *reply,
-		gpointer gdata, gpointer hdata)
+	gpointer gdata, gpointer hdata)
 {
 	GByteArray *body;
 
-	gboolean _runner(gpointer k, gpointer v, gpointer u) {
+	gboolean _runner(gpointer k, gpointer v, gpointer u)
+	{
 		(void) v;
-		g_byte_array_append((GByteArray*)u, (guint8*)hashstr_str(k), hashstr_ulen(k));
-		g_byte_array_append((GByteArray*)u, (guint8*)"\n", 1);
+		g_byte_array_append((GByteArray *) u, (guint8 *) hashstr_str(k),
+			hashstr_ulen(k));
+		g_byte_array_append((GByteArray *) u, (guint8 *) "\n", 1);
 		return FALSE;
 	}
 
@@ -830,15 +819,15 @@ dispatch_LISTHANDLERS(struct gridd_reply_ctx_s *reply,
 	(void) hdata;
 
 	body = g_byte_array_new();
-	g_tree_foreach(reply->client->transport.client_context->dispatcher->tree_requests, _runner, body);
+	g_tree_foreach(reply->client->transport.client_context->dispatcher->
+		tree_requests, _runner, body);
 	reply->add_body(body);
 	reply->send_reply(200, "OK");
 	return TRUE;
 }
 
 static gboolean
-dispatch_PING(struct gridd_reply_ctx_s *reply,
-		gpointer gdata, gpointer hdata)
+dispatch_PING(struct gridd_reply_ctx_s *reply, gpointer gdata, gpointer hdata)
 {
 	(void) gdata;
 	(void) hdata;
@@ -847,13 +836,14 @@ dispatch_PING(struct gridd_reply_ctx_s *reply,
 }
 
 static gboolean
-dispatch_STATS(struct gridd_reply_ctx_s *reply,
-		gpointer gdata, gpointer hdata)
+dispatch_STATS(struct gridd_reply_ctx_s *reply, gpointer gdata, gpointer hdata)
 {
-	gboolean runner(const gchar *n, guint64 v) {
+	gboolean runner(const gchar * n, guint64 v)
+	{
 		gchar *name, value[64];
+
 		name = g_strdup_printf("stat:%s", n);
-		g_snprintf(value, sizeof(value), "%"G_GUINT64_FORMAT, v);
+		g_snprintf(value, sizeof(value), "%" G_GUINT64_FORMAT, v);
 		reply->add_header(name, metautils_gba_from_string(value));
 		g_free(name);
 		return TRUE;
@@ -861,14 +851,14 @@ dispatch_STATS(struct gridd_reply_ctx_s *reply,
 
 	(void) gdata;
 	(void) hdata;
-	grid_stats_holder_foreach(reply->client->main_stats, NULL, runner);	
+	grid_stats_holder_foreach(reply->client->main_stats, NULL, runner);
 	reply->send_reply(200, "OK");
 	return TRUE;
 }
 
 static gboolean
 dispatch_VERSION(struct gridd_reply_ctx_s *reply,
-		gpointer gdata, gpointer hdata)
+	gpointer gdata, gpointer hdata)
 {
 	(void) gdata;
 	(void) hdata;
@@ -876,17 +866,16 @@ dispatch_VERSION(struct gridd_reply_ctx_s *reply,
 	return TRUE;
 }
 
-const struct gridd_request_descr_s*
+const struct gridd_request_descr_s *
 gridd_get_common_requests(void)
 {
 	static struct gridd_request_descr_s descriptions[] = {
-		{"PING",          dispatch_PING,          NULL},
-		{"REQ_STATS",     dispatch_STATS,         NULL},
-		{"REQ_VERSION",   dispatch_VERSION,       NULL},
-		{"REQ_HANDLERS",  dispatch_LISTHANDLERS,  NULL},
+		{"PING", dispatch_PING, NULL},
+		{"REQ_STATS", dispatch_STATS, NULL},
+		{"REQ_VERSION", dispatch_VERSION, NULL},
+		{"REQ_HANDLERS", dispatch_LISTHANDLERS, NULL},
 		{NULL, NULL, NULL}
 	};
 
 	return descriptions;
 }
-

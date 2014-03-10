@@ -1,22 +1,17 @@
 #ifndef GRIDSTORAGE__META2_REMOTE_INTERNALS__H
-# define GRIDSTORAGE__META2_REMOTE_INTERNALS__H 1
-# ifdef HAVE_CONFIG_H
-#  include "../config.h"
-# endif
-# ifndef LOG_DOMAIN
-#  define LOG_DOMAIN "meta2.remote"
-# endif
-# include <stdlib.h>
-# include <errno.h>
-# include <string.h>
-# include <unistd.h>
-# include <glib.h>
-# include <metatypes.h>
-# include <metautils.h>
-# include <metacomm.h>
-# include "./meta2_remote.h"
+#define GRIDSTORAGE__META2_REMOTE_INTERNALS__H 1
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "meta2.remote"
+#endif
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
+#include <meta2/remote/meta2_remote.h>
 
-# define STRING_2_GBA(res,st,st_len) do {\
+#define STRING_2_GBA(res,st,st_len) do {\
 	(res)=NULL;\
 	GByteArray *gba = g_byte_array_new();\
 	if (!gba) { (res) = NULL; break; }\
@@ -24,7 +19,7 @@
 	(res) = gba;\
 } while (0)
 
-# define STRUCT_2_GBA(res,st) do {\
+#define STRUCT_2_GBA(res,st) do {\
 	GByteArray *gba = g_byte_array_new();\
 	if (!gba) { (res) = NULL; break; }\
 	g_byte_array_append( gba, (void*)(&(st)), sizeof(st));\
@@ -47,6 +42,6 @@
 
 #define STATIC_STRLEN(S) (S),sizeof(S)-1
 
-MESSAGE meta2_remote_build_request(GError **err, GByteArray *id, char *name);
+MESSAGE meta2_remote_build_request(GError ** err, GByteArray * id, char *name);
 
 #endif

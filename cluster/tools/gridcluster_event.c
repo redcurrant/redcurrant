@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gridcluster.tools"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gridcluster.tools"
 #endif
 
 #include <errno.h>
@@ -29,25 +9,21 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <glib.h>
-
-#include <metautils.h>
-#include <metacomm.h>
-#include <common_main.h>
-
-#include "../events/gridcluster_events.h"
-#include "../events/gridcluster_eventsremote.h"
-#include "../events/gridcluster_eventhandler.h"
-#include "../lib/gridcluster.h"
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
+#include <cluster/events/gridcluster_events.h>
+#include <cluster/events/gridcluster_eventsremote.h>
+#include <cluster/events/gridcluster_eventhandler.h>
+#include <cluster/lib/gridcluster.h>
 
 static gboolean flag_fancy = FALSE;
 
-static GSList *list_paths = NULL; 
+static GSList *list_paths = NULL;
 
 /* ------------------------------------------------------------------------- */
 
-static gridcluster_event_t*
-event_load(const gchar *path)
+static gridcluster_event_t *
+event_load(const gchar * path)
 {
 	gboolean rc;
 	gchar *ueid = NULL;
@@ -60,19 +36,22 @@ event_load(const gchar *path)
 
 	rc = g_file_get_contents(path, &encoded, &encoded_size, &local_error);
 	if (!rc || !encoded || !encoded_size) {
-		GRID_ERROR("UEID[%s] g_file_get_contents(%s) rc=%d encoded=%p %"G_GSIZE_FORMAT" bytes : %s",
-			ueid, path, rc, encoded, encoded_size, gerror_get_message(local_error));
+		GRID_ERROR("UEID[%s] g_file_get_contents(%s) rc=%d encoded=%p %"
+			G_GSIZE_FORMAT " bytes : %s", ueid, path, rc, encoded, encoded_size,
+			gerror_get_message(local_error));
 		goto label_free_ueid;
 	}
 	else {
-		GRID_DEBUG("UEID[%s] g_file_get_contents(%s) rc=%d encoded=%p %"G_GSIZE_FORMAT" bytes",
-			ueid, path, rc, encoded, encoded_size);
+		GRID_DEBUG("UEID[%s] g_file_get_contents(%s) rc=%d encoded=%p %"
+			G_GSIZE_FORMAT " bytes", ueid, path, rc, encoded, encoded_size);
 	}
 
-	event = gridcluster_decode_event2((guint8*)encoded, encoded_size, &local_error);
+	event =
+		gridcluster_decode_event2((guint8 *) encoded, encoded_size,
+		&local_error);
 	if (!event) {
 		GRID_ERROR("UEID[%s] gridcluster_decode_event2(...) : %s",
-				ueid, gerror_get_message(local_error));
+			ueid, gerror_get_message(local_error));
 	}
 
 	g_free(encoded);
@@ -85,15 +64,16 @@ label_free_ueid:
 }
 
 static gboolean
-gba_is_printable(GByteArray *gba)
+gba_is_printable(GByteArray * gba)
 {
 	gsize i;
 
 	g_assert(gba != NULL);
 	g_assert(!gba->len || gba->data != NULL);
 
-	for (i=0; i<gba->len ;i++) {
+	for (i = 0; i < gba->len; i++) {
 		gchar c = (gchar) gba->data[i];
+
 		if (c && !g_ascii_isspace(c) && !g_ascii_isprint(c))
 			return FALSE;
 	}
@@ -101,15 +81,15 @@ gba_is_printable(GByteArray *gba)
 }
 
 static void
-event_dump(const gchar *path, gridcluster_event_t *event)
+event_dump(const gchar * path, gridcluster_event_t * event)
 {
 	GList *list_keys, *l;
 
 	(void) path;
 
 	list_keys = g_hash_table_get_keys(event);
-	list_keys = g_list_sort(list_keys, (GCompareFunc)g_ascii_strcasecmp);
-	for (l=list_keys; l ;l=l->next) {
+	list_keys = g_list_sort(list_keys, (GCompareFunc) g_ascii_strcasecmp);
+	for (l = list_keys; l; l = l->next) {
 		gsize i;
 		gchar *k;
 		GByteArray *value;
@@ -118,7 +98,7 @@ event_dump(const gchar *path, gridcluster_event_t *event)
 		k = l->data;
 		value = g_hash_table_lookup(event, k);
 		is_printable = gba_is_printable(value);
-	
+
 		/* Header */
 		if (flag_fancy)
 			g_print("[%s] : size=%u\n\t[", k, value->len);
@@ -129,23 +109,34 @@ event_dump(const gchar *path, gridcluster_event_t *event)
 
 		/* Body */
 		if (is_printable) {
-			for (i=0; i<value->len ;i++) {
+			for (i = 0; i < value->len; i++) {
 				gchar c = (gchar) value->data[i];
+
 				switch (c) {
-					case '\0': g_print("\\0"); break;
-					case '\t': g_print("\\t"); break;
-					case '\n': g_print("\\n"); break;
-					case '\r': g_print("\\r"); break;
-					default: g_print("%c", c); break;
+					case '\0':
+						g_print("\\0");
+						break;
+					case '\t':
+						g_print("\\t");
+						break;
+					case '\n':
+						g_print("\\n");
+						break;
+					case '\r':
+						g_print("\\r");
+						break;
+					default:
+						g_print("%c", c);
+						break;
 				}
 			}
 		}
 		else {
 			g_print("0x");
-			for (i=0; i<value->len ;i++)
+			for (i = 0; i < value->len; i++)
 				g_print("%02X", value->data[i]);
 		}
-	
+
 		/* End of Value */
 		if (flag_fancy)
 			g_print("]\n");
@@ -164,12 +155,12 @@ main_action(void)
 
 	list_length = g_slist_length(list_paths);
 
-	for (l=list_paths; l ;l=l->next) {
+	for (l = list_paths; l; l = l->next) {
 		gchar *path = l->data;
 
 		g_print("# file: %s\n", path);
 		if (NULL != (event = event_load(path))) {
-			event_dump(list_length>1 ? path : NULL, event);
+			event_dump(list_length > 1 ? path : NULL, event);
 			g_hash_table_destroy(event);
 		}
 		else
@@ -182,7 +173,7 @@ main_configure(int argc, char **args)
 {
 	int i;
 
-	for (i=0; i<argc ;i++)
+	for (i = 0; i < argc; i++)
 		list_paths = g_slist_prepend(list_paths, g_strdup(args[i]));
 
 	return TRUE;
@@ -197,13 +188,13 @@ main_specific_fini(void)
 	}
 }
 
-static struct grid_main_option_s*
+static struct grid_main_option_s *
 main_get_options(void)
 {
 	static struct grid_main_option_s options[] = {
-		{"FormatFancy", OT_BOOL, {.b=&flag_fancy},
+		{"FormatFancy", OT_BOOL, {.b = &flag_fancy},
 			"Pretty printing"},
-		{NULL, 0, {.b=0}, NULL}
+		{NULL, 0, {.b = 0}, NULL}
 	};
 
 	return options;
@@ -216,10 +207,11 @@ main_set_defaults(void)
 	list_paths = NULL;
 }
 
-static const gchar*
+static const gchar *
 main_get_usage(void)
 {
-	static gchar xtra_usage[] = "\tPATH...\n" ;
+	static gchar xtra_usage[] = "\tPATH...\n";
+
 	return xtra_usage;
 }
 
@@ -228,8 +220,7 @@ main_specific_stop(void)
 {
 }
 
-static struct grid_main_callbacks cb =
-{
+static struct grid_main_callbacks cb = {
 	.options = main_get_options,
 	.action = main_action,
 	.set_defaults = main_set_defaults,
@@ -244,4 +235,3 @@ main(int argc, char **argv)
 {
 	return grid_main_cli(argc, argv, &cb);
 }
-

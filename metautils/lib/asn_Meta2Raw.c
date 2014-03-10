@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "metacomm.meta2_raw.asn"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metacomm.meta2_raw.asn"
 #endif
 
 #include <errno.h>
@@ -52,7 +32,8 @@
 void
 meta2_raw_content_cleanASN(Meta2RawContent_t * asn, gboolean only_content)
 {
-	void free_asn1_chunk(Meta2RawChunk_t * chunk) {
+	void free_asn1_chunk(Meta2RawChunk_t * chunk)
+	{
 		meta2_raw_chunk_cleanASN(chunk, FALSE);
 	}
 
@@ -72,7 +53,8 @@ meta2_raw_content_cleanASN(Meta2RawContent_t * asn, gboolean only_content)
 }
 
 gboolean
-meta2_raw_content_ASN2API(const Meta2RawContent_t * src, struct meta2_raw_content_s *dst)
+meta2_raw_content_ASN2API(const Meta2RawContent_t * src,
+	struct meta2_raw_content_s *dst)
 {
 	int i;
 
@@ -90,11 +72,13 @@ meta2_raw_content_ASN2API(const Meta2RawContent_t * src, struct meta2_raw_conten
 
 	asn_INTEGER_to_uint32(&(src->header.nbChunks), &(dst->nb_chunks));
 	asn_INTEGER_to_int64(&(src->header.size), &(dst->size));
-	/* if(NULL != src->header.version) {
+	/* asn_INTEGER_to_int64(&(src->header.version), &(dst->version)); */
+	if (NULL != src->header.version) {
 		asn_INTEGER_to_int64(src->header.version, &(dst->version));
-	} else {
-		dst->version = 1;
-	} */
+	}
+	else {
+		dst->version = 0;
+	}
 	g_memmove(dst->path, src->header.path.buf, src->header.path.size);
 	g_memmove(&(dst->flags), src->header.flags.buf, src->header.flags.size);
 	g_memmove(dst->container_id, src->header.cID.buf, src->header.cID.size);
@@ -105,16 +89,19 @@ meta2_raw_content_ASN2API(const Meta2RawContent_t * src, struct meta2_raw_conten
 			errno = 0;
 			return FALSE;
 		}
-		g_byte_array_append(dst->metadata, src->header.metadata->buf, src->header.metadata->size);
+		g_byte_array_append(dst->metadata, src->header.metadata->buf,
+			src->header.metadata->size);
 	}
 
 	if (src->header.systemMetadata) {
-		dst->system_metadata = g_byte_array_sized_new(src->header.systemMetadata->size);
+		dst->system_metadata =
+			g_byte_array_sized_new(src->header.systemMetadata->size);
 		if (!dst->system_metadata) {
 			errno = 0;
 			return FALSE;
 		}
-		g_byte_array_append(dst->system_metadata, src->header.systemMetadata->buf, src->header.systemMetadata->size);
+		g_byte_array_append(dst->system_metadata,
+			src->header.systemMetadata->buf, src->header.systemMetadata->size);
 	}
 
 	/*map the chunks */
@@ -123,7 +110,7 @@ meta2_raw_content_ASN2API(const Meta2RawContent_t * src, struct meta2_raw_conten
 		Meta2RawChunk_t *chunk_asn;
 
 		chunk_asn = src->chunks.list.array[i];
-		if (!chunk_asn) /* Skip NULL chunks */
+		if (!chunk_asn)			/* Skip NULL chunks */
 			continue;
 
 		chunk_api = g_try_malloc0(sizeof(struct meta2_raw_chunk_s));
@@ -147,7 +134,8 @@ meta2_raw_content_ASN2API(const Meta2RawContent_t * src, struct meta2_raw_conten
 }
 
 gboolean
-meta2_raw_content_API2ASN(const struct meta2_raw_content_s * src, Meta2RawContent_t * dst)
+meta2_raw_content_API2ASN(const struct meta2_raw_content_s * src,
+	Meta2RawContent_t * dst)
 {
 	GSList *c;
 
@@ -159,31 +147,34 @@ meta2_raw_content_API2ASN(const struct meta2_raw_content_s * src, Meta2RawConten
 	bzero(dst, sizeof(*dst));
 
 	OCTET_STRING_fromBuf(&(dst->header.path), src->path, strlen(src->path));
-	OCTET_STRING_fromBuf(&(dst->header.cID), (char *) src->container_id, sizeof(container_id_t));
-	OCTET_STRING_fromBuf(&(dst->header.flags), (char *) &(src->flags), sizeof(src->flags));
+	OCTET_STRING_fromBuf(&(dst->header.cID), (char *) src->container_id,
+		sizeof(container_id_t));
+	OCTET_STRING_fromBuf(&(dst->header.flags), (char *) &(src->flags),
+		sizeof(src->flags));
 	asn_int64_to_INTEGER(&(dst->header.size), src->size);
 	asn_uint32_to_INTEGER(&(dst->header.nbChunks), src->nb_chunks);
 
 	/* OPTIONAL FIELDS : since 1.8 */
-	/* dst->header.version = g_malloc0(sizeof(INTEGER_t));	
-	asn_int64_to_INTEGER(dst->header.version, src->version);
 
-	dst->header.deleted = g_malloc0(sizeof(BOOLEAN_t));
-	memcpy(dst->header.deleted, &dst->header.deleted, sizeof(int)); */
-	
+	if (src->version > 0)
+		dst->header.version = g_malloc0(sizeof(INTEGER_t));
+	asn_int64_to_INTEGER(dst->header.version, src->version);
 
 	if (src->metadata && src->metadata->len > 0 && src->metadata->data) {
 		dst->header.metadata = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
-				(const char*)src->metadata->data, src->metadata->len);
+			(const char *) src->metadata->data, src->metadata->len);
 		if (!dst->header.metadata) {
 			errno = 0;
 			return FALSE;
 		}
 	}
 
-	if (src->system_metadata && src->system_metadata->len > 0 && src->system_metadata->data) {
-		dst->header.systemMetadata = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
-				(const char*)src->system_metadata->data, src->system_metadata->len);
+	if (src->system_metadata && src->system_metadata->len > 0
+		&& src->system_metadata->data) {
+		dst->header.systemMetadata =
+			OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
+			(const char *) src->system_metadata->data,
+			src->system_metadata->len);
 		if (!dst->header.systemMetadata) {
 			errno = 0;
 			return FALSE;
@@ -195,7 +186,7 @@ meta2_raw_content_API2ASN(const struct meta2_raw_content_s * src, Meta2RawConten
 		Meta2RawChunk_t *chunk_asn;
 		struct meta2_raw_chunk_s *chunk_api;
 
-		if (!c->data) /* skip NULL chunks */
+		if (!c->data)			/* skip NULL chunks */
 			continue;
 
 		chunk_api = (struct meta2_raw_chunk_s *) (c->data);
@@ -221,7 +212,8 @@ meta2_raw_content_API2ASN(const struct meta2_raw_content_s * src, Meta2RawConten
 /* RAW Chunks -------------------------------------------------------------- */
 
 gboolean
-meta2_raw_chunk_API2ASN(const struct meta2_raw_chunk_s * src, Meta2RawChunk_t * dst)
+meta2_raw_chunk_API2ASN(const struct meta2_raw_chunk_s * src,
+	Meta2RawChunk_t * dst)
 {
 	if (!src || !dst) {
 		errno = EINVAL;
@@ -233,12 +225,14 @@ meta2_raw_chunk_API2ASN(const struct meta2_raw_chunk_s * src, Meta2RawChunk_t * 
 	chunk_id_API2ASN(&(src->id), &(dst->id));
 	asn_uint32_to_INTEGER(&(dst->position), src->position);
 	asn_int64_to_INTEGER(&(dst->size), src->size);
-	OCTET_STRING_fromBuf(&(dst->flags), (char *) (&(src->flags)), sizeof(src->flags));
-	OCTET_STRING_fromBuf(&(dst->hash), (char *) (&(src->hash)), sizeof(src->hash));
+	OCTET_STRING_fromBuf(&(dst->flags), (char *) (&(src->flags)),
+		sizeof(src->flags));
+	OCTET_STRING_fromBuf(&(dst->hash), (char *) (&(src->hash)),
+		sizeof(src->hash));
 
 	if (src->metadata && src->metadata->data && src->metadata->len > 0) {
 		dst->metadata = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
-		    (const char*)src->metadata->data, src->metadata->len);
+			(const char *) src->metadata->data, src->metadata->len);
 		if (!dst->metadata) {
 			errno = ENOMEM;
 			return FALSE;
@@ -250,7 +244,8 @@ meta2_raw_chunk_API2ASN(const struct meta2_raw_chunk_s * src, Meta2RawChunk_t * 
 }
 
 gboolean
-meta2_raw_chunk_ASN2API(const Meta2RawChunk_t * src, struct meta2_raw_chunk_s * dst)
+meta2_raw_chunk_ASN2API(const Meta2RawChunk_t * src,
+	struct meta2_raw_chunk_s * dst)
 {
 	if (!src || !dst) {
 		errno = EINVAL;
@@ -271,7 +266,8 @@ meta2_raw_chunk_ASN2API(const Meta2RawChunk_t * src, struct meta2_raw_chunk_s * 
 			errno = ENOMEM;
 			return FALSE;
 		}
-		g_byte_array_append(dst->metadata, src->metadata->buf, src->metadata->size);
+		g_byte_array_append(dst->metadata, src->metadata->buf,
+			src->metadata->size);
 	}
 
 	errno = 0;
@@ -279,7 +275,7 @@ meta2_raw_chunk_ASN2API(const Meta2RawChunk_t * src, struct meta2_raw_chunk_s * 
 }
 
 void
-meta2_raw_chunk_cleanASN(Meta2RawChunk_t *asn, gboolean only_content)
+meta2_raw_chunk_cleanASN(Meta2RawChunk_t * asn, gboolean only_content)
 {
 	if (!asn) {
 		errno = EINVAL;
@@ -297,8 +293,8 @@ meta2_raw_chunk_cleanASN(Meta2RawChunk_t *asn, gboolean only_content)
 /* RAW Content header ------------------------------------------------------ */
 
 gboolean
-meta2_raw_content_header_ASN2API(const Meta2RawContentHeader_t *asn,
-		meta2_raw_content_header_t *api)
+meta2_raw_content_header_ASN2API(const Meta2RawContentHeader_t * asn,
+	meta2_raw_content_header_t * api)
 {
 	if (!asn || !api) {
 		errno = EINVAL;
@@ -319,16 +315,19 @@ meta2_raw_content_header_ASN2API(const Meta2RawContentHeader_t *asn,
 			errno = ENOMEM;
 			return FALSE;
 		}
-		g_byte_array_append(api->metadata, asn->metadata->buf, asn->metadata->size);
+		g_byte_array_append(api->metadata, asn->metadata->buf,
+			asn->metadata->size);
 	}
 
 	if (asn->systemMetadata) {
-		api->system_metadata = g_byte_array_sized_new(asn->systemMetadata->size);
+		api->system_metadata =
+			g_byte_array_sized_new(asn->systemMetadata->size);
 		if (!api->system_metadata) {
 			errno = ENOMEM;
 			return FALSE;
 		}
-		g_byte_array_append(api->system_metadata, asn->systemMetadata->buf, asn->systemMetadata->size);
+		g_byte_array_append(api->system_metadata, asn->systemMetadata->buf,
+			asn->systemMetadata->size);
 	}
 
 	errno = 0;
@@ -336,8 +335,8 @@ meta2_raw_content_header_ASN2API(const Meta2RawContentHeader_t *asn,
 }
 
 gboolean
-meta2_raw_content_header_API2ASN(const meta2_raw_content_header_t *api,
-	Meta2RawContentHeader_t *asn)
+meta2_raw_content_header_API2ASN(const meta2_raw_content_header_t * api,
+	Meta2RawContentHeader_t * asn)
 {
 	if (!asn || !api) {
 		errno = EINVAL;
@@ -346,16 +345,18 @@ meta2_raw_content_header_API2ASN(const meta2_raw_content_header_t *api,
 
 	bzero(asn, sizeof(*asn));
 
-	OCTET_STRING_fromBuf( &(asn->path), api->path, strlen(api->path));
-	OCTET_STRING_fromBuf( &(asn->cID), (char *) api->container_id, sizeof(container_id_t));
-	OCTET_STRING_fromBuf( &(asn->flags), (char *) &(api->flags), sizeof(api->flags));
-	asn_int64_to_INTEGER( &(asn->size), api->size);
+	OCTET_STRING_fromBuf(&(asn->path), api->path, strlen(api->path));
+	OCTET_STRING_fromBuf(&(asn->cID), (char *) api->container_id,
+		sizeof(container_id_t));
+	OCTET_STRING_fromBuf(&(asn->flags), (char *) &(api->flags),
+		sizeof(api->flags));
+	asn_int64_to_INTEGER(&(asn->size), api->size);
 	asn_uint32_to_INTEGER(&(asn->nbChunks), api->nb_chunks);
 
 	/*user metadata */
 	if (api->metadata && api->metadata->len > 0 && api->metadata->data) {
 		asn->metadata = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
-		    (const char*)api->metadata->data, api->metadata->len);
+			(const char *) api->metadata->data, api->metadata->len);
 		if (!asn->metadata) {
 			errno = ENOMEM;
 			return FALSE;
@@ -363,9 +364,12 @@ meta2_raw_content_header_API2ASN(const meta2_raw_content_header_t *api,
 	}
 
 	/*system metadata */
-	if (api->system_metadata && api->system_metadata->len > 0 && api->system_metadata->data) {
-		asn->systemMetadata = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
-		    (const char*)api->system_metadata->data, api->system_metadata->len);
+	if (api->system_metadata && api->system_metadata->len > 0
+		&& api->system_metadata->data) {
+		asn->systemMetadata =
+			OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
+			(const char *) api->system_metadata->data,
+			api->system_metadata->len);
 		if (!asn->systemMetadata) {
 			errno = ENOMEM;
 			return FALSE;
@@ -377,7 +381,8 @@ meta2_raw_content_header_API2ASN(const meta2_raw_content_header_t *api,
 }
 
 void
-meta2_raw_content_header_cleanASN(Meta2RawContentHeader_t *asn, gboolean only_content)
+meta2_raw_content_header_cleanASN(Meta2RawContentHeader_t * asn,
+	gboolean only_content)
 {
 	if (!asn) {
 		errno = EINVAL;
@@ -395,7 +400,8 @@ meta2_raw_content_header_cleanASN(Meta2RawContentHeader_t *asn, gboolean only_co
 /* RAW Content V2 ---------------------------------------------------------- */
 
 gboolean
-meta2_raw_content_v2_ASN2API(const Meta2RawContentV2_t *asn, meta2_raw_content_v2_t *api)
+meta2_raw_content_v2_ASN2API(const Meta2RawContentV2_t * asn,
+	meta2_raw_content_v2_t * api)
 {
 	int i;
 
@@ -415,7 +421,7 @@ meta2_raw_content_v2_ASN2API(const Meta2RawContentV2_t *asn, meta2_raw_content_v
 		struct meta2_raw_chunk_s *c_api = NULL;
 		Meta2RawChunk_t *c_asn = NULL;
 
-		if (!(c_asn = asn->chunks.list.array[i])) /* Skip NULL's */
+		if (!(c_asn = asn->chunks.list.array[i]))	/* Skip NULL's */
 			continue;
 		if (!(c_api = g_try_malloc0(sizeof(*c_api)))) {
 			errno = ENOMEM;
@@ -436,7 +442,7 @@ meta2_raw_content_v2_ASN2API(const Meta2RawContentV2_t *asn, meta2_raw_content_v
 		service_info_t *c_api = NULL;
 		ServiceInfo_t *c_asn = NULL;
 
-		if (!(c_asn = asn->services.list.array[i])) /* Skip NULL's */
+		if (!(c_asn = asn->services.list.array[i]))	/* Skip NULL's */
 			continue;
 		if (!(c_api = g_try_malloc0(sizeof(*c_api)))) {
 			errno = ENOMEM;
@@ -457,7 +463,7 @@ meta2_raw_content_v2_ASN2API(const Meta2RawContentV2_t *asn, meta2_raw_content_v
 		meta2_property_t *c_api = NULL;
 		Meta2Property_t *c_asn = NULL;
 
-		if (!(c_asn = asn->properties.list.array[i])) /* Skip NULL's */
+		if (!(c_asn = asn->properties.list.array[i]))	/* Skip NULL's */
 			continue;
 		if (!(c_api = g_try_malloc0(sizeof(*c_api)))) {
 			errno = ENOMEM;
@@ -481,7 +487,8 @@ label_error:
 }
 
 gboolean
-meta2_raw_content_v2_API2ASN(const meta2_raw_content_v2_t *api, Meta2RawContentV2_t *asn)
+meta2_raw_content_v2_API2ASN(const meta2_raw_content_v2_t * api,
+	Meta2RawContentV2_t * asn)
 {
 	GSList *l;
 
@@ -497,7 +504,7 @@ meta2_raw_content_v2_API2ASN(const meta2_raw_content_v2_t *api, Meta2RawContentV
 		return FALSE;
 
 	/* chunks */
-	for (l=api->raw_chunks; l ;l=l->next) {
+	for (l = api->raw_chunks; l; l = l->next) {
 		Meta2RawChunk_t *chunk_asn;
 		struct meta2_raw_chunk_s *chunk_api;
 
@@ -516,7 +523,7 @@ meta2_raw_content_v2_API2ASN(const meta2_raw_content_v2_t *api, Meta2RawContentV
 	}
 
 	/* Services */
-	for (l=api->raw_services; l ;l=l->next) {
+	for (l = api->raw_services; l; l = l->next) {
 		ServiceInfo_t *si_asn;
 		service_info_t *si;
 
@@ -535,7 +542,7 @@ meta2_raw_content_v2_API2ASN(const meta2_raw_content_v2_t *api, Meta2RawContentV
 	}
 
 	/* Properties */
-	for (l=api->properties; l ;l=l->next) {
+	for (l = api->properties; l; l = l->next) {
 		Meta2Property_t *prop_asn;
 		meta2_property_t *prop_api;
 
@@ -561,15 +568,18 @@ label_error:
 }
 
 void
-meta2_raw_content_v2_cleanASN(Meta2RawContentV2_t *asn, gboolean only_content)
+meta2_raw_content_v2_cleanASN(Meta2RawContentV2_t * asn, gboolean only_content)
 {
-	void free_asn1_property(Meta2Property_t * prop) {
+	void free_asn1_property(Meta2Property_t * prop)
+	{
 		meta2_property_cleanASN(prop, FALSE);
 	}
-	void free_asn1_service(ServiceInfo_t * si) {
+	void free_asn1_service(ServiceInfo_t * si)
+	{
 		service_info_cleanASN(si, FALSE);
 	}
-	void free_asn1_chunk(Meta2RawChunk_t * chunk) {
+	void free_asn1_chunk(Meta2RawChunk_t * chunk)
+	{
 		meta2_raw_chunk_cleanASN(chunk, FALSE);
 	}
 	if (!asn) {
@@ -592,7 +602,7 @@ meta2_raw_content_v2_cleanASN(Meta2RawContentV2_t *asn, gboolean only_content)
 /* META2 properties -------------------------------------------------------- */
 
 void
-meta2_property_cleanASN(Meta2Property_t *asn, gboolean only_content)
+meta2_property_cleanASN(Meta2Property_t * asn, gboolean only_content)
 {
 	if (!asn) {
 		errno = EINVAL;
@@ -608,7 +618,7 @@ meta2_property_cleanASN(Meta2Property_t *asn, gboolean only_content)
 }
 
 gboolean
-meta2_property_ASN2API(const Meta2Property_t *asn, meta2_property_t *api)
+meta2_property_ASN2API(const Meta2Property_t * asn, meta2_property_t * api)
 {
 	if (!asn || !api) {
 		errno = EINVAL;
@@ -620,20 +630,20 @@ meta2_property_ASN2API(const Meta2Property_t *asn, meta2_property_t *api)
 	}
 
 	bzero(api, sizeof(*api));
-	
-	api->name = g_strndup((gchar*)asn->name.buf, asn->name.size);
+
+	api->name = g_strndup((gchar *) asn->name.buf, asn->name.size);
 	asn_INTEGER_to_int64(&(asn->version), &(api->version));
 	api->value = g_byte_array_new();
 
 	if (asn->value.size > 0 && asn->value.buf != NULL)
 		g_byte_array_append(api->value, asn->value.buf, asn->value.size);
-	
+
 	errno = 0;
 	return TRUE;
 }
 
 gboolean
-meta2_property_API2ASN(const meta2_property_t *api, Meta2Property_t *asn)
+meta2_property_API2ASN(const meta2_property_t * api, Meta2Property_t * asn)
 {
 	if (!api || !asn) {
 		errno = EINVAL;
@@ -650,7 +660,8 @@ meta2_property_API2ASN(const meta2_property_t *api, Meta2Property_t *asn)
 	asn_int64_to_INTEGER(&(asn->version), api->version);
 
 	if (api->value && api->value->data && api->value->len) {
-		OCTET_STRING_fromBuf(&(asn->value), (gchar*)api->value->data, api->value->len);
+		OCTET_STRING_fromBuf(&(asn->value), (gchar *) api->value->data,
+			api->value->len);
 	}
 	else {
 		OCTET_STRING_fromBuf(&(asn->value), "", 0);
@@ -659,4 +670,3 @@ meta2_property_API2ASN(const meta2_property_t *api, Meta2Property_t *asn)
 	errno = 0;
 	return TRUE;
 }
-

@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file broken_event.h
  */
@@ -29,14 +12,14 @@
  */
 
 #include <string.h>
-#include <metatypes.h>
+#include <metautils/lib/metatypes.h>
 
 /**
  * The list of chunk and content properties that can be checked by the integrity loop
  */
 enum broken_property_e
 {
-	P_CONTAINER_ID =1,		/**< container id */
+	P_CONTAINER_ID = 1,		/**< container id */
 	P_CONTENT_NAME,		/**< content name */
 	P_CONTENT_SIZE,		/**< content size */
 	P_CONTENT_CHUNK_NB,	/**< content chunk nb */
@@ -59,6 +42,8 @@ enum broken_reason_e
 	R_FORMAT	/**< The element property doesn't have the correct format */
 };
 
+extern const gchar *const reason_to_str[];
+
 /**
  * The list of broken locations
  */
@@ -68,6 +53,8 @@ enum broken_location_e
 	L_CHUNK,	/**< The element was missing or badly formated in chunk attributes */
 	L_META2		/**< The element was missing or badly formated in META2 */
 };
+
+extern const gchar *const loc_to_str[];
 
 /**
  * A broken element
@@ -80,7 +67,7 @@ struct broken_element_s
 	enum broken_location_e location;		/**< The location of the broken element */
 	enum broken_property_e property;		/**< The property broken in this element */
 	enum broken_reason_e reason;			/**< The reason this property is broken */
-	void * reference_value;				/**< The value the property should have if not broken */
+	void *reference_value;				/**< The value the property should have if not broken */
 };
 
 /**
@@ -105,9 +92,10 @@ struct broken_event_s
  *
  * @return the newly allocated and filled broken_element
  */
-struct broken_element_s *broken_element_alloc(const container_id_t container_id, const gchar * content_name,
-    const hash_sha256_t chunk_id, enum broken_location_e location, enum broken_property_e property,
-    enum broken_reason_e reason, void * reference_value);
+struct broken_element_s *broken_element_alloc(const container_id_t container_id,
+	const gchar * content_name, const hash_sha256_t chunk_id,
+	enum broken_location_e location, enum broken_property_e property,
+	enum broken_reason_e reason, void *reference_value);
 
 /**
  * Allocate a new struct broken_element_s from infos in text format
@@ -122,9 +110,10 @@ struct broken_element_s *broken_element_alloc(const container_id_t container_id,
  *
  * @return the newly allocated and filled broken_element
  */
-struct broken_element_s *broken_element_alloc2(const gchar * container_id, const gchar * content_name,
-    const gchar * chunk_id, enum broken_location_e location, enum broken_property_e property,
-    enum broken_reason_e reason, void * reference_value);
+struct broken_element_s *broken_element_alloc2(const gchar * container_id,
+	const gchar * content_name, const gchar * chunk_id,
+	enum broken_location_e location, enum broken_property_e property,
+	enum broken_reason_e reason, void *reference_value);
 
 /**
  * Free the given struct broken_element_s (glib GList form)
@@ -139,7 +128,7 @@ void broken_element_gfree(gpointer data, gpointer user_data);
  *
  * @param E the element to free
  */
-#define broken_element_free(E) broken_element_gfree(E, NULL)
+void broken_element_free(gpointer e);
 
 /** @} */
 

@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "conscience.api"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "conscience.api"
 #endif
 
 #include <string.h>
@@ -49,7 +29,7 @@ _unlock_rw(GStaticRWLock * lock)
 
 struct conscience_srvtype_s *
 conscience_get_locked_srvtype(struct conscience_s *conscience, GError ** error,
-    const gchar * type, enum mode_e mode, char lock_mode)
+	const gchar * type, enum mode_e mode, char lock_mode)
 {
 	struct conscience_srvtype_s *srvtype;
 
@@ -67,7 +47,8 @@ conscience_get_locked_srvtype(struct conscience_s *conscience, GError ** error,
 		conscience_unlock_srvtypes(conscience);
 
 		conscience_lock_srvtypes(conscience, 'w');
-		srvtype = conscience_get_srvtype(conscience, error, type, MODE_AUTOCREATE);
+		srvtype =
+			conscience_get_srvtype(conscience, error, type, MODE_AUTOCREATE);
 	}
 
 	if (!srvtype) {
@@ -108,7 +89,7 @@ conscience_unlock_srvtypes(struct conscience_s *conscience)
 void
 conscience_lock_broken_elements(struct conscience_s *conscience, char lock_mode)
 {
-	(void)lock_mode;
+	(void) lock_mode;
 	if (conscience)
 		g_static_rec_mutex_lock(&(conscience->srmut_brk));
 }
@@ -135,13 +116,14 @@ conscience_create(void)
 	g_static_rec_mutex_init(&(conscience->srmut_brk));
 
 	conscience->srvtypes = g_hash_table_new_full(g_str_hash, g_str_equal,
-			g_free, (GDestroyNotify) conscience_srvtype_destroy);
+		g_free, (GDestroyNotify) conscience_srvtype_destroy);
 	if (!conscience->srvtypes) {
 		conscience_destroy(conscience);
 		return NULL;
 	}
 
-	conscience->default_srvtype = conscience_srvtype_create(conscience, "default");
+	conscience->default_srvtype =
+		conscience_srvtype_create(conscience, "default");
 	if (!conscience->default_srvtype) {
 		conscience_destroy(conscience);
 		return NULL;
@@ -156,24 +138,26 @@ conscience_create(void)
 	return conscience;
 }
 
-struct conscience_s*
-conscience_create_named(const gchar *ns_name, GError **error)
+struct conscience_s *
+conscience_create_named(const gchar * ns_name, GError ** error)
 {
 	struct conscience_s *conscience;
 
 	if (!ns_name || !*ns_name) {
-		GSETERROR(error,"NULL/empty namespace name (%p)", ns_name);
+		GSETERROR(error, "NULL/empty namespace name (%p)", ns_name);
 		return NULL;
 	}
 
 	conscience = conscience_create();
 	if (!conscience) {
-		GSETERROR(error,"Memory allocation failure");
+		GSETERROR(error, "Memory allocation failure");
 		return NULL;
 	}
-	
-	g_strlcpy(conscience->ns_info.name, ns_name, sizeof(conscience->ns_info.name));
-	conscience->event_handler = gridcluster_eventhandler_create(ns_name, error, NULL, NULL);
+
+	g_strlcpy(conscience->ns_info.name, ns_name,
+		sizeof(conscience->ns_info.name));
+	conscience->event_handler =
+		gridcluster_eventhandler_create(ns_name, error, NULL, NULL);
 	return conscience;
 }
 
@@ -202,12 +186,14 @@ conscience_destroy(struct conscience_s *conscience)
 /* ------------------------------------------------------------------------- */
 
 struct conscience_srvtype_s *
-conscience_get_srvtype(struct conscience_s *conscience, GError ** error, const char *type, enum mode_e mode)
+conscience_get_srvtype(struct conscience_s *conscience, GError ** error,
+	const char *type, enum mode_e mode)
 {
 	struct conscience_srvtype_s *srvtype;
 
 	if (!conscience || !type) {
-		GSETERROR(error, "Invalid parameter (conscience=%p type=%s)", conscience, type);
+		GSETERROR(error, "Invalid parameter (conscience=%p type=%s)",
+			conscience, type);
 		return NULL;
 	}
 
@@ -216,7 +202,8 @@ conscience_get_srvtype(struct conscience_s *conscience, GError ** error, const c
 		return srvtype;
 
 	if (mode == MODE_AUTOCREATE) {
-		NOTICE("[NS=%s][SRVTYPE=%s] Autocreation wanted!", conscience_get_namespace(conscience), type);
+		NOTICE("[NS=%s][SRVTYPE=%s] Autocreation wanted!",
+			conscience_get_namespace(conscience), type);
 		srvtype = conscience_srvtype_create(conscience, type);
 		if (!srvtype) {
 			GSETERROR(error, "ServiceType allocation failure");
@@ -273,8 +260,9 @@ conscience_get_srvtype_names(struct conscience_s * conscience, GError ** error)
 }
 
 gboolean
-conscience_run_srvtypes(struct conscience_s * conscience, GError ** error, guint32 flags,
-    gchar ** names_array, service_callback_f * callback, gpointer udata)
+conscience_run_srvtypes(struct conscience_s * conscience, GError ** error,
+	guint32 flags, gchar ** names_array, service_callback_f * callback,
+	gpointer udata)
 {
 	gboolean rc;
 	register guint i, max;
@@ -283,8 +271,9 @@ conscience_run_srvtypes(struct conscience_s * conscience, GError ** error, guint
 	GPtrArray *array_srvtypes;
 
 	if (!conscience || !names_array || !callback) {
-		GSETERROR(error, "Invalid parameter (conscience=%p names_array=%p callback=%p)",
-		    conscience, names_array, callback);
+		GSETERROR(error,
+			"Invalid parameter (conscience=%p names_array=%p callback=%p)",
+			conscience, names_array, callback);
 		return FALSE;
 	}
 
@@ -302,7 +291,7 @@ conscience_run_srvtypes(struct conscience_s * conscience, GError ** error, guint
 		srvtype = conscience_get_srvtype(conscience, error, *name, MODE_STRICT);
 		if (!srvtype) {
 			rc = FALSE;
-			GSETERROR(error, "Failed to run the services of type [%s]", *name);
+			GSETCODE(error, 460, "Service type [%s] not managed", *name);
 			goto unlock_and_exit;
 		}
 		g_ptr_array_add(array_srvtypes, srvtype);
@@ -324,7 +313,8 @@ conscience_run_srvtypes(struct conscience_s * conscience, GError ** error, guint
 				g_static_rw_lock_reader_lock(&(srvtype->rw_lock));
 		}
 
-		rc = conscience_srvtype_run_all(srvtype, error, real_flags, callback, udata);
+		rc = conscience_srvtype_run_all(srvtype, error, real_flags, callback,
+			udata);
 
 		if (flags & SRVTYPE_FLAG_LOCK_ENABLE) {
 			if (flags & SRVTYPE_FLAG_LOCK_WRITER)
@@ -335,7 +325,9 @@ conscience_run_srvtypes(struct conscience_s * conscience, GError ** error, guint
 		}
 
 		if (!rc) {
-			GSETERROR(error, "An error occured while running the services of type [%s]", srvtype->type_name);
+			GSETERROR(error,
+				"An error occured while running the services of type [%s]",
+				srvtype->type_name);
 			goto unlock_and_exit;
 		}
 	}
@@ -343,7 +335,7 @@ conscience_run_srvtypes(struct conscience_s * conscience, GError ** error, guint
 	if (rc && (flags & SRVTYPE_FLAG_ADDITIONAL_CALL))
 		rc = callback(NULL, udata);
 
-      unlock_and_exit:
+unlock_and_exit:
 
 	if (flags & SRVTYPE_FLAG_LOCK_ENABLE)
 		conscience_unlock_srvtypes(conscience);

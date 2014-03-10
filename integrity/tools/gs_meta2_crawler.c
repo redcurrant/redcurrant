@@ -1,36 +1,19 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gs_meta2_crawler"
+#endif
 
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <attr/xattr.h>
 
-#include <glib.h>
-#include <glib/gstdio.h>
+#include <metautils/lib/metautils.h>
+#include <meta2/remote/meta2_remote.h>
+#include <rawx-lib/src/rawx.h>
+#include <rules-motor/lib/motor.h>
 
-#include <metautils.h>
-#include <meta2_remote.h>
-#include <rawx.h>
-#include <motor.h>
-
-#include <common_main.h>
 #include "./lock.h"
-#include "../lib/volume_scanner.h"
+#include "./volume_scanner.h"
 
 #define LIMIT_LENGTH_URL 23
 
@@ -49,11 +32,13 @@
 
 int volume_busy = 0;
 
-struct meta2_crawler_stats_s{
+struct meta2_crawler_stats_s
+{
+	gint container_total;
 	guint64 container_skipped;
-	guint64 container_success;
-	guint64 container_failures;
-	guint64 container_recently_scanned;
+	guint64 container_success;	// not used
+	guint64 container_failures;	// not used
+	guint64 container_recently_scanned;	// not used
 };
 
 static gchar lock_xattr_name[256] = META2_CRAWLER_XATTRLOCK;
@@ -65,7 +50,22 @@ static gchar ns_name[LIMIT_LENGTH_NSNAME] = "";
 
 static gboolean flag_loop = FALSE;
 static gboolean flag_crawl_content = FALSE;
+static gint nbContainerMax = 0;
 
+// motor_env and rules_reload_time_interval declared in motor.h
+struct rules_motor_env_s *motor_env = NULL;
+gint rules_reload_time_interval = 1L;
+
+// m2v1_list declared in libintegrity
+GSList *m2v1_list = NULL;
+
+static time_t interval_sleep = 200L;
+
+static void
+sleep_inter_container(void)
+{
+	usleep(1000L * interval_sleep);
+}
 
 static void
 main_specific_stop(void)
@@ -73,82 +73,92 @@ main_specific_stop(void)
 }
 
 static void
-main_set_defaults(void){
+main_set_defaults(void)
+{
 	bzero(path_root, sizeof(path_root));
 	bzero(meta2_str_addr, sizeof(meta2_str_addr));
 	bzero(meta2_url, LIMIT_LENGTH_URL);
 	bzero(ns_name, LIMIT_LENGTH_NSNAME);
 }
 
-static struct grid_main_option_s*
+static struct grid_main_option_s *
 main_get_options(void)
 {
 	static struct grid_main_option_s options[] = {
 		{"RunLoop", OT_BOOL, {.b = &flag_loop},
 			"Loop until the FS usage fulfills"},
+		{"InterContainerSleepMilli", OT_TIME, {.t = &interval_sleep},
+			"Sleep between each container"},
 		{"RulesReloadTimeInterval", OT_INT, {.i = &rules_reload_time_interval},
 			"Update rules every n seconds"},
 		{"CrawlContents", OT_BOOL, {.b = &flag_crawl_content},
 			"Also crawl contents in containers"},
+		{"nbContainerMax", OT_INT, {.i = &nbContainerMax},
+			"Stop after N containers"},
 		{NULL, 0, {.str = NULL}, NULL}
 	};
 
 	return options;
 }
 
-static const gchar*
-main_get_usage(void){
+static const gchar *
+main_get_usage(void)
+{
 	static gchar xtra_usage[] =
 		"\tExpected argument: an absolute path of a valid meta2 directory\n";
 	return xtra_usage;
 }
 
 static void
-main_specific_fini(void){
-	if(volume_busy)
+main_specific_fini(void)
+{
+	if (volume_busy)
 		return;
-	if(*path_root && *lock_xattr_name) {
+	if (*path_root && *lock_xattr_name) {
 		if (volume_lock_get(path_root, lock_xattr_name) == getpid())
 			volume_lock_release(path_root, lock_xattr_name);
 	}
 }
 
 static gboolean
-main_save_canonical_directory(const char *dir){
+main_save_canonical_directory(const char *dir)
+{
 	int i, slash;
 	char *path;
 	size_t path_len;
 
-	path_len = strlen(dir)+1;
+	path_len = strlen(dir) + 1;
 	path = g_alloca(path_len);
 	bzero(path, path_len);
 
-	for(i=0,slash=0; *dir; dir++){
-		if(*dir != '/'){
+	for (i = 0, slash = 0; *dir; dir++) {
+		if (*dir != '/') {
 			path[i++] = *dir;
 			slash = 0;
 		}
-		else{
-			if(!slash)
+		else {
+			if (!slash)
 				path[i++] = *dir;
 			slash = 1;
 		}
 	}
 
-	while(i >= 0 && path[--i] == '/')
+	while (i >= 0 && path[--i] == '/')
 		path[i] = '\0';
 
-	if (sizeof(path_root) <= g_strlcpy(path_root, path, sizeof(path_root)-1))
+	if (sizeof(path_root) <= g_strlcpy(path_root, path, sizeof(path_root) - 1))
 		return FALSE;
 	return TRUE;
 }
 
 static gboolean
-meta2_get_lock_info(const char *vol, gchar *dst_host, gsize dst_host_size, GError **gerr){
+meta2_get_lock_info(const char *vol, gchar * dst_host, gsize dst_host_size,
+	GError ** gerr)
+{
 	ssize_t size;
 	size_t usize;
 
-	if(!vol || !dst_host || !dst_host_size){
+	if (!vol || !dst_host || !dst_host_size) {
 		SETERRCODE(gerr, EINVAL, "Invalid parameter");
 		return FALSE;
 	}
@@ -156,168 +166,184 @@ meta2_get_lock_info(const char *vol, gchar *dst_host, gsize dst_host_size, GErro
 	bzero(dst_host, dst_host_size);
 	bzero(ns_name, LIMIT_LENGTH_NSNAME);
 
-	switch(size = getxattr(vol, META2LOCK_ATTRNAME_URL, meta2_url, LIMIT_LENGTH_URL)) {
+	switch (size =
+		getxattr(vol, META2LOCK_ATTRNAME_URL, meta2_url, LIMIT_LENGTH_URL)) {
 		case -1:
 			if (errno != ENOATTR) {
-				SETERRCODE(gerr, errno, "getxattr(%s) : %s", META2LOCK_ATTRNAME_URL, strerror(errno));
+				SETERRCODE(gerr, errno, "getxattr(%s) : %s",
+					META2LOCK_ATTRNAME_URL, strerror(errno));
 				return FALSE;
 			}
 			break;
 		case 0:
-			SETERRCODE(gerr, ENOTSUP, "getxattr(%s) : operation not supported", META2LOCK_ATTRNAME_URL);
+			SETERRCODE(gerr, ENOTSUP, "getxattr(%s) : operation not supported",
+				META2LOCK_ATTRNAME_URL);
 			return FALSE;
 		default:
 			usize = size;
 			if (usize > dst_host_size) {
-				SETERRCODE(gerr, EINVAL, "getxattr(%s) : xattr value too long", META2LOCK_ATTRNAME_URL);
+				SETERRCODE(gerr, EINVAL, "getxattr(%s) : xattr value too long",
+					META2LOCK_ATTRNAME_URL);
 				return FALSE;
 			}
 			getxattr(vol, META2LOCK_ATTRNAME_URL, dst_host, dst_host_size);
 			break;
 	}
 
-	GRID_DEBUG("Attr [%s] found with value [%s]", META2LOCK_ATTRNAME_URL, meta2_url);
+	GRID_DEBUG("Attr [%s] found with value [%s]", META2LOCK_ATTRNAME_URL,
+		meta2_url);
 
 	switch (size = getxattr(vol, META2_ATTRNAME_NAMESPACE, NULL, 0)) {
 		case -1:
 			if (errno != ENOATTR) {
-				SETERRCODE(gerr, errno, "getxattr(%s) : %s", META2_ATTRNAME_NAMESPACE, strerror(errno));
+				SETERRCODE(gerr, errno, "getxattr(%s) : %s",
+					META2_ATTRNAME_NAMESPACE, strerror(errno));
 				return FALSE;
 			}
 			break;
 		case 0:
-			SETERRCODE(gerr, ENOTSUP, "getxattr(%s) : operation not supported", META2_ATTRNAME_NAMESPACE);
+			SETERRCODE(gerr, ENOTSUP, "getxattr(%s) : operation not supported",
+				META2_ATTRNAME_NAMESPACE);
 			return FALSE;
 		default:
 			usize = size;
 			if (usize > LIMIT_LENGTH_NSNAME) {
-				SETERRCODE(gerr, EINVAL, "getxattr(%s) : xattr value too long", META2_ATTRNAME_NAMESPACE);
+				SETERRCODE(gerr, EINVAL, "getxattr(%s) : xattr value too long",
+					META2_ATTRNAME_NAMESPACE);
 				return FALSE;
 			}
-			getxattr(vol, META2_ATTRNAME_NAMESPACE, ns_name, LIMIT_LENGTH_NSNAME);
+			getxattr(vol, META2_ATTRNAME_NAMESPACE, ns_name,
+				LIMIT_LENGTH_NSNAME);
 			break;
 	}
 
-	GRID_DEBUG("Attr [%s] found with value [%s]", META2_ATTRNAME_NAMESPACE, ns_name);
+	GRID_DEBUG("Attr [%s] found with value [%s]", META2_ATTRNAME_NAMESPACE,
+		ns_name);
 
 	errno = 0;
 	return TRUE;
 }
 
 static gboolean
-main_configure(int argc, char **args){
+main_configure(int argc, char **args)
+{
 	GError *local_error = NULL;
 
-	if(!argc){
+	if (!argc) {
 		GRID_ERROR("Missing arguments");
 		return FALSE;
 	}
 
-	if(!main_save_canonical_directory(args[0])){
+	if (!main_save_canonical_directory(args[0])) {
 		GRID_ERROR("Volume name too long");
 		return FALSE;
 	}
 
-	if (!meta2_get_lock_info(path_root, meta2_str_addr, sizeof(meta2_str_addr), &local_error)) {
+	if (!meta2_get_lock_info(path_root, meta2_str_addr, sizeof(meta2_str_addr),
+			&local_error)) {
 		GRID_ERROR("The direcotry doesn't seem to be a meta2 directory: %s",
 			gerror_get_message(local_error));
 		g_clear_error(&local_error);
 		return FALSE;
 	}
 	if (!*ns_name || !*meta2_str_addr) {
-		GRID_ERROR("The volume doesn't seem to be a META2 volume. Check that attributes [%s] and [%s] are set on volume [%s]", META2_ATTRNAME_NAMESPACE, META2LOCK_ATTRNAME_URL, path_root);
+		GRID_ERROR
+			("The volume doesn't seem to be a META2 volume. Check that attributes [%s] and [%s] are set on volume [%s]",
+			META2_ATTRNAME_NAMESPACE, META2LOCK_ATTRNAME_URL, path_root);
 		return FALSE;
 	}
 	return TRUE;
 }
 
-static gboolean
-is_hexa(const gchar *s){
-	register char c;
-	for(; '\0' != (c = *s); s++){
-		if (!g_ascii_isxdigit(g_ascii_toupper(c)))
-			return FALSE;
-	}
-	return TRUE;
-}
 
 static gboolean
-accept_meta2(const gchar *dirname, const gchar *basename, void *data){
+accept_meta2(const gchar * dirname, const gchar * bn, void *data)
+{
 	(void) dirname;
 	(void) data;
 
 	size_t len;
 
-	if (!basename || !*basename)
+	if (!bn || !*bn)
 		return FALSE;
 	if (!grid_main_is_running())
 		return FALSE;
 
-	len = strlen(basename);
-	if (basename[0]=='.' && (len==1 || (len==2 && basename[1] == '.')))
+	len = strlen(bn);
+	if (bn[0] == '.' && (len == 1 || (len == 2 && bn[1] == '.')))
 		return FALSE;
 
-	return is_hexa(basename);
+	return metautils_str_ishexa(bn, len);
 }
 
 
 static enum scanner_traversal_e
-manage_dir_enter(const gchar *path_dir, guint depth, gpointer data){
+manage_dir_enter(const gchar * path_dir, guint depth, gpointer data)
+{
 	(void) depth;
 	(void) data;
 
 	GRID_DEBUG("Entering dir [%s]", path_dir);
-	return grid_main_is_running() ? SCAN_CONTINUE : SCAN_ABORT;
+	return grid_main_is_running()? SCAN_CONTINUE : SCAN_ABORT;
 }
 
 static gboolean
-meta2_path_is_valid(const gchar *fullpath){
-	size_t len,i;
+meta2_path_is_valid(const gchar * fullpath)
+{
+	size_t len, i;
 	const gchar *ptr;
 
 	i = 0;
 	len = strlen(fullpath);
 	ptr = fullpath + len - 1;
-	
-	for(; ptr >= fullpath; ptr--, i++){
+
+	for (; ptr >= fullpath; ptr--, i++) {
 		register char c = *ptr;
-		if(c != '/')
+
+		if (c == '/')
 			break;
-		if(!g_ascii_isxdigit(c))
+		if (!g_ascii_isxdigit(c))
 			return FALSE;
 	}
-
 	return (i == 64);
 }
 
 static enum scanner_traversal_e
-manage_meta2(const gchar *container_path, void *data, struct rules_motor_env_s** motor)
+manage_meta2(const gchar * container_path, void *data,
+	struct rules_motor_env_s **motor)
 {
 	struct meta2_crawler_stats_s *stats;
-        GError *err = NULL;
+	GError *err = NULL;
 
-	stats = (struct meta2_crawler_stats_s*)data;
+	stats = (struct meta2_crawler_stats_s *) data;
 
-	do {
-		if(meta2_path_is_valid(container_path)){
-			GRID_DEBUG("Skipping non-meta2 file [%s]", container_path);
-			stats->container_skipped++;
-			break;
+	if (!meta2_path_is_valid(container_path)) {
+		GRID_DEBUG("Skipping non-container file [%s]", container_path);
+		stats->container_skipped++;
+		return SCAN_CONTINUE;
+	}
+
+	/* Execute action if nb max container wasn't already managed */
+	if (nbContainerMax > 0) {
+		stats->container_total++;
+		if (nbContainerMax < stats->container_total) {
+			GRID_WARN("stop because %d max container manage !", nbContainerMax);
+			return SCAN_STOP_ALL;
 		}
-		printf("container_path: %s\n", container_path);
-	} while(0);
-
+	}
 
 	/* Execute python script over container */
 	do {
 		struct crawler_meta2_data_pack_s *data_block;
 		struct motor_args args;
+
 		data_block = g_malloc0(sizeof(struct crawler_meta2_data_pack_s));
 		meta2_crawler_data_block_init(data_block, container_path, meta2_url);
-		motor_args_init(&args, (gpointer)data_block, (gint8)META2_TYPE_ID, motor, ns_name);
-		pass_to_motor((gpointer)(&args));
+		motor_args_init(&args, (gpointer) data_block, (gint8) META2_TYPE_ID,
+			motor, ns_name);
+		pass_to_motor((gpointer) (&args));
 		destroy_crawler_meta2_data_block(data_block);
-	} while(0);
+	} while (0);
 
 	/* Start content crawling */
 	if (flag_crawl_content) {
@@ -331,39 +357,53 @@ manage_meta2(const gchar *container_path, void *data, struct rules_motor_env_s**
 		memset(&meta2_addr, 0x00, sizeof(addr_info_t));
 		l4_address_init_with_url(&meta2_addr, meta2_url, &err);
 		container_id_str = g_path_get_basename(container_path);
-		container_id_hex2bin(container_id_str, strlen(container_id_str), &container_id, &err);
+		container_id_hex2bin(container_id_str, strlen(container_id_str),
+			&container_id, &err);
 
-		contents_list = meta2_remote_container_list(&meta2_addr, meta2_connection_timeout, &err, container_id);
+		contents_list =
+			meta2_remote_container_list(&meta2_addr, meta2_connection_timeout,
+			&err, container_id);
 		if (err != NULL) {
-			GRID_ERROR("Failed to list contents of container [%s] : %s", container_id_str, err->message);
+			GRID_ERROR("Failed to list contents of container [%s] : %s",
+				container_id_str, err->message);
 			g_clear_error(&err);
 			g_free(container_id_str);
 			return SCAN_CONTINUE;
 		}
 
-		for (GSList *l = contents_list; l != NULL; l = l->next) {
+		for (GSList * l = contents_list; l != NULL; l = l->next) {
 			path_info_t *info = l->data;
+
 			GRID_DEBUG("Crawling content [%s]", info->path);
 
 			/* Create content_info from path_info */
 			bzero(&content_info, sizeof(struct content_textinfo_s));
 			content_info.container_id = g_strdup(container_id_str);
 			content_info.path = g_strdup(info->path);
-			content_info.size = g_strdup_printf("%"G_GINT64_FORMAT, info->size);
+			content_info.size =
+				g_strdup_printf("%" G_GINT64_FORMAT, info->size);
 			if (info->user_metadata)
-				content_info.metadata = g_strndup((gchar*)info->user_metadata->data, info->user_metadata->len);
+				content_info.metadata =
+					g_strndup((gchar *) info->user_metadata->data,
+					info->user_metadata->len);
 			if (info->system_metadata)
-				content_info.system_metadata = g_strndup((gchar*)info->system_metadata->data, info->system_metadata->len);
+				content_info.system_metadata =
+					g_strndup((gchar *) info->system_metadata->data,
+					info->system_metadata->len);
 
 			/* Execute python script over content */
 			do {
 				struct crawler_chunk_data_pack_s *data_block;
 				struct motor_args args;
-				data_block = g_malloc0(sizeof(struct crawler_chunk_data_pack_s));
-				chunk_crawler_data_block_init(data_block, &content_info, NULL, NULL, NULL, NULL);
-				motor_args_init(&args, (gpointer)data_block, (gint8)CONTENT_TYPE_ID, motor, ns_name);
-				pass_to_motor((gpointer)(&args));
-			} while(0);
+
+				data_block =
+					g_malloc0(sizeof(struct crawler_chunk_data_pack_s));
+				chunk_crawler_data_block_init(data_block, &content_info, NULL,
+					NULL, NULL, NULL);
+				motor_args_init(&args, (gpointer) data_block,
+					(gint8) CONTENT_TYPE_ID, motor, ns_name);
+				pass_to_motor((gpointer) (&args));
+			} while (0);
 
 			/* Free content */
 			content_textinfo_free_content(&content_info);
@@ -376,25 +416,43 @@ manage_meta2(const gchar *container_path, void *data, struct rules_motor_env_s**
 		g_free(container_id_str);
 	}
 
+	stats->container_success++;
+
 	return SCAN_CONTINUE;
 }
 
 static enum scanner_traversal_e
-manage_dir_exit(const gchar *path_dir, guint depth, void *data){
+manage_meta2_and_sleep(const gchar * container_path, void *data,
+	struct rules_motor_env_s **motor)
+{
+	enum scanner_traversal_e rc;
+
+	if (!grid_main_is_running())
+		return SCAN_STOP_ALL;
+
+	rc = manage_meta2(container_path, data, motor);
+	sleep_inter_container();
+	return rc;
+}
+
+static enum scanner_traversal_e
+manage_dir_exit(const gchar * path_dir, guint depth, void *data)
+{
 	(void) depth;
 	(void) data;
 
-	if(!grid_main_is_running()){
+	if (!grid_main_is_running()) {
 		GRID_DEBUG("Exiting dir [%s]", path_dir);
 		return SCAN_ABORT;
 	}
 
-	usleep(200000L);
+	sleep_inter_container();
 	return SCAN_CONTINUE;
 }
 
 static void
-main_action(void) {
+main_action(void)
+{
 	struct meta2_crawler_stats_s scan_stats;
 	struct volume_scanning_info_s scan_info;
 
@@ -403,7 +461,7 @@ main_action(void) {
 
 	scan_info.volume_path = path_root;
 	scan_info.file_match = accept_meta2;
-	scan_info.file_action = manage_meta2;
+	scan_info.file_action = manage_meta2_and_sleep;
 	scan_info.dir_enter = manage_dir_enter;
 	scan_info.dir_exit = manage_dir_exit;
 	scan_info.callback_data = &scan_stats;
@@ -418,9 +476,9 @@ main_action(void) {
 
 	motor_env_init();
 
-	do{
+	do {
 		scan_volume(&scan_info, &motor_env);
-	}while(flag_loop && grid_main_is_running());
+	} while (flag_loop && grid_main_is_running());
 
 
 	destroy_motor_env(&motor_env);
@@ -430,8 +488,7 @@ main_action(void) {
 	}
 }
 
-static struct grid_main_callbacks cb =
-{
+static struct grid_main_callbacks cb = {
 	.options = main_get_options,
 	.action = main_action,
 	.set_defaults = main_set_defaults,
@@ -444,6 +501,6 @@ static struct grid_main_callbacks cb =
 int
 main(int argc, char **argv)
 {
+	g_setenv("GS_DEBUG_ENABLE", "0", TRUE);
 	return grid_main_cli(argc, argv, &cb);
 }
-

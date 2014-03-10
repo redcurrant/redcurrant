@@ -1,48 +1,27 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gridcluster.agent.server"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gridcluster.agent.server"
 #endif
 
-#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
-#include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 
-#include "server.h"
-#include "config.h"
-#include "gridagent.h"
-#include "io_scheduler.h"
-#include "accept_worker.h"
+#include "./server.h"
+#include "./config.h"
+#include "./gridagent.h"
+#include "./io_scheduler.h"
+#include "./accept_worker.h"
 
 /* Global variables */
 int backlog_unix = MAX_ACCEPT;
@@ -61,7 +40,7 @@ static int sock_inet = -1;
 static worker_t worker_inet;
 
 static gboolean
-set_unix_permissions(const gchar *path, GError **error)
+set_unix_permissions(const gchar * path, GError ** error)
 {
 	if (unix_socket_mode != 0) {
 		INFO("Setting UNIX socket mode to %o", unix_socket_mode);
@@ -73,7 +52,8 @@ set_unix_permissions(const gchar *path, GError **error)
 	}
 
 	if (unix_socket_uid > 0 && unix_socket_gid > 0) {
-		INFO("Setting UNIX socket ids to %d:%d", unix_socket_uid, unix_socket_gid);
+		INFO("Setting UNIX socket ids to %d:%d", unix_socket_uid,
+			unix_socket_gid);
 		if (0 != chown(path, unix_socket_uid, unix_socket_gid)) {
 			GSETERROR(error, "chown(%s,%d,%d) error : errno=%d (%s)",
 				path, unix_socket_uid, unix_socket_gid, errno, strerror(errno));
@@ -87,11 +67,11 @@ set_unix_permissions(const gchar *path, GError **error)
 void
 set_inet_server_port(int port)
 {
-	if (port<1 || port>=65536) {
+	if (port < 1 || port >= 65536) {
 		ERROR("Invalid port (%d outside 1,65535)", port);
 		return;
 	}
-	if (port_inet>=1) {
+	if (port_inet >= 1) {
 		ERROR("The INET port has already been set to %d", port_inet);
 		return;
 	}
@@ -100,7 +80,7 @@ set_inet_server_port(int port)
 }
 
 static int
-start_unix_server(long sock_timeout, GError **error)
+start_unix_server(long sock_timeout, GError ** error)
 {
 	struct sockaddr_un local;
 	worker_data_t wdata;
@@ -110,40 +90,36 @@ start_unix_server(long sock_timeout, GError **error)
 	memset(&worker_unix, 0, sizeof(worker_t));
 
 	/* Create ressources to monitor */
-	usock = socket(PF_UNIX, SOCK_STREAM, 0);
+	usock = socket_nonblock(PF_UNIX, SOCK_STREAM, 0);
 	if (usock < 0) {
 		GSETERROR(error, "Failed to create socket : %s", strerror(errno));
-		return(0);
-	}
-
-	/* Got to non-blocking mode */
-	if (!sock_set_non_blocking(usock, TRUE)) {
-		GSETERROR(error, "Failed to put socket %d in non-blocking mode : %s", usock, strerror(errno));
-		close(usock);
-		return(0);
+		return (0);
 	}
 
 	/* Bind to file */
 	local.sun_family = AF_UNIX;
-	g_strlcpy(local.sun_path, AGENT_SOCK_PATH, sizeof(local.sun_path)-1);
+	g_strlcpy(local.sun_path, AGENT_SOCK_PATH, sizeof(local.sun_path) - 1);
 
-	if (-1 == bind(usock, (struct sockaddr *)&local, sizeof(local))) {
-		GSETERROR(error, "Failed to bind socket %d to file %s : %s", usock, AGENT_SOCK_PATH, strerror(errno));
-		close(usock);
-		return(0);
+	if (-1 == bind(usock, (struct sockaddr *) &local, sizeof(local))) {
+		GSETERROR(error, "Failed to bind socket %d to file %s : %s", usock,
+			AGENT_SOCK_PATH, strerror(errno));
+		metautils_pclose(&usock);
+		return (0);
 	}
 
 	/* Listen on that socket */
 	if (-1 == listen(usock, backlog_unix)) {
-		GSETERROR(error, "Failed to listen on socket %d : %s", usock, strerror(errno));
-		close(usock);
-		return(0);
+		GSETERROR(error, "Failed to listen on socket %d : %s", usock,
+			strerror(errno));
+		metautils_pclose(&usock);
+		return (0);
 	}
 
 	if (!set_unix_permissions(AGENT_SOCK_PATH, error)) {
-		GSETERROR(error, "Failed to set proper permissions on socket %d", usock);
-		close(usock);
-		return(0);
+		GSETERROR(error, "Failed to set proper permissions on socket %d",
+			usock);
+		metautils_pclose(&usock);
+		return (0);
 	}
 
 	/* Create worker */
@@ -156,17 +132,17 @@ start_unix_server(long sock_timeout, GError **error)
 
 	/* Accept new connection */
 	if (!add_fd_to_io_scheduler(&worker_unix, EPOLLIN, error)) {
-		GSETERROR(error,"Failed to add server sock to io_scheduler");
-		close(usock);
+		GSETERROR(error, "Failed to add server sock to io_scheduler");
+		metautils_pclose(&usock);
 		return 0;
 	}
 
 	INFO("UNIX server started on socket %s", AGENT_SOCK_PATH);
-	return(1);
+	return (1);
 }
 
 static int
-start_inet_server(long sock_timeout, GError **error)
+start_inet_server(long sock_timeout, GError ** error)
 {
 	struct sockaddr_in sin;
 	worker_data_t wdata;
@@ -176,20 +152,12 @@ start_inet_server(long sock_timeout, GError **error)
 	memset(&worker_inet, 0, sizeof(worker_t));
 
 	/* Create ressources to monitor */
-	sock_inet = socket(PF_INET, SOCK_STREAM, 0);
+	sock_inet = socket_nonblock(PF_INET, SOCK_STREAM, 0);
 	if (sock_inet < 0) {
 		GSETERROR(error, "Failed to create socket : %s", strerror(errno));
-		return(0);
+		return (0);
 	}
 
-	/* Got to non-blocking mode */
-	if (!sock_set_non_blocking(sock_inet, TRUE)) {
-		GSETERROR(error, "Failed to put socket [%d] in non-blocking mode : %s", sock_inet, strerror(errno));
-		close(sock_inet);
-		return(0);
-	}
-
-	sock_set_tcpquickack(sock_inet, TRUE);
 	sock_set_reuseaddr(sock_inet, TRUE);
 
 	/* Bind to file */
@@ -197,19 +165,21 @@ start_inet_server(long sock_timeout, GError **error)
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port_inet);
 	if (!inet_aton("127.0.0.1", &(sin.sin_addr))) {
-		GSETERROR(error,"Invalid address : 127.0.0.1 !!!");
+		GSETERROR(error, "Invalid address : 127.0.0.1 !!!");
 		return 0;
 	}
 
-	if (-1 == bind(sock_inet, (struct sockaddr *)&sin, sizeof(sin))) {
-		GSETERROR(error, "Failed to bind socket [%d] to address 127.0.0.1 : %s", sock_inet, strerror(errno));
-		return(0);
+	if (-1 == bind(sock_inet, (struct sockaddr *) &sin, sizeof(sin))) {
+		GSETERROR(error, "Failed to bind socket [%d] to address 127.0.0.1 : %s",
+			sock_inet, strerror(errno));
+		return (0);
 	}
 
 	/* Listen on that socket */
 	if (-1 == listen(sock_inet, backlog_tcp)) {
-		GSETERROR(error, "Failed to listen on socket [%d] : %s", sock_inet, strerror(errno));
-		return(0);
+		GSETERROR(error, "Failed to listen on socket [%d] : %s", sock_inet,
+			strerror(errno));
+		return (0);
 	}
 
 	/* Create worker */
@@ -222,28 +192,29 @@ start_inet_server(long sock_timeout, GError **error)
 
 	/* Accept new connection */
 	if (!add_fd_to_io_scheduler(&worker_inet, EPOLLIN, error)) {
-		GSETERROR(error,"Failed to add server sock to io_scheduler");
+		GSETERROR(error, "Failed to add server sock to io_scheduler");
 		return 0;
 	}
 
-	INFO("INET server started on socket fd=%d 127.0.0.1:%d", sock_inet, port_inet);
-	return(1);
+	INFO("INET server started on socket fd=%d 127.0.0.1:%d", sock_inet,
+		port_inet);
+	return (1);
 }
 
 int
-start_server(long sock_timeout, GError **error)
+start_server(long sock_timeout, GError ** error)
 {
-	if (!start_unix_server(sock_timeout,error)) {
-		GSETERROR(error,"Failed to start the UNIX server");
+	if (!start_unix_server(sock_timeout, error)) {
+		GSETERROR(error, "Failed to start the UNIX server");
 		stop_server();
 		return 0;
 	}
-	
-	if (port_inet<0)
+
+	if (port_inet < 0)
 		NOTICE("No INET port provided, no INET server started");
 	else {
-		if (!start_inet_server(sock_timeout,error)) {
-			GSETERROR(error,"Failed to start the INET server");
+		if (!start_inet_server(sock_timeout, error)) {
+			GSETERROR(error, "Failed to start the INET server");
 			stop_server();
 			return 0;
 		}
@@ -257,16 +228,14 @@ stop_server(void)
 {
 	DEBUG("Stopping the server...");
 
-	if (usock>=0) {
+	if (usock >= 0) {
 		remove_fd_from_io_scheduler(&worker_unix, NULL);
-		close(usock);
-		usock = -1;
+		metautils_pclose(&usock);
 	}
-	
-	if (sock_inet>=0) {
+
+	if (sock_inet >= 0) {
 		remove_fd_from_io_scheduler(&worker_inet, NULL);
-		close(sock_inet);
-		sock_inet = -1;
+		metautils_pclose(&sock_inet);
 	}
 
 	unlink(AGENT_SOCK_PATH);

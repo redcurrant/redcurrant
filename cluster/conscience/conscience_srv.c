@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "conscience.api"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "conscience.api"
 #endif
 
 #include <stdlib.h>
@@ -27,36 +7,31 @@
 #include <strings.h>
 #include <math.h>
 
-#include <glib.h>
-#include <expr.h>
-#include <metatypes.h>
-#include <metautils.h>
-#include <metacomm.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
 
 #include "./conscience.h"
 #include "./conscience_srv.h"
 #include "./conscience_srvtype.h"
 
 struct service_tag_s *
-conscience_srv_get_tag(struct conscience_srv_s *service,
-    const gchar * name)
+conscience_srv_get_tag(struct conscience_srv_s *service, const gchar * name)
 {
-	return service ? service_info_get_tag(service->tags,name) : NULL;
+	return service ? service_info_get_tag(service->tags, name) : NULL;
 }
 
 struct service_tag_s *
-conscience_srv_ensure_tag(struct conscience_srv_s *service,
-    const gchar * name)
+conscience_srv_ensure_tag(struct conscience_srv_s *service, const gchar * name)
 {
-	return service && name ? service_info_ensure_tag(service->tags,name) : NULL;
+	return service
+		&& name ? service_info_ensure_tag(service->tags, name) : NULL;
 }
 
 void
-conscience_srv_remove_tag(struct conscience_srv_s *service,
-    const char *name)
+conscience_srv_remove_tag(struct conscience_srv_s *service, const char *name)
 {
 	if (service && name)
-		service_info_remove_tag(service->tags,name);
+		service_info_remove_tag(service->tags, name);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -70,15 +45,17 @@ conscience_srv_destroy(struct conscience_srv_s *service)
 	/*free the tags */
 	if (service->tags) {
 		while (service->tags->len > 0) {
-			struct service_tag_s *tag = g_ptr_array_index(service->tags,0);
+			struct service_tag_s *tag = g_ptr_array_index(service->tags, 0);
+
 			service_tag_destroy(tag);
 			g_ptr_array_remove_index_fast(service->tags, 0);
 		}
 		g_ptr_array_free(service->tags, TRUE);
 	}
 
-	if (service->app_data_type==SAD_PTR) {
-		if (service->app_data.pointer.value && service->app_data.pointer.cleaner)
+	if (service->app_data_type == SAD_PTR) {
+		if (service->app_data.pointer.value
+			&& service->app_data.pointer.cleaner)
 			service->app_data.pointer.cleaner(service->app_data.pointer.value);
 	}
 
@@ -90,49 +67,55 @@ conscience_srv_destroy(struct conscience_srv_s *service)
 	g_free(service);
 }
 
-score_t*
-conscience_srv_compute_score(struct conscience_srv_s
-    *service, GError ** err)
+score_t *
+conscience_srv_compute_score(struct conscience_srv_s *service, GError ** err)
 {
 	gint32 current;
 	struct conscience_s *conscience;
 	struct conscience_srvtype_s *srvtype;
 	gdouble d;
-	char *getField(char *b, char *f) {
+
+	char *getField(char *b, char *f)
+	{
 		char str_name[128];
 		struct service_tag_s *pTag;
 
 		if (!f) {
-			DEBUG("[%s/%s/] NULL tag wanted", conscience->ns_info.name, srvtype->type_name);
+			DEBUG("[%s/%s/] NULL tag wanted", conscience->ns_info.name,
+				srvtype->type_name);
 			return NULL;
 		}
-		g_snprintf(str_name,sizeof(str_name),"%s.%s", b, f);
+		g_snprintf(str_name, sizeof(str_name), "%s.%s", b, f);
 		pTag = conscience_srv_get_tag(service, str_name);
 		if (!pTag) {
-			DEBUG("[%s/%s/] Undefined tag wanted : %s", conscience->ns_info.name, srvtype->type_name, f);
+			DEBUG("[%s/%s/] Undefined tag wanted : %s",
+				conscience->ns_info.name, srvtype->type_name, f);
 			return NULL;
 		}
 		switch (pTag->type) {
-		case STVT_I64:
-			return g_strdup_printf("%"G_GINT64_FORMAT, pTag->value.i);
-		case STVT_REAL:
-			return g_strdup_printf("%f", pTag->value.r);
-		case STVT_BOOL:
-			return g_strdup_printf("%d", pTag->value.b ? 1 : 0);
-		case STVT_STR:
-			return g_strdup(pTag->value.s);
-		case STVT_BUF:
-			return g_strdup(pTag->value.buf);
-		case STVT_MACRO:
-			break;
+			case STVT_I64:
+				return g_strdup_printf("%" G_GINT64_FORMAT, pTag->value.i);
+			case STVT_REAL:
+				return g_strdup_printf("%f", pTag->value.r);
+			case STVT_BOOL:
+				return g_strdup_printf("%d", pTag->value.b ? 1 : 0);
+			case STVT_STR:
+				return g_strdup(pTag->value.s);
+			case STVT_BUF:
+				return g_strdup(pTag->value.buf);
+			case STVT_MACRO:
+				break;
 		}
-		DEBUG("[%s/%s/] invalid tag value! : %s", conscience->ns_info.name, srvtype->type_name, f);
+		DEBUG("[%s/%s/] invalid tag value! : %s", conscience->ns_info.name,
+			srvtype->type_name, f);
 		return NULL;
 	}
-	char *getStat(char *f) {
+	char *getStat(char *f)
+	{
 		return getField("stat", f);
 	}
-	char *getTag(char *f) {
+	char *getTag(char *f)
+	{
 		return getField("tag", f);
 	}
 	accessor_f *getAcc(char *b)
@@ -143,7 +126,8 @@ conscience_srv_compute_score(struct conscience_srv_s
 			return getStat;
 		if (!g_ascii_strcasecmp(b, "tag"))
 			return getTag;
-		DEBUG("[%s/%s/] invalid tag domain : [%s]", conscience->ns_info.name, srvtype->type_name, b);
+		DEBUG("[%s/%s/] invalid tag domain : [%s]", conscience->ns_info.name,
+			srvtype->type_name, b);
 		return NULL;
 	}
 
@@ -186,29 +170,31 @@ conscience_srv_compute_score(struct conscience_srv_s
 	}
 
 	current = d;
-	if (current<0) {
-		WARN("[%s] CONVERSION failure [%f] -> [%d]", service->description, d, current);
+	if (current < 0) {
+		WARN("[%s] CONVERSION failure [%f] -> [%d]", service->description, d,
+			current);
 		current = 0;
 	}
 
-	if (service->score.value>=0) {
-		if (srvtype->score_variation_bound>0) {
+	if (service->score.value >= 0) {
+		if (srvtype->score_variation_bound > 0) {
 			register gint32 max;
+
 			max = service->score.value + srvtype->score_variation_bound;
-			current = MIN(current,max);
+			current = MIN(current, max);
 		}
-		else if (current>service->score.value+1) {
+		else if (current > service->score.value + 1) {
 			current = (current + service->score.value) / 2;
 		}
 	}
 
-	service->score.value = MAX(0,current);
+	service->score.value = MAX(0, current);
 	service->score.timestamp = time(0);
 	return &(service->score);
 }
 
 void
-conscience_srv_lock_score( struct conscience_srv_s *srv, gint s )
+conscience_srv_lock_score(struct conscience_srv_s *srv, gint s)
 {
 	if (!srv)
 		return;
@@ -219,7 +205,7 @@ conscience_srv_lock_score( struct conscience_srv_s *srv, gint s )
 
 void
 conscience_srv_fill_srvinfo(struct service_info_s *dst,
-    struct conscience_srv_s *src)
+	struct conscience_srv_s *src)
 {
 	if (!dst || !src)
 		return;
@@ -230,7 +216,7 @@ conscience_srv_fill_srvinfo(struct service_info_s *dst,
 
 void
 conscience_srv_fill_srvinfo_header(struct service_info_s *dst,
-		struct conscience_srv_s *src)
+	struct conscience_srv_s *src)
 {
 	const gchar *ns_name;
 
@@ -248,6 +234,5 @@ conscience_srv_fill_srvinfo_header(struct service_info_s *dst,
 	memcpy(dst->type, src->srvtype->type_name, sizeof(dst->type));
 	ns_name = conscience_get_namespace(src->srvtype->conscience);
 	if (ns_name)
-		g_strlcpy(dst->ns_name, ns_name, sizeof(dst->ns_name)-1);
+		g_strlcpy(dst->ns_name, ns_name, sizeof(dst->ns_name) - 1);
 }
-

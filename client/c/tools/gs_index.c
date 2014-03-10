@@ -1,25 +1,7 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "grid.tools.index"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "grid.tools.index"
 #endif
 
-#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -31,10 +13,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#include <glib.h>
-
-#include <metautils.h>
 
 #include "../lib/grid_client.h"
 #include "./gs_tools.h"
@@ -60,7 +38,7 @@ static enum action_e action = A_NOTSET;
 static gint debug_level = 0;
 
 static void
-debug(const gchar *fmt, ...)
+debug(const gchar * fmt, ...)
 {
 	va_list va;
 	gchar *msg;
@@ -73,7 +51,7 @@ debug(const gchar *fmt, ...)
 	va_end(va);
 
 	if (msg) {
-		g_print(msg);
+		g_print("%s", msg);
 		g_free(msg);
 	}
 }
@@ -91,9 +69,12 @@ help(void)
 	g_printerr("Mandatory options:\n");
 	g_printerr("\t -m <URL> : provides the URL to the namespace META0;\n");
 	g_printerr("\t -d <TOKEN> : the name of the container;\n");
-	g_printerr("Action options (if more than one, only the last on command line will be taken into account):\n");
-	g_printerr("\t -l : list all the index services used for the given service type;\n");
-	g_printerr("\t -c <TOKEN> : get the service used for the given content path;\n");
+	g_printerr
+		("Action options (if more than one, only the last on command line will be taken into account):\n");
+	g_printerr
+		("\t -l : list all the index services used for the given service type;\n");
+	g_printerr
+		("\t -c <TOKEN> : get the service used for the given content path;\n");
 	g_printerr("\t -L : List all the services used, container-widely\n");
 	g_printerr("\t -G : Get an available service for the whole container\n");
 }
@@ -104,7 +85,8 @@ conf_check(void)
 	if (flag_quiet)
 		flag_verbose = 0;
 	if (!meta0_url) {
-		PRINT_ERROR("no namespace URL configured (use -m option of " ENV_META0URL " environment variable)\n");
+		PRINT_ERROR("no namespace URL configured (use -m option of "
+			ENV_META0URL " environment variable)\n");
 		return 0;
 	}
 	if (!container_name) {
@@ -112,12 +94,13 @@ conf_check(void)
 			ENV_CONTAINER " environment variable)\n");
 		return 0;
 	}
-	if (action==A_LISTCONTENT && !remote_path) {
+	if (action == A_LISTCONTENT && !remote_path) {
 		PRINT_ERROR("no remote path configured (use -f option)\n");
 		return 0;
 	}
 
-	PRINT_DEBUG("remote_path=%s container=%s namespace=%s\n", remote_path, container_name, meta0_url);
+	PRINT_DEBUG("remote_path=%s container=%s namespace=%s\n", remote_path,
+		container_name, meta0_url);
 
 	return 1;
 }
@@ -130,56 +113,56 @@ parse_opt(int argc, char **args)
 	while ((opt = getopt(argc, args, "hvqlLGm:c:d:")) != -1) {
 		switch (opt) {
 
-		case 'h':
-			flag_help = ~0;
-			break;
+			case 'h':
+				flag_help = ~0;
+				break;
 
-		case 'v':
-			flag_verbose++;
-			break;
+			case 'v':
+				flag_verbose++;
+				break;
 
-		case 'q':
-			flag_quiet = ~0;
-			break;
+			case 'q':
+				flag_quiet = ~0;
+				break;
 
-		case 'G':
-			action = A_CONTAINER_GET;
-			break;
-		case 'L':
-			action = A_CONTAINER_LIST;
-			break;
-		case 'l':
-			action = A_LISTSRV;
-			break;
+			case 'G':
+				action = A_CONTAINER_GET;
+				break;
+			case 'L':
+				action = A_CONTAINER_LIST;
+				break;
+			case 'l':
+				action = A_LISTSRV;
+				break;
 
-		case 'm':
-			/*meta0 url */
-			IGNORE_ARG('m');
-			if (meta0_url)
-				free(meta0_url);
-			meta0_url = strdup(optarg);
-			break;
-		case 'd':
-			/*container info */
-			IGNORE_ARG('d');
-			if (container_name)
-				free(container_name);
-			container_name = strdup(optarg);
-			break;
+			case 'm':
+				/*meta0 url */
+				IGNORE_ARG('m');
+				if (meta0_url)
+					free(meta0_url);
+				meta0_url = strdup(optarg);
+				break;
+			case 'd':
+				/*container info */
+				IGNORE_ARG('d');
+				if (container_name)
+					free(container_name);
+				container_name = strdup(optarg);
+				break;
 
-		case 'c':
-			/*remote source path */
-			IGNORE_ARG('c');
-			if (remote_path)
-				free(remote_path);
-			remote_path = strdup(optarg);
-			action = A_LISTCONTENT;
-			break;
+			case 'c':
+				/*remote source path */
+				IGNORE_ARG('c');
+				if (remote_path)
+					free(remote_path);
+				remote_path = strdup(optarg);
+				action = A_LISTCONTENT;
+				break;
 
-		case '?':
-		default:
-			PRINT_ERROR("unexpected %c (%s)\n", optopt, strerror(opterr));
-			return 0;
+			case '?':
+			default:
+				PRINT_ERROR("unexpected %c (%s)\n", optopt, strerror(opterr));
+				return 0;
 		}
 	}
 
@@ -191,12 +174,13 @@ parse_opt(int argc, char **args)
 static void
 sig_pipe(int s)
 {
-	(void)s;
+	(void) s;
 	signal(SIGPIPE, sig_pipe);
 }
 
 static int
-list_services_for_path(gs_container_t *container, gs_error_t **err, char *path)
+list_services_for_path(gs_container_t * container, gs_error_t ** err,
+	char *path)
 {
 	int i;
 	size_t str_url_len;
@@ -204,7 +188,7 @@ list_services_for_path(gs_container_t *container, gs_error_t **err, char *path)
 	gs_service_t **all_services, **current_service;
 	char **paths;
 
-	paths = calloc(2,sizeof(char*));
+	paths = calloc(2, sizeof(char *));
 	paths[0] = path;
 	all_services = gs_index_get_services_for_paths(container, paths, err);
 	free(paths);
@@ -212,9 +196,11 @@ list_services_for_path(gs_container_t *container, gs_error_t **err, char *path)
 	if (!all_services)
 		return -1;
 
-	debug("# services for [%s]: %d\n", remote_path, g_strv_length((gchar**)all_services));
-	for (current_service=all_services; *current_service ;current_service++) {
-		str_url_len = gs_service_get_url(*current_service,str_url,sizeof(str_url));
+	debug("# services for [%s]: %d\n", remote_path,
+		g_strv_length((gchar **) all_services));
+	for (current_service = all_services; *current_service; current_service++) {
+		str_url_len =
+			gs_service_get_url(*current_service, str_url, sizeof(str_url));
 		i = str_url_len;
 		g_print("%.*s\n", i, str_url);
 	}
@@ -225,7 +211,7 @@ list_services_for_path(gs_container_t *container, gs_error_t **err, char *path)
 }
 
 static int
-list_services_used(gs_container_t *container, gs_error_t **err)
+list_services_used(gs_container_t * container, gs_error_t ** err)
 {
 	int i;
 	size_t str_url_len;
@@ -236,9 +222,11 @@ list_services_used(gs_container_t *container, gs_error_t **err)
 	if (!all_services)
 		return -1;
 
-	debug("# services used by [%s] : %d\n", container_name, g_strv_length((gchar**)all_services));
-	for (current_service=all_services; *current_service ;current_service++) {
-		str_url_len = gs_service_get_url(*current_service,str_url,sizeof(str_url));
+	debug("# services used by [%s] : %d\n", container_name,
+		g_strv_length((gchar **) all_services));
+	for (current_service = all_services; *current_service; current_service++) {
+		str_url_len =
+			gs_service_get_url(*current_service, str_url, sizeof(str_url));
 		i = str_url_len;
 		g_print("%.*s\n", i, str_url);
 	}
@@ -249,7 +237,7 @@ list_services_used(gs_container_t *container, gs_error_t **err)
 }
 
 static int
-get_service_for_container(gs_container_t *container, gs_error_t **err)
+get_service_for_container(gs_container_t * container, gs_error_t ** err)
 {
 	int i;
 	size_t str_url_len;
@@ -260,9 +248,11 @@ get_service_for_container(gs_container_t *container, gs_error_t **err)
 	if (!all_services)
 		return -1;
 
-	debug("# services available for container [%s] : %u\n", container_name, g_strv_length((gchar**)all_services));
-	for (current_service=all_services; *current_service ;current_service++) {
-		str_url_len = gs_service_get_url(*current_service,str_url,sizeof(str_url));
+	debug("# services available for container [%s] : %u\n", container_name,
+		g_strv_length((gchar **) all_services));
+	for (current_service = all_services; *current_service; current_service++) {
+		str_url_len =
+			gs_service_get_url(*current_service, str_url, sizeof(str_url));
 		i = str_url_len;
 		g_print("%.*s\n", i, str_url);
 	}
@@ -273,7 +263,7 @@ get_service_for_container(gs_container_t *container, gs_error_t **err)
 }
 
 static int
-list_services_used_by_container(gs_container_t *container, gs_error_t **err)
+list_services_used_by_container(gs_container_t * container, gs_error_t ** err)
 {
 	int i;
 	size_t str_url_len;
@@ -284,9 +274,11 @@ list_services_used_by_container(gs_container_t *container, gs_error_t **err)
 	if (!all_services)
 		return -1;
 
-	debug("# services currently used by container [%s] : %u\n", container_name, g_strv_length((gchar**)all_services));
-	for (current_service=all_services; *current_service ;current_service++) {
-		str_url_len = gs_service_get_url(*current_service,str_url,sizeof(str_url));
+	debug("# services currently used by container [%s] : %u\n", container_name,
+		g_strv_length((gchar **) all_services));
+	for (current_service = all_services; *current_service; current_service++) {
+		str_url_len =
+			gs_service_get_url(*current_service, str_url, sizeof(str_url));
 		i = str_url_len;
 		g_print("%.*s\n", i, str_url);
 	}
@@ -326,7 +318,9 @@ main(int argc, char **args)
 	/*open the connection to the META0 */
 	gs = gs_grid_storage_init(meta0_url, &err);
 	if (!gs) {
-		PRINT_ERROR("grid storage error : cannot init the namespace configuration from %s\n", meta0_url);
+		PRINT_ERROR
+			("grid storage error : cannot init the namespace configuration from %s\n",
+			meta0_url);
 		return -1;
 	}
 	PRINT_DEBUG("Connected to the GridStorage namespace %s\n", meta0_url);
@@ -342,40 +336,44 @@ main(int argc, char **args)
 	PRINT_DEBUG("container %s found\n", container_name);
 
 	switch (action) {
-	case A_CONTAINER_GET:
-		rc = get_service_for_container(container,&err);
-		if (rc != 0)
-			PRINT_ERROR("Failed to list the index services used in container [%s] : %s\n",
-				container_name, gs_error_get_message(err));
-		break;
-	case A_CONTAINER_LIST:
-		rc = list_services_used_by_container(container,&err);
-		if (rc != 0)
-			PRINT_ERROR("Failed to list the index services used in container [%s] : %s\n",
-				container_name, gs_error_get_message(err));
-		break;
-	case A_LISTSRV:
-		rc = list_services_used(container,&err);
-		if (rc != 0)
-			PRINT_ERROR("Failed to list the index services used in container [%s] : %s\n",
-				container_name, gs_error_get_message(err));
-		break;
-		
-	case A_LISTCONTENT:
-		rc = list_services_for_path(container,&err, remote_path);
-		if (rc != 0)
-			PRINT_ERROR("Failed to list the index services used in container [%s] for path [%s] : %s\n",
-				container_name, remote_path, gs_error_get_message(err));
-		break;
+		case A_CONTAINER_GET:
+			rc = get_service_for_container(container, &err);
+			if (rc != 0)
+				PRINT_ERROR
+					("Failed to list the index services used in container [%s] : %s\n",
+					container_name, gs_error_get_message(err));
+			break;
+		case A_CONTAINER_LIST:
+			rc = list_services_used_by_container(container, &err);
+			if (rc != 0)
+				PRINT_ERROR
+					("Failed to list the index services used in container [%s] : %s\n",
+					container_name, gs_error_get_message(err));
+			break;
+		case A_LISTSRV:
+			rc = list_services_used(container, &err);
+			if (rc != 0)
+				PRINT_ERROR
+					("Failed to list the index services used in container [%s] : %s\n",
+					container_name, gs_error_get_message(err));
+			break;
 
-	default:
-		PRINT_ERROR("Action not set, please provide at least '-l' or '-c'\n");
-		rc = -1;
-		break;
+		case A_LISTCONTENT:
+			rc = list_services_for_path(container, &err, remote_path);
+			if (rc != 0)
+				PRINT_ERROR
+					("Failed to list the index services used in container [%s] for path [%s] : %s\n",
+					container_name, remote_path, gs_error_get_message(err));
+			break;
+
+		default:
+			PRINT_ERROR
+				("Action not set, please provide at least '-l' or '-c'\n");
+			rc = -1;
+			break;
 	}
 
 	gs_container_free(container);
 	gs_grid_storage_free(gs);
 	return 0;
 }
-

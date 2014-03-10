@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /*  $NetBSD: tree.h,v 1.8 2004/03/28 19:38:30 provos Exp $  */
 /*  $OpenBSD: tree.h,v 1.7 2002/10/17 21:51:54 art Exp $    */
 /* $FreeBSD: src/sys/sys/tree.h,v 1.9.4.2 2012/11/17 11:37:26 svnexp Exp $ */
@@ -105,7 +88,7 @@ struct {                                \
     SPLAY_RIGHT(tmp, field) = (head)->sph_root;         \
     (head)->sph_root = tmp;                     \
 } while (/*CONSTCOND*/ 0)
-    
+
 #define SPLAY_ROTATE_LEFT(head, tmp, field) do {            \
     SPLAY_RIGHT((head)->sph_root, field) = SPLAY_LEFT(tmp, field);  \
     SPLAY_LEFT(tmp, field) = (head)->sph_root;          \
@@ -779,4 +762,4 @@ name##_RB_MINMAX(struct name *head, int val)                \
         ((x) != NULL) && ((y) = name##_RB_PREV(x), (x) != NULL);    \
          (x) = (y))
 
-#endif  /* _SYS_TREE_H_ */
+#endif /* _SYS_TREE_H_ */

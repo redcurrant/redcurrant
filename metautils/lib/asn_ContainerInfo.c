@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metacomm.container_info.asn"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metacomm.container_info.asn"
 #endif
 
 #include <errno.h>
@@ -38,7 +18,7 @@ container_info_ASN2API(const ContainerInfo_t * asn, container_info_t * api)
 		return FALSE;
 
 	memset(api, 0x00, sizeof(container_info_t));
-	
+
 	/* cid */
 	g_memmove(api->id, asn->id.buf, asn->id.size);
 
@@ -57,8 +37,8 @@ container_info_API2ASN(const container_info_t * api, ContainerInfo_t * asn)
 
 	memset(asn, 0x00, sizeof(ContainerInfo_t));
 
-        /* cID */
-        OCTET_STRING_fromBuf(&(asn->id), (char *) api->id, sizeof(container_id_t));
+	/* cID */
+	OCTET_STRING_fromBuf(&(asn->id), (char *) api->id, sizeof(container_id_t));
 
 	/*size */
 	asn_int64_to_INTEGER(&(asn->size), api->size);

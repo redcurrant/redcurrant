@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file meta1_remote.h
  */
@@ -22,14 +5,12 @@
 #ifndef __META1_REMOTE_H__
 #define __META1_REMOTE_H__
 
-# include <stdlib.h>
-# include <errno.h>
-# include <string.h>
-# include <unistd.h>
-# include <glib.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
 
-# include <metatypes.h>
-# include <metacomm.h>
+#include <metautils/lib/metacomm.h>
 
 /**
  * @addtogroup meta1v2_remotev1
@@ -83,8 +64,8 @@
  * 
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_create_container (addr_info_t *meta1, gint ms, GError **err,
-		const char *cName, container_id_t cid);
+gboolean meta1_remote_create_container(addr_info_t * meta1, gint ms,
+	GError ** err, const char *cName, container_id_t cid);
 
 
 /**
@@ -105,9 +86,9 @@ gboolean meta1_remote_create_container (addr_info_t *meta1, gint ms, GError **er
  * 
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_create_container_v2 (addr_info_t *meta1, gint ms, GError **err,
-		const char *cName, const char *virtualNs, container_id_t cid,
-		gdouble to_step, gdouble to_overall, char **master);
+gboolean meta1_remote_create_container_v2(addr_info_t * meta1, gint ms,
+	GError ** err, const char *cName, const char *virtualNs, container_id_t cid,
+	gdouble to_step, gdouble to_overall, char **master);
 
 
 /**
@@ -128,8 +109,9 @@ gboolean meta1_remote_create_container_v2 (addr_info_t *meta1, gint ms, GError *
  * 
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_destroy_container_by_name (addr_info_t *meta1, gint ms, GError **err,
-		const char *cName, gdouble to_step, gdouble to_overall, char **master);
+gboolean meta1_remote_destroy_container_by_name(addr_info_t * meta1, gint ms,
+	GError ** err, const char *cName, gdouble to_step, gdouble to_overall,
+	char **master);
 
 
 /**
@@ -143,8 +125,8 @@ gboolean meta1_remote_destroy_container_by_name (addr_info_t *meta1, gint ms, GE
  * 
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_destroy_container_by_id (addr_info_t *meta1, gint ms, GError **err,
-	const container_id_t cid);
+gboolean meta1_remote_destroy_container_by_id(addr_info_t * meta1, gint ms,
+	GError ** err, const container_id_t cid);
 
 
 /**
@@ -155,8 +137,9 @@ gboolean meta1_remote_destroy_container_by_id (addr_info_t *meta1, gint ms, GErr
  * @param flags
  * @return
  */
-gboolean meta1_remote_destroy_container_with_flags (addr_info_t *meta1, gint ms, GError **err,
-	const container_id_t cid, guint32 flags, gdouble to_step, gdouble to_overall, char **master);
+gboolean meta1_remote_destroy_container_with_flags(addr_info_t * meta1, gint ms,
+	GError ** err, const container_id_t cid, guint32 flags, gdouble to_step,
+	gdouble to_overall, char **master);
 
 
 /**
@@ -169,8 +152,8 @@ gboolean meta1_remote_destroy_container_with_flags (addr_info_t *meta1, gint ms,
  * 
  * @return NULL in case of failure, a valid list af addr_info_t* in case of success.
  */
-GSList* meta1_remote_get_meta2_by_container_name (addr_info_t *meta1, gint ms, GError **err,
-	const char *cName);
+GSList *meta1_remote_get_meta2_by_container_name(addr_info_t * meta1, gint ms,
+	GError ** err, const char *cName);
 
 
 /**
@@ -184,8 +167,9 @@ GSList* meta1_remote_get_meta2_by_container_name (addr_info_t *meta1, gint ms, G
  * 
  * @return NULL in case of failure, a valid list af addr_info_t* in case of success.
  */
-GSList* meta1_remote_get_meta2_by_container_id (addr_info_t *meta1, gint ms, GError **err,
-	const container_id_t cid, gdouble to_step, gdouble to_overall);
+GSList *meta1_remote_get_meta2_by_container_id(addr_info_t * meta1, gint ms,
+	GError ** err, const container_id_t cid, gdouble to_step,
+	gdouble to_overall);
 
 
 /**
@@ -199,8 +183,8 @@ GSList* meta1_remote_get_meta2_by_container_id (addr_info_t *meta1, gint ms, GEr
  * 
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_set_container_flag (addr_info_t *meta1, gint ms, GError **err,
-	const container_id_t cid, guint32 flags);
+gboolean meta1_remote_set_container_flag(addr_info_t * meta1, gint ms,
+	GError ** err, const container_id_t cid, guint32 flags);
 
 
 /**
@@ -215,8 +199,8 @@ gboolean meta1_remote_set_container_flag (addr_info_t *meta1, gint ms, GError **
  * 
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_get_container_flag (addr_info_t *meta1, gint ms, GError **err,
-	const container_id_t cid, guint32 *flags);
+gboolean meta1_remote_get_container_flag(addr_info_t * meta1, gint ms,
+	GError ** err, const container_id_t cid, guint32 * flags);
 
 
 /**
@@ -229,8 +213,8 @@ gboolean meta1_remote_get_container_flag (addr_info_t *meta1, gint ms, GError **
  * 
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_range_del (addr_info_t *meta1, gint ms, GError **err,
-		prefix_t prefix);
+gboolean meta1_remote_range_del(addr_info_t * meta1, gint ms, GError ** err,
+	prefix_t prefix);
 
 
 /**
@@ -244,8 +228,8 @@ gboolean meta1_remote_range_del (addr_info_t *meta1, gint ms, GError **err,
  * 
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_range_add (addr_info_t *meta1, gint ms, GError **err,
-		prefix_t prefix, prefix_data_t *pData);
+gboolean meta1_remote_range_add(addr_info_t * meta1, gint ms, GError ** err,
+	prefix_t prefix, prefix_data_t * pData);
 
 
 /**
@@ -258,8 +242,8 @@ gboolean meta1_remote_range_add (addr_info_t *meta1, gint ms, GError **err,
  * @param pData the prefix parameters to be set
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_range_set (addr_info_t *meta1, gint ms, GError **err,
-		prefix_t prefix, prefix_data_t *pData);
+gboolean meta1_remote_range_set(addr_info_t * meta1, gint ms, GError ** err,
+	prefix_t prefix, prefix_data_t * pData);
 
 
 /**
@@ -272,8 +256,8 @@ gboolean meta1_remote_range_set (addr_info_t *meta1, gint ms, GError **err,
  * @param pData a valid pointer to a structure that will be set.
  * @return TRUE in case of success, FALSE in case of failure.
  */
-gboolean meta1_remote_range_get (addr_info_t *meta1, gint ms, GError **err,
-		prefix_t prefix, prefix_data_t *pData);
+gboolean meta1_remote_range_get(addr_info_t * meta1, gint ms, GError ** err,
+	prefix_t prefix, prefix_data_t * pData);
 
 
 /**
@@ -283,7 +267,7 @@ gboolean meta1_remote_range_get (addr_info_t *meta1, gint ms, GError **err,
  * @param err
  * @return
  */
-GSList* meta1_remote_range_list( addr_info_t *meta1, gint ms, GError **err);
+GSList *meta1_remote_range_list(addr_info_t * meta1, gint ms, GError ** err);
 
 
 /**
@@ -295,8 +279,8 @@ GSList* meta1_remote_range_list( addr_info_t *meta1, gint ms, GError **err);
  * @param err
  * @return
  */
-GSList* meta1_remote_get_containers_on_meta2( struct metacnx_ctx_s *ctx,
-		addr_info_t *m2_addr, GError **err);
+GSList *meta1_remote_get_containers_on_meta2(struct metacnx_ctx_s *ctx,
+	addr_info_t * m2_addr, GError ** err);
 
 
 /**
@@ -307,8 +291,8 @@ GSList* meta1_remote_get_containers_on_meta2( struct metacnx_ctx_s *ctx,
  * @param err 
  * @return 
  */
-gboolean meta1_remote_force_creation( struct metacnx_ctx_s *ctx, GError **err,
-		const container_id_t cid, const gchar *name, GSList *addr_list);
+gboolean meta1_remote_force_creation(struct metacnx_ctx_s *ctx, GError ** err,
+	const container_id_t cid, const gchar * name, GSList * addr_list);
 
 
 /**
@@ -319,9 +303,9 @@ gboolean meta1_remote_force_creation( struct metacnx_ctx_s *ctx, GError **err,
  * @param err
  * @return
  */
-struct meta1_raw_container_s* meta1_remote_get_container_by_id(
-		struct metacnx_ctx_s *ctx, container_id_t cid, GError **err,
-		gdouble to_step, gdouble to_overall);
+struct meta1_raw_container_s *meta1_remote_get_container_by_id(struct
+	metacnx_ctx_s *ctx, container_id_t cid, GError ** err, gdouble to_step,
+	gdouble to_overall);
 
 
 /**
@@ -332,8 +316,8 @@ struct meta1_raw_container_s* meta1_remote_get_container_by_id(
  * @param err
  * @return
  */
-struct meta1_raw_container_s* meta1_remote_get_container_by_name(
-		struct metacnx_ctx_s *ctx, gchar *container_name, GError **err);
+struct meta1_raw_container_s *meta1_remote_get_container_by_name(struct
+	metacnx_ctx_s *ctx, gchar * container_name, GError ** err);
 
 /**
  * @param ctx
@@ -343,7 +327,7 @@ struct meta1_raw_container_s* meta1_remote_get_container_by_name(
  * @return
  */
 gboolean meta1_remote_get_container_names_matching(struct metacnx_ctx_s *ctx,
-		GSList *list_of_patterns, GSList **result, GError **err);
+	GSList * list_of_patterns, GSList ** result, GError ** err);
 
 
 /**
@@ -357,8 +341,8 @@ gboolean meta1_remote_get_container_names_matching(struct metacnx_ctx_s *ctx,
  * @return
  */
 gboolean meta1_remote_change_container_reference(struct metacnx_ctx_s *cnx,
-		const container_id_t cid, const addr_info_t *old_m2,
-		const addr_info_t *new_m2, GSList **new_set, GError **gerr);
+	const container_id_t cid, const addr_info_t * old_m2,
+	const addr_info_t * new_m2, GSList ** new_set, GError ** gerr);
 
 
 /**
@@ -369,8 +353,8 @@ gboolean meta1_remote_change_container_reference(struct metacnx_ctx_s *cnx,
  * @return
  */
 gboolean
-meta1_remote_update_containers(addr_info_t *meta1, GSList *list_of_containers,
-		gint ms, GError **err);
+meta1_remote_update_containers(gchar * meta1_addr_str,
+	GSList * list_of_containers, gint ms, GError ** err);
 
 
 /**
@@ -379,8 +363,8 @@ meta1_remote_update_containers(addr_info_t *meta1, GSList *list_of_containers,
  * @param err
  * @return
  */
-GHashTable* meta1_remote_get_virtual_ns_state(addr_info_t *meta1, gint ms,
-		GError **err);
+GHashTable *meta1_remote_get_virtual_ns_state(addr_info_t * meta1, gint ms,
+	GError ** err);
 
 
 /** @} */
@@ -398,6 +382,7 @@ GHashTable* meta1_remote_get_virtual_ns_state(addr_info_t *meta1, gint ms,
 #define NAME_MSGNAME_M1V2_SRVSETARG "M1V2_SRVSETARG"
 #define NAME_MSGNAME_M1V2_SRVDEL "M1V2_SRVDEL"
 #define NAME_MSGNAME_M1V2_SRVALL "M1V2_SRVALL"
+#define NAME_MSGNAME_M1V2_SRVALLONM1 "M1V2_SRVALLONM1"
 #define NAME_MSGNAME_M1V2_SRVAVAIL "M1V2_SRVAVAIL"
 #define NAME_MSGNAME_M1V2_CID_PROPGET "M1V2_CID_PROPGET"
 #define NAME_MSGNAME_M1V2_CID_PROPSET "M1V2_CID_PROPSET"
@@ -406,6 +391,9 @@ GHashTable* meta1_remote_get_virtual_ns_state(addr_info_t *meta1, gint ms,
 #define NAME_MSGNAME_M1V2_OPENALL "M1V2_OPENALL"
 #define NAME_MSGNAME_M1V2_LISTBYPREF "M1V2_LISTBYPREFIX"
 #define NAME_MSGNAME_M1V2_LISTBYSERV "M1V2_LISTBYSERV"
+#define NAME_MSGNAME_M1V2_UPDATEM1POLICY "M1V2_UPDATEM1POLICY"
+
+#define NAME_HEADER_DRYRUN "DRYRUN"
 
 /**
  * @param meta1
@@ -415,10 +403,9 @@ GHashTable* meta1_remote_get_virtual_ns_state(addr_info_t *meta1, gint ms,
  * @param refname
  * @return
  */
-gboolean meta1v2_remote_create_reference (const addr_info_t *meta1,
-		GError **err, const gchar *ns, const container_id_t refid,
-		const gchar *refname, gdouble to_step, gdouble to_overall,
-		char **master);
+gboolean meta1v2_remote_create_reference(const addr_info_t * meta1,
+	GError ** err, const gchar * ns, const container_id_t refid,
+	const gchar * refname, gdouble to_step, gdouble to_overall, char **master);
 
 
 /**
@@ -428,9 +415,9 @@ gboolean meta1v2_remote_create_reference (const addr_info_t *meta1,
  * @param refid
  * @return 
  */
-gboolean meta1v2_remote_delete_reference(const addr_info_t *meta1,
-		GError **err, const gchar *ns, const container_id_t refid
-		, gdouble to_step, gdouble to_overall, char **master);
+gboolean meta1v2_remote_delete_reference(const addr_info_t * meta1,
+	GError ** err, const gchar * ns, const container_id_t refid,
+	gdouble to_step, gdouble to_overall, char **master);
 
 /**
  * @param meta1
@@ -439,9 +426,9 @@ gboolean meta1v2_remote_delete_reference(const addr_info_t *meta1,
  * @param refid
  * @return
  */
-gboolean meta1v2_remote_has_reference(const addr_info_t *meta1,
-		GError **err, const gchar *ns, const container_id_t refid,
-		gdouble to_step, gdouble to_overall);
+gboolean meta1v2_remote_has_reference(const addr_info_t * meta1,
+	GError ** err, const gchar * ns, const container_id_t refid,
+	gdouble to_step, gdouble to_overall);
 
 
 /**
@@ -452,9 +439,10 @@ gboolean meta1v2_remote_has_reference(const addr_info_t *meta1,
  * @param service_type
  * @return
  */
-gchar ** meta1v2_remote_link_service(const addr_info_t *meta1, GError **err,
-		const char *ns, const container_id_t refID,
-		const gchar *service_type, gdouble to_step, gdouble to_overall, char **master);
+gchar **meta1v2_remote_link_service(const addr_info_t * meta1, GError ** err,
+	const char *ns, const container_id_t refID,
+	const gchar * service_type, gdouble to_step, gdouble to_overall,
+	char **master);
 
 
 
@@ -466,17 +454,17 @@ gchar ** meta1v2_remote_link_service(const addr_info_t *meta1, GError **err,
  * @param srvtype
  * @return
  */
-gboolean meta1v2_remote_unlink_service(const addr_info_t *meta1,
-		GError **err, const char *ns, const container_id_t refid,
-		const gchar *srvtype, gdouble to_step, gdouble to_overall, char **master);
+gboolean meta1v2_remote_unlink_service(const addr_info_t * meta1,
+	GError ** err, const char *ns, const container_id_t refid,
+	const gchar * srvtype, gdouble to_step, gdouble to_overall, char **master);
 
 /**
  * @param ...
  */
-gboolean meta1v2_remote_unlink_one_service(const addr_info_t *meta1,
-		GError **err, const char *ns, const container_id_t refid,
-		const gchar *srvtype , gdouble to_step, gdouble to_overall, char **master,
-		gint64 seqid);
+gboolean meta1v2_remote_unlink_one_service(const addr_info_t * meta1,
+	GError ** err, const char *ns, const container_id_t refid,
+	const gchar * srvtype, gdouble to_step, gdouble to_overall, char **master,
+	gint64 seqid);
 
 /**
  * @param meta1
@@ -486,9 +474,9 @@ gboolean meta1v2_remote_unlink_one_service(const addr_info_t *meta1,
  * @param service_type
  * @return
  */
-gchar ** meta1v2_remote_list_reference_services(const addr_info_t *meta1,
-		GError **err, const char *ns, const container_id_t refid,
-		const gchar *srvtype, gdouble to_step, gdouble to_overall);
+gchar **meta1v2_remote_list_reference_services(const addr_info_t * meta1,
+	GError ** err, const char *ns, const container_id_t refid,
+	const gchar * srvtype, gdouble to_step, gdouble to_overall);
 
 
 /**
@@ -499,9 +487,39 @@ gchar ** meta1v2_remote_list_reference_services(const addr_info_t *meta1,
  * @param srvtype
  * @return
  */
-gchar** meta1v2_remote_poll_reference_service(const addr_info_t *meta1,
-		GError **err, const char *ns, const container_id_t refid,
-		const gchar *srvtype, gdouble to_step, gdouble to_overall, char **master);
+gchar **meta1v2_remote_poll_reference_service(const addr_info_t * meta1,
+	GError ** err, const char *ns, const container_id_t refid,
+	const gchar * srvtype, gdouble to_step, gdouble to_overall, char **master);
+
+/**
+ * @param meta1
+ * @param err
+ * @param ns
+ * @param prefix
+ * @param refid
+ * @param srvtype
+ * @param action
+ * @param checkonly
+ * @param excludeurl
+ * @return
+ */
+gchar **meta1v2_remote_update_m1_policy(const addr_info_t * meta1,
+	GError ** err, const char *ns, const container_id_t prefix,
+	const container_id_t refid, const gchar * srvtype, const gchar * action,
+	gboolean checkonly, const gchar * excludeurl, gdouble to_step,
+	gdouble to_overall);
+/**
+ * @param meta1
+ * @param err
+ * @param ns
+ * @param refid
+ * @param url
+ * @return
+ */
+gboolean meta1v2_remote_force_reference_service(const addr_info_t * meta1,
+	GError ** err, const char *ns, const container_id_t refid,
+	const gchar * url, gdouble to_step, gdouble to_overall, char **master);
+
 
 /**
  * @param meta1
@@ -511,22 +529,9 @@ gchar** meta1v2_remote_poll_reference_service(const addr_info_t *meta1,
  * @param url
  * @return
  */
-gboolean meta1v2_remote_force_reference_service(const addr_info_t *meta1,
-		GError **err, const char *ns, const container_id_t refid,
-		const gchar *url, gdouble to_step, gdouble to_overall, char **master);
-
-
-/**
- * @param meta1
- * @param err
- * @param ns
- * @param refid
- * @param url
- * @return
- */
-gboolean meta1v2_remote_configure_reference_service(const addr_info_t *meta1,
-		GError **err, const char *ns, const container_id_t refid,
-		const gchar *url, gdouble to_step, gdouble to_overall, char **master);
+gboolean meta1v2_remote_configure_reference_service(const addr_info_t * meta1,
+	GError ** err, const char *ns, const container_id_t refid,
+	const gchar * url, gdouble to_step, gdouble to_overall, char **master);
 
 /**
  * @param m1
@@ -537,9 +542,9 @@ gboolean meta1v2_remote_configure_reference_service(const addr_info_t *meta1,
  * @param result
  * @return
  */
-gboolean meta1v2_remote_reference_get_property(const addr_info_t *m1,
-		GError **err, const gchar *ns, const container_id_t refid,
-		gchar **keys, gchar ***result, gdouble to_step, gdouble to_overall);
+gboolean meta1v2_remote_reference_get_property(const addr_info_t * m1,
+	GError ** err, const gchar * ns, const container_id_t refid,
+	gchar ** keys, gchar *** result, gdouble to_step, gdouble to_overall);
 
 /**
  * @param m1
@@ -549,9 +554,9 @@ gboolean meta1v2_remote_reference_get_property(const addr_info_t *m1,
  * @param pairs
  * @return
  */
-gboolean meta1v2_remote_reference_set_property(const addr_info_t *m1,
-		GError **err, const gchar *ns, const container_id_t refid,
-		gchar **pairs, gdouble to_step, gdouble to_overall, char **master);
+gboolean meta1v2_remote_reference_set_property(const addr_info_t * m1,
+	GError ** err, const gchar * ns, const container_id_t refid,
+	gchar ** pairs, gdouble to_step, gdouble to_overall, char **master);
 
 /**
  * @param m1
@@ -561,9 +566,9 @@ gboolean meta1v2_remote_reference_set_property(const addr_info_t *m1,
  * @param keys
  * @return
  */
-gboolean meta1v2_remote_reference_del_property(const addr_info_t *m1,
-		GError **err, const gchar *ns, const container_id_t refid,
-		gchar **keys, gdouble to_step, gdouble to_overall, char **master);
+gboolean meta1v2_remote_reference_del_property(const addr_info_t * m1,
+	GError ** err, const gchar * ns, const container_id_t refid,
+	gchar ** keys, gdouble to_step, gdouble to_overall, char **master);
 
 /**
  * @param m1
@@ -572,9 +577,19 @@ gboolean meta1v2_remote_reference_del_property(const addr_info_t *m1,
  * @parem result
  * @return
  */
-GError * meta1v2_remote_list_references(const addr_info_t *m1,
-		const gchar *ns, const container_id_t refid,
-		GByteArray **result);
+gchar **meta1v2_remote_list_services(const addr_info_t * m1, GError ** err,
+	const gchar * ns, const container_id_t refid);
+
+
+/**
+ * @param m1
+ * @param ns
+ * @param refid
+ * @parem result
+ * @return
+ */
+GError *meta1v2_remote_list_references(const addr_info_t * m1,
+	const gchar * ns, const container_id_t refid, GByteArray ** result);
 
 /**
  * @param m1
@@ -585,10 +600,11 @@ GError * meta1v2_remote_list_references(const addr_info_t *m1,
  * @param result
  * @return
  */
-GError * meta1v2_remote_list_references_by_service(const addr_info_t *m1,
-		const gchar *ns, const container_id_t refid,
-		const gchar *srvtype, const gchar *url,
-		GByteArray **result);
+GError *meta1v2_remote_list_references_by_service(const addr_info_t * m1,
+	const gchar * ns, const container_id_t refid,
+	const gchar * srvtype, const gchar * url, GByteArray ** result);
+
+
 
 /**
  * @param m1
@@ -596,8 +612,8 @@ GError * meta1v2_remote_list_references_by_service(const addr_info_t *m1,
  * @param result
  * @return
  */
-gboolean meta1v2_remote_get_prefixes(const addr_info_t *m1,
-		GError **err, gchar ***result );
+gboolean meta1v2_remote_get_prefixes(const addr_info_t * m1,
+	GError ** err, gchar *** result);
 
 /** @} */
 

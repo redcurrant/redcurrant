@@ -1,30 +1,13 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef GENERIC_H
-# define GENERIC_H 1
-# include <glib.h>
-# include <sqlite3.h>
+#define GENERIC_H 1
+#include <glib.h>
+#include <sqlite3.h>
 
-# define BEAN_FLAG_DIRTY     0x01
-# define BEAN_FLAG_TRANSIENT 0x02
+#define BEAN_FLAG_DIRTY     0x01
+#define BEAN_FLAG_TRANSIENT 0x02
 
 #ifndef M2_SQLITE_GERROR
-# define M2_SQLITE_GERROR(db, RC) g_error_new(GQ(), (RC), "(%d) %s", (RC), db?sqlite3_errmsg(db):"-")
+#define M2_SQLITE_GERROR(db, RC) g_error_new(GQ(), (RC), "(%d) %s", (RC), db?sqlite3_errmsg(db):"-")
 #endif
 
 #define HDR(B)            ((struct bean_header_s*)(B))
@@ -43,26 +26,30 @@ typedef void (*on_bean_f) (gpointer u, gpointer bean);
 /** PRIVATE, DON'T TOUCH UNLESS YOU KNOW WHAT YOU ARE DOING */
 struct bean_header_s
 {
-	guint32 flags; 
-	guint64 fields; /*!< the bit at position i means that the fields at
-					  position i is set (and thus not NULL) */
+	guint32 flags;
+	guint64 fields;				/*!< the bit at position i means that the fields at
+								   position i is set (and thus not NULL) */
 	const struct bean_descriptor_s *descr;
 };
 
-struct field_descriptor_s {
+struct field_descriptor_s
+{
 	const gchar *name;
 	const guint position;
 	const long offset;
 	const gboolean mandatory;
-	const enum {FT_BOOL, FT_INT, FT_REAL, FT_TEXT, FT_BLOB} type;
+	const enum
+	{ FT_BOOL, FT_INT, FT_REAL, FT_TEXT, FT_BLOB } type;
 	const gboolean pk;
 };
 
-struct bean_descriptor_s {
+struct bean_descriptor_s
+{
 	const gchar *name;
 	const gchar *c_name;
 	const gchar *sql_name;
 	const gchar *sql_select;
+	const gchar *sql_count;
 	const gchar *sql_replace;
 	const gchar *sql_update;
 	const long offset_fields;
@@ -73,12 +60,14 @@ struct bean_descriptor_s {
 	gchar **fk_names;
 };
 
-struct fk_field_s {
+struct fk_field_s
+{
 	gint i;
 	const gchar *name;
 };
 
-struct fk_descriptor_s {
+struct fk_descriptor_s
+{
 	/* the name making sense for the  */
 	const gchar *logical_name;
 
@@ -100,17 +89,17 @@ void _bean_clean(gpointer bean);
 /**
  * @param beans
  */
-void _bean_cleanv(gpointer *beanv);
+void _bean_cleanv(gpointer * beanv);
 
 /**
  * @param v
  */
-void _bean_cleanv2(GPtrArray *v);
+void _bean_cleanv2(GPtrArray * v);
 
 /**
  * @param v
  */
-void _bean_cleanl2(GSList *v);
+void _bean_cleanl2(GSList * v);
 
 /**
  * @param descr
@@ -118,25 +107,42 @@ void _bean_cleanl2(GSList *v);
  * @param bean
  * @return
  */
-GError* _db_save_bean(sqlite3 *db, gpointer bean);
+GError *_db_save_bean(sqlite3 * db, gpointer bean);
+
+/**
+ * @param db
+ * @param list
+ * @return
+ */
+GError *_db_save_beans_list(sqlite3 * db, GSList * list);
+
+/**
+ * @param db
+ * @param array
+ * @return
+ */
+GError *_db_save_beans_array(sqlite3 * db, GPtrArray * array);
 
 /**
  * @param db
  * @param bean
  * @return
  */
-GError* _db_delete_bean(sqlite3 *db, gpointer bean);
+GError *_db_delete_bean(sqlite3 * db, gpointer bean);
 
-GError* _db_delete(const struct bean_descriptor_s *descr, sqlite3 *db,
-		const gchar *clause, GVariant **params);
+GError *_db_delete(const struct bean_descriptor_s *descr, sqlite3 * db,
+	const gchar * clause, GVariant ** params);
 
 /**
  * Fills 'result' with beans described by 'descr', filtered with
  * the 'clause' and its parameters.
  */
-GError* _db_get_bean(const struct bean_descriptor_s *descr,
-		sqlite3 *db, const gchar *clause, GVariant **params,
-		on_bean_f cb, gpointer u);
+GError *_db_get_bean(const struct bean_descriptor_s *descr,
+	sqlite3 * db, const gchar * clause, GVariant ** params,
+	on_bean_f cb, gpointer u);
+
+GError *_db_count_bean(const struct bean_descriptor_s *descr,
+	sqlite3 * db, const gchar * clause, GVariant ** params, gint64 * pcount);
 
 /**
  * Finds the FK descriptor, then calls _db_get_FK()
@@ -147,8 +153,11 @@ GError* _db_get_bean(const struct bean_descriptor_s *descr,
  * @param u
  * @return
  */
-GError* _db_get_FK_by_name(gpointer bean, const gchar *name,
-		sqlite3 *db, on_bean_f cb, gpointer u);
+GError *_db_get_FK_by_name(gpointer bean, const gchar * name,
+	sqlite3 * db, on_bean_f cb, gpointer u);
+
+GError *_db_count_FK_by_name(gpointer bean, const gchar * name,
+	sqlite3 * db, gint64 * pcount);
 
 /**
  * @param bean
@@ -157,15 +166,15 @@ GError* _db_get_FK_by_name(gpointer bean, const gchar *name,
  * @param result
  * @return
  */
-GError* _db_get_FK_by_name_buffered(gpointer bean, const gchar *name,
-		sqlite3 *db, GPtrArray *result);
+GError *_db_get_FK_by_name_buffered(gpointer bean, const gchar * name,
+	sqlite3 * db, GPtrArray * result);
 
 /**
  * @param gstr can be NULL
  * @param bean
  * @return
  */
-GString* _bean_debug(GString *gstr, gpointer bean);
+GString *_bean_debug(GString * gstr, gpointer bean);
 
 /**
  * @param bean
@@ -184,20 +193,20 @@ gpointer _bean_create(const struct bean_descriptor_s *descr);
  * @param bean
  * @return
  */
-const gchar * _bean_get_typename(gpointer bean);
+const gchar *_bean_get_typename(gpointer bean);
 
 /**
  * @param bean
  * @return
  */
-gchar ** _bean_get_FK_names(gpointer bean);
+gchar **_bean_get_FK_names(gpointer bean);
 
 /**
  * @param bean
  * @param fkname
  * @return
  */
-gpointer _bean_create_child(gpointer bean, const gchar *fkname);
+gpointer _bean_create_child(gpointer bean, const gchar * fkname);
 
 /**
  * Duplicates 'bean' and returns it
@@ -225,10 +234,10 @@ void _bean_buffer_cb(gpointer gpa, gpointer bean);
 #define _bean_set_field(bean,pos) (HDR(bean)->fields |= (1<<(pos)))
 #define _bean_del_field(bean,pos) (HDR(bean)->fields &= ~(1<<(pos)))
 
-gsize SHA256_randomized_buffer(guint8 *d, gsize dlen);
+gsize SHA256_randomized_buffer(guint8 * d, gsize dlen);
 
-gsize SHA256_randomized_string(gchar *d, gsize dlen);
+gsize SHA256_randomized_string(gchar * d, gsize dlen);
 
-GVariant* _gba_to_gvariant(GByteArray *gba);
+GVariant *_gba_to_gvariant(GByteArray * gba);
 
 #endif /* GENERIC_H */

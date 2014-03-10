@@ -11,11 +11,10 @@
  * @{
  */
 
+#include <metautils/lib/metatypes.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
 #include <glib.h>
-
-#include <metatypes.h>
-#include <metautils.h>
-#include <metacomm.h>
 
 /*
  * ---------------------------
@@ -44,6 +43,9 @@
 #define REMOTECONTAINER_FLAG_OK       0x00000000
 #define REMOTECONTAINER_FLAG_FROZEN   0x00000001
 #define REMOTECONTAINER_FLAG_DISABLED 0x00000002
+
+#define META2TOUCH_FLAGS_UPDATECSIZE     0x00000001
+#define META2TOUCH_FLAGS_RECALCCSIZE     0x00000002
 
 #define NAME_MSGNAME_M2RAW_GETCONTENTS "REQ_M2RAW_CONTENT_GETALL"
 #define NAME_MSGNAME_M2RAW_GETCONTENTBYPATH  "REQ_M2RAW_CONTENT_GETBYPATH"
@@ -82,7 +84,7 @@
   *             well known keys wil be present: NAME_HEADER_NAMESPACE (the namespace),
   *		NAME_HEADER_CONFIGURATION (the configuration string of the server).
  */
-GHashTable *meta2_remote_info(struct metacnx_ctx_s *ctx, GError ** err);
+GHashTable *meta2_remote_info(struct metacnx_ctx_s * ctx, GError ** err);
 
 /**
  * @see meta2_remote_info()
@@ -100,7 +102,8 @@ GHashTable *meta2_remote_info_with_fd(int fd, gint ms, GError ** err);
  * @param err
  * @return
  */
-GHashTable *meta2_remote_info_with_addr(addr_info_t * m2_addr, gint ms, GError ** err);
+GHashTable *meta2_remote_info_with_addr(addr_info_t * m2_addr, gint ms,
+	GError ** err);
 
 /**
  * @param ctx
@@ -111,7 +114,8 @@ GHashTable *meta2_remote_info_with_addr(addr_info_t * m2_addr, gint ms, GError *
  * @return
  */
 GSList *meta2_remote_content_append(struct metacnx_ctx_s *ctx, GError ** err,
-    const container_id_t container_id, const gchar * content_path, content_length_t content_length);
+	const container_id_t container_id, const gchar * content_path,
+	content_length_t content_length);
 
 /**
  * @param ctx
@@ -123,7 +127,8 @@ GSList *meta2_remote_content_append(struct metacnx_ctx_s *ctx, GError ** err,
  * @return
  */
 GSList *meta2_remote_content_append_v2(struct metacnx_ctx_s *ctx, GError ** err,
-    gchar *virtual_namespace, const container_id_t container_id, const gchar * content_path, content_length_t content_length);
+	gchar * virtual_namespace, const container_id_t container_id,
+	const gchar * content_path, content_length_t content_length);
 
 
 /**
@@ -137,8 +142,8 @@ GSList *meta2_remote_content_append_v2(struct metacnx_ctx_s *ctx, GError ** err,
  *
  * @return TRUE if the function succeeds (the distant flag is now set), FALSE elsewhere and err is set
  */
-gboolean meta2_remote_container_set_flag(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    guint32 flag);
+gboolean meta2_remote_container_set_flag(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id, guint32 flag);
 
 
 /**
@@ -154,8 +159,8 @@ gboolean meta2_remote_container_set_flag(addr_info_t * m2_addr, gint ms, GError 
  * @return TRUE if the function succeeds (flag succesfully retrieved), FALSE
  *         elsewhere and err is set
  */
-gboolean meta2_remote_container_get_flag(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    guint32 * flag);
+gboolean meta2_remote_container_get_flag(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id, guint32 * flag);
 
 
 /**
@@ -173,7 +178,8 @@ gboolean meta2_remote_container_get_flag(addr_info_t * m2_addr, gint ms, GError 
  *
  * @return a --maybe empty-- list of path_info_t* structures.
  */
-GSList *meta2_remote_container_list(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id);
+GSList *meta2_remote_container_list(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id);
 
 
 /**
@@ -186,8 +192,8 @@ GSList *meta2_remote_container_list(addr_info_t * m2_addr, gint ms, GError ** er
  * @param name
  * @return TRUE if the container was created, FALSE elsewhere and err is set
  */
-gboolean meta2_remote_container_create(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * name);
+gboolean meta2_remote_container_create(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id, const gchar * name);
 
 
 /**
@@ -199,8 +205,9 @@ gboolean meta2_remote_container_create(addr_info_t * m2_addr, gint ms, GError **
  * @param virtual_namespace
  * @return
  */
-gboolean meta2_remote_container_create_v2(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * name, const gchar * virtual_namespace);
+gboolean meta2_remote_container_create_v2(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id, const gchar * name,
+	const gchar * virtual_namespace);
 
 
 /**
@@ -213,8 +220,9 @@ gboolean meta2_remote_container_create_v2(addr_info_t * m2_addr, gint ms, GError
  * @param e
  * @return
  */
-gboolean meta2_remote_container_create_v3 (const addr_info_t *m2, gint ms, const char *ns, const char *cname,
-                const container_id_t cid, const char *stgpol, GError **e);
+gboolean meta2_remote_container_create_v3(const addr_info_t * m2, gint ms,
+	const char *ns, const char *cname, const container_id_t cid,
+	const char *stgpol, GError ** e);
 
 /**
  * Destroys the container with the given ID on the remote container
@@ -226,7 +234,8 @@ gboolean meta2_remote_container_create_v3 (const addr_info_t *m2, gint ms, const
  *
  * @return TRUE if the container was created, FALSE elsewhere and err is set
  */
-gboolean meta2_remote_container_destroy(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id);
+gboolean meta2_remote_container_destroy(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id);
 
 
 /**
@@ -239,7 +248,8 @@ gboolean meta2_remote_container_destroy(addr_info_t * m2_addr, gint ms, GError *
  *
  * @return
  */
-gboolean meta2_remote_container_open(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id);
+gboolean meta2_remote_container_open(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id);
 
 
 /**
@@ -252,7 +262,8 @@ gboolean meta2_remote_container_open(addr_info_t * m2_addr, gint ms, GError ** e
  *
  * @return
  */
-gboolean meta2_remote_container_close(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id);
+gboolean meta2_remote_container_close(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id);
 
 
 /**
@@ -273,8 +284,9 @@ gboolean meta2_remote_container_close(addr_info_t * m2_addr, gint ms, GError ** 
  * @return NULL in case of error (and then err is set) or a list of chunk_info_t*
  */
 GSList *meta2_remote_content_add(addr_info_t * m2_addr, gint ms, GError ** err,
-    const container_id_t container_id, const gchar * content_path, content_length_t content_length,
-    GByteArray * system_metadata, GByteArray ** new_system_metadata);
+	const container_id_t container_id, const gchar * content_path,
+	content_length_t content_length, GByteArray * system_metadata,
+	GByteArray ** new_system_metadata);
 
 /**
  * Add new spare chunks to the remote content chunk's list, and returns their
@@ -290,8 +302,9 @@ GSList *meta2_remote_content_add(addr_info_t * m2_addr, gint ms, GError ** err,
  *
  * @return NULL in case of error (and then err is set) or a list of chunk_info_t*
  */
-GSList *meta2_remote_content_spare(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+GSList *meta2_remote_content_spare(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id,
+	const gchar * content_path);
 
 
 /**
@@ -309,8 +322,9 @@ GSList *meta2_remote_content_spare(addr_info_t * m2_addr, gint ms, GError ** err
  * @param content_path a not NULL pointer to a NULL-terminated character array
  * @return TRUE if the content could be marked for removal
  */
-gboolean meta2_remote_content_remove(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+gboolean meta2_remote_content_remove(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id,
+	const gchar * content_path);
 
 
 /**
@@ -323,8 +337,9 @@ gboolean meta2_remote_content_remove(addr_info_t * m2_addr, gint ms, GError ** e
  * @param content_path
  * @return
  */
-gboolean meta2_remote_content_commit(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+gboolean meta2_remote_content_commit(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id,
+	const gchar * content_path);
 
 
 /**
@@ -338,8 +353,9 @@ gboolean meta2_remote_content_commit(addr_info_t * m2_addr, gint ms, GError ** e
  * @param content_path
  * @return
  */
-gboolean meta2_remote_content_rollback(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+gboolean meta2_remote_content_rollback(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id,
+	const gchar * content_path);
 
 /**
  * Get the chunks locations of the given content in the givan container.
@@ -354,8 +370,9 @@ gboolean meta2_remote_content_rollback(addr_info_t * m2_addr, gint ms, GError **
  * @param content_path
  * @return NULL in case of error (and err is set), or a list of chunk_info_t*
  */
-GSList *meta2_remote_content_retrieve(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+GSList *meta2_remote_content_retrieve(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id,
+	const gchar * content_path);
 
 
 /**
@@ -370,8 +387,9 @@ GSList *meta2_remote_content_retrieve(addr_info_t * m2_addr, gint ms, GError ** 
  * @param chunks
  * @return TRUE if all the changes succeeded, FALSE elsewhere (and err is set).
  */
-gboolean meta2_remote_chunk_commit(addr_info_t * m2_addr, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path, GSList * chunks);
+gboolean meta2_remote_chunk_commit(addr_info_t * m2_addr, gint ms,
+	GError ** err, const container_id_t container_id,
+	const gchar * content_path, GSList * chunks);
 
 /**
  * Returns all the information about the content with the given path in the
@@ -389,7 +407,8 @@ gboolean meta2_remote_chunk_commit(addr_info_t * m2_addr, gint ms, GError ** err
  *         a well initiated struct meta2_raw_content_s.
  */
 struct meta2_raw_content_s *meta2_remote_stat_content(struct metacnx_ctx_s *cnx,
-	const container_id_t cid, const gchar *path, gsize path_len, GError **error);
+	const container_id_t cid, const gchar * path, gsize path_len,
+	GError ** error);
 
 /* ------------------------------------------------------------------------- */
 
@@ -402,8 +421,8 @@ struct meta2_raw_content_s *meta2_remote_stat_content(struct metacnx_ctx_s *cnx,
  * @param container_id
  * @return
  */
-GSList *meta2_remote_container_list_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id);
-
+GSList *meta2_remote_container_list_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id);
 
 /**
  * @see meta2_remote_container_create()
@@ -414,8 +433,8 @@ GSList *meta2_remote_container_list_in_fd(int fd, gint ms, GError ** err, const 
  * @param name
  * @return
  */
-gboolean meta2_remote_container_create_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * name);
+gboolean meta2_remote_container_create_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * name);
 
 
 /**
@@ -426,7 +445,8 @@ gboolean meta2_remote_container_create_in_fd(int fd, gint ms, GError ** err, con
  * @param container_id
  * @return
  */
-gboolean meta2_remote_container_destroy_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id);
+gboolean meta2_remote_container_destroy_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id);
 
 
 /**
@@ -437,7 +457,8 @@ gboolean meta2_remote_container_destroy_in_fd(int fd, gint ms, GError ** err, co
  * @param container_id
  * @return
  */
-gboolean meta2_remote_container_open_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id);
+gboolean meta2_remote_container_open_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id);
 
 
 /**
@@ -448,7 +469,8 @@ gboolean meta2_remote_container_open_in_fd(int fd, gint ms, GError ** err, const
  * @param container_id
  * @return
  */
-gboolean meta2_remote_container_close_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id);
+gboolean meta2_remote_container_close_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id);
 
 
 /**
@@ -463,17 +485,19 @@ gboolean meta2_remote_container_close_in_fd(int fd, gint ms, GError ** err, cons
  * @param new_system_metadata
  * @return
  */
-GSList *meta2_remote_content_add_in_fd(int fd, gint ms, GError ** err,
-    const container_id_t container_id, const gchar * content_path, content_length_t content_length,
-    GByteArray * system_metadata, GByteArray ** new_system_metadata);
+GSList *meta2_remote_content_add_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path,
+	content_length_t content_length, GByteArray * system_metadata,
+	GByteArray ** new_system_metadata);
 
 /**
  * @see meta2_remote_content_add()
  * @param fd an opened and  connected socket to the META2 server
  */
-GSList *meta2_remote_content_add_in_fd_v2(int fd, gint ms, GError ** err,
-    const container_id_t container_id, const gchar * content_path, content_length_t content_length,
-    GByteArray *user_metadata, GByteArray * system_metadata, GByteArray ** new_system_metadata);
+GSList *meta2_remote_content_add_in_fd_v2(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path,
+	content_length_t content_length, GByteArray * user_metadata,
+	GByteArray * system_metadata, GByteArray ** new_system_metadata);
 
 
 /**
@@ -485,9 +509,25 @@ GSList *meta2_remote_content_add_in_fd_v2(int fd, gint ms, GError ** err,
  * @param content_path
  * @return
  */
-GSList *meta2_remote_content_spare_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+GSList *meta2_remote_content_spare_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path);
 
+/**
+ *
+ * @param fd
+ * @param ms
+ * @param err
+ * @param container_id
+ * @param content_path
+ * @param count
+ * @param distance
+ * @param notin
+ * @param broken
+ * @return
+ */
+GSList *meta2_remote_content_spare_in_fd_full(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path, gint count,
+	gint distance, const gchar * notin, const gchar * broken);
 
 /**
  * @see meta2_remote_content_remove()
@@ -498,8 +538,8 @@ GSList *meta2_remote_content_spare_in_fd(int fd, gint ms, GError ** err, const c
  * @param content_path
  * @return
  */
-gboolean meta2_remote_content_remove_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+gboolean meta2_remote_content_remove_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path);
 
 
 /**
@@ -511,8 +551,8 @@ gboolean meta2_remote_content_remove_in_fd(int fd, gint ms, GError ** err, const
  * @param content_path
  * @return
  */
-gboolean meta2_remote_content_commit_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+gboolean meta2_remote_content_commit_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path);
 
 
 /**
@@ -524,8 +564,8 @@ gboolean meta2_remote_content_commit_in_fd(int fd, gint ms, GError ** err, const
  * @param content_path
  * @return
  */
-gboolean meta2_remote_content_rollback_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+gboolean meta2_remote_content_rollback_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path);
 
 
 /**
@@ -536,8 +576,8 @@ gboolean meta2_remote_content_rollback_in_fd(int fd, gint ms, GError ** err, con
  * @param content_path
  * @return
  */
-GSList *meta2_remote_content_retrieve_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path);
+GSList *meta2_remote_content_retrieve_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path);
 
 
 /**
@@ -550,8 +590,9 @@ GSList *meta2_remote_content_retrieve_in_fd(int fd, gint ms, GError ** err, cons
  * @param chunks
  * @return
  */
-gboolean meta2_remote_chunk_commit_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path, GSList * chunks);
+gboolean meta2_remote_chunk_commit_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path,
+	GSList * chunks);
 
 
 /**
@@ -563,8 +604,9 @@ gboolean meta2_remote_chunk_commit_in_fd(int fd, gint ms, GError ** err, const c
  * @param content_length
  * @return
  */
-GSList *meta2_remote_content_append_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path, content_length_t content_length);
+GSList *meta2_remote_content_append_in_fd(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path,
+	content_length_t content_length);
 
 /**
  * @param fd
@@ -575,8 +617,9 @@ GSList *meta2_remote_content_append_in_fd(int fd, gint ms, GError ** err, const 
  * @param content_length
  * @return
  */
-GSList *meta2_remote_content_append_in_fd_v2(int fd, gint ms, GError ** err, const container_id_t container_id,
-    const gchar * content_path, content_length_t content_length, GByteArray **sys_metadata);
+GSList *meta2_remote_content_append_in_fd_v2(int *fd, gint ms, GError ** err,
+	const container_id_t container_id, const gchar * content_path,
+	content_length_t content_length, GByteArray ** sys_metadata);
 
 /**
  * @param fd
@@ -585,7 +628,8 @@ GSList *meta2_remote_content_append_in_fd_v2(int fd, gint ms, GError ** err, con
  * @param container_id
  * @return
  */
-gboolean meta2raw_remote_mark_container_repaired_in_fd(int fd, gint ms, GError ** err, const container_id_t container_id);
+gboolean meta2raw_remote_mark_container_repaired_in_fd(int *fd, gint ms,
+	GError ** err, const container_id_t container_id);
 
 
 /**
@@ -595,7 +639,8 @@ gboolean meta2raw_remote_mark_container_repaired_in_fd(int fd, gint ms, GError *
  * @param container_id
  * @return
  */
-gboolean meta2raw_remote_mark_container_repaired(addr_info_t * ai, gint ms, GError ** err, const container_id_t container_id);
+gboolean meta2raw_remote_mark_container_repaired(addr_info_t * ai, gint ms,
+	GError ** err, const container_id_t container_id);
 
 
 /* ------------------------------------------------------------------------- */
@@ -609,7 +654,8 @@ gboolean meta2raw_remote_mark_container_repaired(addr_info_t * ai, gint ms, GErr
  * @return
  */
 gboolean meta2raw_remote_update_chunks(struct metacnx_ctx_s *ctx, GError ** err,
-    struct meta2_raw_content_s *content, gboolean allow_update);
+	struct meta2_raw_content_s *content, gboolean allow_update,
+	char *position_prefix);
 
 
 /**
@@ -620,8 +666,8 @@ gboolean meta2raw_remote_update_chunks(struct metacnx_ctx_s *ctx, GError ** err,
  * @param allow_update
  * @return
  */
-gboolean meta2raw_remote_update_content(struct metacnx_ctx_s *ctx, GError ** err,
-    struct meta2_raw_content_s *content, gboolean allow_update);
+gboolean meta2raw_remote_update_content(struct metacnx_ctx_s *ctx,
+	GError ** err, struct meta2_raw_content_s *content, gboolean allow_update);
 
 
 /** 
@@ -631,7 +677,8 @@ gboolean meta2raw_remote_update_content(struct metacnx_ctx_s *ctx, GError ** err
  * @param content
  * @return
  */
-gboolean meta2raw_remote_delete_chunks(struct metacnx_ctx_s *ctx, GError ** err, struct meta2_raw_content_s *content);
+gboolean meta2raw_remote_delete_chunks(struct metacnx_ctx_s *ctx, GError ** err,
+	struct meta2_raw_content_s *content);
 
 
 /**
@@ -642,8 +689,9 @@ gboolean meta2raw_remote_delete_chunks(struct metacnx_ctx_s *ctx, GError ** err,
  * @param path_len
  * @return
  */
-gboolean meta2raw_remote_delete_content(struct metacnx_ctx_s *ctx, GError ** err,
-    const container_id_t container_id, const gchar * path, gsize path_len);
+gboolean meta2raw_remote_delete_content(struct metacnx_ctx_s *ctx,
+	GError ** err, const container_id_t container_id, const gchar * path,
+	gsize path_len);
 
 
 /**
@@ -654,8 +702,9 @@ gboolean meta2raw_remote_delete_content(struct metacnx_ctx_s *ctx, GError ** err
  * @param path_len
  * @return
  */
-struct meta2_raw_content_s *meta2raw_remote_get_content_from_name(struct metacnx_ctx_s *ctx, GError ** err,
-    const container_id_t container_id, const gchar * path, gsize path_len);
+struct meta2_raw_content_s *meta2raw_remote_get_content_from_name(struct
+	metacnx_ctx_s *ctx, GError ** err, const container_id_t container_id,
+	const gchar * path, gsize path_len);
 
 
 /**
@@ -665,8 +714,9 @@ struct meta2_raw_content_s *meta2raw_remote_get_content_from_name(struct metacnx
  * @param id
  * @return
  */
-struct meta2_raw_content_s *meta2raw_remote_get_content_from_chunkid(struct metacnx_ctx_s *ctx, GError ** err,
-    const container_id_t container_id, const chunk_id_t * id);
+struct meta2_raw_content_s *meta2raw_remote_get_content_from_chunkid(struct
+	metacnx_ctx_s *ctx, GError ** err, const container_id_t container_id,
+	const chunk_id_t * id);
 
 
 /**
@@ -679,8 +729,9 @@ struct meta2_raw_content_s *meta2raw_remote_get_content_from_chunkid(struct meta
  * @param path_len
  * @return
  */
-struct meta2_raw_content_s *meta2raw_remote_get_chunks(struct metacnx_ctx_s *ctx, GError ** err,
-    const container_id_t container_id, const char *path, gsize path_len);
+struct meta2_raw_content_s *meta2raw_remote_get_chunks(struct metacnx_ctx_s
+	*ctx, GError ** err, const container_id_t container_id, const char *path,
+	gsize path_len);
 
 
 /**
@@ -692,8 +743,8 @@ struct meta2_raw_content_s *meta2raw_remote_get_chunks(struct metacnx_ctx_s *ctx
  * @param container_id
  * @return a (GSList*) of (gchar*) to be freed with g_free, g_slist_foreach, g_slist_free...
  */
-GSList *meta2raw_remote_get_contents_names(struct metacnx_ctx_s *ctx, GError ** error,
-    const container_id_t container_id);
+GSList *meta2raw_remote_get_contents_names(struct metacnx_ctx_s *ctx,
+	GError ** error, const container_id_t container_id);
 
 
 /**
@@ -704,8 +755,8 @@ GSList *meta2raw_remote_get_contents_names(struct metacnx_ctx_s *ctx, GError ** 
  * @param container_id
  * @return
  */
-GHashTable *meta2raw_remote_get_admin_entries(struct metacnx_ctx_s *ctx, GError ** error,
-    const container_id_t container_id);
+GHashTable *meta2raw_remote_get_admin_entries(struct metacnx_ctx_s *ctx,
+	GError ** error, const container_id_t container_id);
 
 
 /**
@@ -718,8 +769,9 @@ GHashTable *meta2raw_remote_get_admin_entries(struct metacnx_ctx_s *ctx, GError 
  * @param value a pointer to the value
  * @param value_size the size of value
  */
-gboolean meta2raw_remote_set_admin_entry(struct metacnx_ctx_s *ctx, GError ** error,
-    const container_id_t container_id, const gchar * key, void *value, gsize value_size);
+gboolean meta2raw_remote_set_admin_entry(struct metacnx_ctx_s *ctx,
+	GError ** error, const container_id_t container_id, const gchar * key,
+	void *value, gsize value_size);
 
 
 /**
@@ -729,7 +781,8 @@ gboolean meta2raw_remote_set_admin_entry(struct metacnx_ctx_s *ctx, GError ** er
  * @param err
  * @return
  */
-status_t meta2_remote_touch_content(struct metacnx_ctx_s *ctx, const container_id_t var_0, gchar* var_1, GError **err);
+status_t meta2_remote_touch_content(struct metacnx_ctx_s *ctx,
+	const container_id_t var_0, const gchar * var_1, GError ** err);
 
 
 /**
@@ -738,7 +791,19 @@ status_t meta2_remote_touch_content(struct metacnx_ctx_s *ctx, const container_i
  * @param err
  * @return
  */
-status_t meta2_remote_touch_container(struct metacnx_ctx_s *ctx, const container_id_t var_0, GError **err);
+status_t meta2_remote_touch_container(struct metacnx_ctx_s *ctx,
+	const container_id_t var_0, GError ** err);
+
+/**
+ * @param ctx
+ * @param var_0
+ * @param err
+ * @return
+ */
+status_t meta2_remote_touch_container_ex(struct metacnx_ctx_s *ctx,
+	const container_id_t var_0, unsigned int flags, GError ** err);
+
+
 
 /* ------------------------------------------------------------------------- */
 
@@ -753,7 +818,7 @@ struct meta2_dumpv1_hooks_remote_s
 	 * @param p a valid pointer to an object found
 	 * @return TRUE to continue the dump, FALSE to stop it
 	 */
-	gboolean (*on_content)  (gpointer u, meta2_raw_content_v2_t *p);
+	gboolean(*on_content) (gpointer u, meta2_raw_content_v2_t * p);
 
 	/*!
 	 * @brief Notify a KeyValue pair (admin table) has been found
@@ -762,7 +827,7 @@ struct meta2_dumpv1_hooks_remote_s
 	 * @param p a valid pointer to an object found
 	 * @return TRUE to continue the dump, FALSE to stop it
 	 */
-	gboolean (*on_admin)    (gpointer u, key_value_pair_t *p);
+	gboolean(*on_admin) (gpointer u, key_value_pair_t * p);
 
 	/*!
 	 * @brief Notify a container property has been found
@@ -771,7 +836,7 @@ struct meta2_dumpv1_hooks_remote_s
 	 * @param p a valid pointer to an object found
 	 * @return TRUE to continue the dump, FALSE to stop it
 	 */
-	gboolean (*on_property) (gpointer u, meta2_property_t *p);
+	gboolean(*on_property) (gpointer u, meta2_property_t * p);
 
 	/*!
 	 * @brief Notify a container_event has been found
@@ -780,7 +845,7 @@ struct meta2_dumpv1_hooks_remote_s
 	 * @param p a valid pointer to an object found
 	 * @return TRUE to continue the dump, FALSE to stop it
 	 */
-	gboolean (*on_event)    (gpointer u, container_event_t *p);
+	gboolean(*on_event) (gpointer u, container_event_t * p);
 };
 
 /**
@@ -791,9 +856,9 @@ struct meta2_dumpv1_hooks_remote_s
  * @param err
  * @return
  */
-status_t meta2_remote_dumpv1_container(struct metacnx_ctx_s *cnx, const container_id_t cid,
-		struct meta2_dumpv1_hooks_remote_s *hooks, gpointer u,
-		GError **err);
+status_t meta2_remote_dumpv1_container(struct metacnx_ctx_s *cnx,
+	const container_id_t cid, struct meta2_dumpv1_hooks_remote_s *hooks,
+	gpointer u, GError ** err);
 
 /* ------------------------------------------------------------------------- */
 
@@ -805,11 +870,10 @@ status_t meta2_remote_dumpv1_container(struct metacnx_ctx_s *cnx, const containe
  * @param err
  * @return
  */
-status_t meta2_remote_restorev1_container(
-		struct metacnx_ctx_s *dst_cnx, const container_id_t dst_cid,
-		const addr_info_t *src_addr, const container_id_t src_cid,
-		GError **err);
-		
+status_t meta2_remote_restorev1_container(struct metacnx_ctx_s *dst_cnx,
+	const container_id_t dst_cid, const addr_info_t * src_addr,
+	const container_id_t src_cid, GError ** err);
+
 /** @} */
 
 #endif /*__META2_REMOTE_H__*/

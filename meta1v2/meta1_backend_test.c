@@ -1,22 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "grid.meta1.test"
+#define G_LOG_DOMAIN "grid.meta1.test"
 #endif
 
 #include <stdlib.h>
@@ -25,14 +8,14 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#include <glib.h>
-
-#include "../metautils/lib/lb.h"
-#include "../sqliterepo/sqliterepo.h"
+#include <metautils/lib/metautils.h>
+#include <sqliterepo/sqliterepo.h>
 
 #include "./internals.h"
 #include "./meta1_backend.h"
 #include "./meta1_prefixes.h"
+
+static struct grid_lbpool_s *glp = NULL;
 
 static gboolean flag_destroy = FALSE;
 static container_id_t cid;
@@ -46,7 +29,7 @@ gchar *meta1_url = NULL;
 static gchar zk_url[512];
 
 static void
-assert_noerror(GError *err)
+assert_noerror(GError * err)
 {
 	if (err != NULL)
 		g_error("ERROR! code=%d message=%s", err->code, err->message);
@@ -55,10 +38,14 @@ assert_noerror(GError *err)
 static struct meta1_backend_s *
 _meta1_init(void)
 {
-	GError *err;
+	struct sqlx_repo_config_s cfg;
 	struct meta1_backend_s *m1 = NULL;
+	struct sqlx_repository_s *repo = NULL;
+	GError *err;
 
-	err = meta1_backend_init(&m1, ns, local_url, basedir);
+	memset(&cfg, 0, sizeof(cfg));
+	err = sqlx_repository_init(basedir, &cfg, &repo);
+	m1 = meta1_backend_init(ns, repo, glp);
 	assert_noerror(err);
 	g_assert(m1 != NULL);
 
@@ -84,36 +71,38 @@ __build_si(guint i)
 	}
 	si->addr.type = TADDR_V4;
 	si->addr.port = htons(i);
-	si->score.value = i+1;
+	si->score.value = i + 1;
 	si->score.timestamp = time(0);
 	return si;
 }
 
-static struct grid_lb_s *
-lb_init(struct grid_lb_iterator_s **iter)
+static struct grid_lbpool_s *
+lb_init(void)
 {
-	struct grid_lb_s *lb;
 	guint i, count, max;
 
-	auto gboolean __provide(struct service_info_s **p_si);
-
-	gboolean __provide(struct service_info_s **p_si) {
+	gboolean __provide(struct service_info_s **p_si)
+	{
 		g_assert(p_si != NULL);
 		if (i >= max)
 			return FALSE;
-		*p_si = __build_si(i ++);
-		count ++;
+		*p_si = __build_si(i++);
+		count++;
 		return TRUE;
 	}
 
+	struct grid_lbpool_s *g = grid_lbpool_create(ns);
+
+	g_assert(g != NULL);
+
+	grid_lbpool_configure_string(g, "rawx", "RR");
+
 	max = 10;
 	i = count = 0;
-	lb = grid_lb_init(ns, srvname);
-	g_assert(lb != NULL);
-	grid_lb_reload(lb, &__provide);
-	*iter = grid_lb_iterator_random(lb);
+	grid_lbpool_reload(g, srvname, &__provide);
 	g_assert(count == max);
-	return lb;
+
+	return g;
 }
 
 static void
@@ -123,6 +112,7 @@ test_meta1_backend_create_destroy(void)
 	container_id_t local_cid;
 
 	struct meta1_backend_s *m1 = NULL;
+
 	m1 = _meta1_init();
 
 	memset(local_cid, 0, sizeof(container_id_t));
@@ -143,10 +133,12 @@ test_meta1_backend_get_all(void)
 	container_id_t local_cid;
 
 	struct meta1_backend_s *m1 = NULL;
+
 	m1 = _meta1_init();
 
 	do {
 		gchar **srv = NULL;
+
 		err = meta1_backend_get_container_all_services(m1, cid, srvname, &srv);
 		g_assert(err != NULL);
 		g_assert(srv == NULL);
@@ -160,6 +152,7 @@ test_meta1_backend_get_all(void)
 
 	do {
 		gchar **srv = NULL;
+
 		err = meta1_backend_get_container_all_services(m1, cid, srvname, &srv);
 		g_assert(err == NULL);
 		g_assert(srv != NULL);
@@ -176,19 +169,21 @@ static void
 test_meta1_backend_get_available(void)
 {
 	GError *err = NULL;
-	struct grid_lb_s *lb = NULL;
-	struct grid_lb_iterator_s *iter = NULL;
 	container_id_t local_cid;
+	gchar strcid[STRLEN_CONTAINERID];
 	struct meta1_backend_s *m1 = NULL;
 
-	m1 = _meta1_init();
+	container_id_to_string(cid, strcid, sizeof(strcid));
+	struct hc_url_s *u = hc_url_empty();
 
-	lb = lb_init(&iter);
-	meta1_configure_type(m1, srvname, iter);
+	hc_url_set(u, HCURL_HEXID, strcid);
+	m1 = _meta1_init();
 
 	do {
 		gchar **srv = NULL;
-		err = meta1_backend_get_container_service_available(m1, cid, srvname, &srv);
+
+		err = meta1_backend_get_container_service_available(m1, u, srvname,
+			FALSE, &srv);
 		g_assert(err != NULL);
 		g_assert(srv == NULL);
 		g_clear_error(&err);
@@ -201,7 +196,9 @@ test_meta1_backend_get_available(void)
 
 	do {
 		gchar **srv = NULL;
-		err = meta1_backend_get_container_service_available(m1, cid, srvname, &srv);
+
+		err = meta1_backend_get_container_service_available(m1, u, srvname,
+			FALSE, &srv);
 		assert_noerror(err);
 		g_assert(srv != NULL);
 		g_strfreev(srv);
@@ -213,8 +210,6 @@ test_meta1_backend_get_available(void)
 	}
 
 	meta1_backend_clean(m1);
-	grid_lb_iterator_clean(iter);
-	grid_lb_clean(lb);
 }
 
 int
@@ -222,30 +217,31 @@ main(int argc, char **argv)
 {
 	memset(zk_url, 0, sizeof(zk_url));
 	srand(time(0) ^ getpid());
-	if (!g_thread_supported())
-		g_thread_init(NULL);
-	g_set_prgname(argv[0]);
-	g_log_set_default_handler(logger_stderr, NULL);
-	g_log_set_handler(NULL, G_LOG_LEVEL_MASK|G_LOG_FLAG_FATAL, logger_stderr, NULL);
-	g_test_init (&argc, &argv, NULL);
+	HC_PROC_INIT(argv, GRID_LOGLVL_TRACE2);
+	g_test_init(&argc, &argv, NULL);
 
 	if (argc < 2)
-		g_strlcat(zk_url, "0.0.0.0:2181", sizeof(zk_url)-1);
+		g_strlcat(zk_url, "0.0.0.0:2181", sizeof(zk_url) - 1);
 	else {
 		int i;
-		for (i=1; i<argc ;i++) {
+
+		for (i = 1; i < argc; i++) {
 			if (*zk_url)
 				g_strlcat(zk_url, ",", sizeof(zk_url));
 			g_strlcat(zk_url, argv[i], sizeof(zk_url));
 		}
 	}
-	meta1_url = g_strdup(local_url);
-	meta1_name2hash((guint8*)cid, vns, cname);
 
-	g_test_add_func("/meta1/backend/create_destroy", test_meta1_backend_create_destroy);
+	glp = lb_init();
+
+	meta1_url = g_strdup(local_url);
+	meta1_name2hash((guint8 *) cid, vns, cname);
+
+	g_test_add_func("/meta1/backend/create_destroy",
+		test_meta1_backend_create_destroy);
 	g_test_add_func("/meta1/backend/get_all", test_meta1_backend_get_all);
-	g_test_add_func("/meta1/backend/get_available", test_meta1_backend_get_available);
+	g_test_add_func("/meta1/backend/get_available",
+		test_meta1_backend_get_available);
 
 	return g_test_run();
 }
-

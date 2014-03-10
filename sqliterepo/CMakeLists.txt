@@ -1,9 +1,11 @@
-include_directories(BEFORE .
-		../metautils/lib)
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
+
+include_directories(BEFORE . ..
+		${CMAKE_CURRENT_BINARY_DIR}/../metautils/lib)
+
 include_directories(AFTER
 		${OPENSSL_INCLUDE_DIRS}
-		${ZK_INCLUDE_DIRS}
-		${CMAKE_CURRENT_BINARY_DIR}/../metautils/lib)
+		${ZK_INCLUDE_DIRS})
 
 link_directories(
 		${ZK_LIBRARY_DIRS}
@@ -21,6 +23,7 @@ target_link_libraries(sqliteutils metautils
 
 add_library(sqlitereporemote SHARED
 		sqlx_remote.c sqlx_remote.h
+		sqlx_remote_ex.c sqlx_remote_ex.h
 		replication_client.c 
 )
 
@@ -29,11 +32,11 @@ target_link_libraries(sqlitereporemote metautils metacomm
 		${GLIB2_LIBRARIES} ${SQLITE3_LIBRARIES})
 	
 add_library(sqliterepo SHARED
+		synchro.c
 		version.c
 		internals.h
 		cache.c cache.h
 		hash.h hash.c
-		client_pool.c client_pool.h
 		replication.c
 		election.c election.h
 		replication_dispatcher.c replication_dispatcher.h
@@ -47,6 +50,10 @@ target_link_libraries(sqliterepo metautils metacomm
 		${GLIB2_LIBRARIES} ${SQLITE3_LIBRARIES}
 		-lzookeeper_mt)
 
+add_executable(test_election test_election.c)
+target_link_libraries(test_election sqliterepo
+		${GLIB2_LIBRARIES} ${SQLITE3_LIBRARIES})
+
 #add_executable(test_cache test_cache.c)
 #target_link_libraries(test_cache sqliterepo metautils metacomm
 #		${GLIB2_LIBRARIES} ${SQLITE3_LIBRARIES})
@@ -59,14 +66,38 @@ target_link_libraries(test_repository sqliterepo sqlitereporemote
 add_executable(test_sqliterepo test_sqliterepo.c)
 target_link_libraries(test_sqliterepo sqliterepo sqlitereporemote
 		metautils metacomm
-		${GLIB2_LIBRARIES} ${SQLITE3_LIBRARIES})
+		${GLIB2_LIBRARIES})
+
+add_executable(test_version test_version.c)
+target_link_libraries(test_version sqliterepo 
+		metautils metacomm
+		${GLIB2_LIBRARIES})
 
 add_executable(gs_m1hash hash.h gs_m1hash.c)
 target_link_libraries(gs_m1hash
 		metautils metacomm sqliterepo
-		${GLIB2_LIBRARIES} ${SQLITE3_LIBRARIES})
+		${GLIB2_LIBRARIES})
 
-install(TARGETS sqliterepo sqliteutils sqlitereporemote
+install(FILES
+			cache.h
+			election.h
+			hash.h
+			replication_dispatcher.h
+			sqliterepo.h
+			sqlite_utils.h
+			sqlx_remote.h
+			upgrade.h
+			version.h
+			zk_manager.h
+		DESTINATION include/sqliterepo
+		PERMISSIONS
+			OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)
+
+install(TARGETS sqliterepo sqliteutils sqlitereporemote gs_m1hash
 		LIBRARY DESTINATION ${LD_LIBDIR}
 		RUNTIME DESTINATION bin)
+
+add_test(NAME sqliterepo/version COMMAND test_version)
+add_test(NAME sqliterepo/election COMMAND test_election)
+add_test(NAME sqliterepo/repository COMMAND test_repository)
 

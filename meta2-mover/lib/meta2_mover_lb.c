@@ -1,35 +1,19 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include <gridcluster.h>
-#include "./meta2_mover_internals.h"
+#include "meta2_mover_internals.h"
+#include <cluster/lib/gridcluster.h>
 
 static time_t meta2_last_update = 0L;
 static GSList *list_of_meta2 = NULL;
 static GSList *meta2_pointer = NULL;
 
 static guint
-count_valid_meta2(GSList *list, guint max, const addr_info_t *avoid)
+count_valid_meta2(GSList * list, guint max, const addr_info_t * avoid)
 {
 	guint count;
 	GSList *l;
 
-	for (count=0,l=list; l ;l=l->next) {
+	for (count = 0, l = list; l; l = l->next) {
 		struct service_info_s *si = l->data;
+
 		if (si->score.value == 0)
 			return count;
 		if (0 == memcmp(avoid, &(si->addr), sizeof(addr_info_t))) {
@@ -60,31 +44,34 @@ conscience_load_meta2(const gchar * ns_name)
 	}
 
 	meta2_mover_clean_services();
-	meta2_pointer = list_of_meta2 = g_slist_sort(new_services, service_info_sort_by_score);
+	meta2_pointer = list_of_meta2 =
+		g_slist_sort(new_services, service_info_sort_by_score);
 	meta2_last_update = time(NULL);
 
 	DEBUG("Received %u META2", g_slist_length(list_of_meta2));
 	return TRUE;
 }
 
-const service_info_t*
-get_available_meta2_from_conscience(const gchar * ns_name, const addr_info_t *avoid)
+const service_info_t *
+get_available_meta2_from_conscience(const gchar * ns_name,
+	const addr_info_t * avoid)
 {
 	time_t now;
 	service_info_t *result;
 
 	now = time(0);
-	if (!list_of_meta2 || now > (meta2_last_update+interval_update_services))
+	if (!list_of_meta2 || now > (meta2_last_update + interval_update_services))
 		(void) conscience_load_meta2(ns_name);
 
 	if (count_valid_meta2(list_of_meta2, 3, avoid) < 1) {
-		DEBUG("count_valid test failed, break without getting available volume from conscience");
+		DEBUG
+			("count_valid test failed, break without getting available volume from conscience");
 		return NULL;
 	}
 
 	for (;;) {
 
-		if (!meta2_pointer) /* reset the list */
+		if (!meta2_pointer)		/* reset the list */
 			meta2_pointer = list_of_meta2;
 
 		result = meta2_pointer->data;
@@ -116,4 +103,3 @@ meta2_mover_clean_services(void)
 		list_of_meta2 = NULL;
 	}
 }
-

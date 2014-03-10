@@ -1,26 +1,8 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #include "./gs_internals.h"
-#include "./grid_client_shortcuts.h"
 
-static gs_container_t*
-gs_container_init_from_location(gs_grid_storage_t *client,
-	struct gs_container_location_s *location, gs_error_t **gserr)
+static gs_container_t *
+gs_container_init_from_location(gs_grid_storage_t * client,
+	struct gs_container_location_s *location, gs_error_t ** gserr)
 {
 	GError *gerr = NULL;
 	gs_container_t *container = NULL;
@@ -29,10 +11,11 @@ gs_container_init_from_location(gs_grid_storage_t *client,
 	container->meta2_cnx = -1;
 	container->opened = 0;
 
-	l4_address_init_with_url(&(container->meta2_addr), location->m2_url[0], NULL);
+	l4_address_init_with_url(&(container->meta2_addr), location->m2_url[0],
+		NULL);
 
-	if (!container_id_hex2bin(location->container_hexid, strlen(location->container_hexid),
-			&(container->cID), &gerr)) {
+	if (!container_id_hex2bin(location->container_hexid,
+			strlen(location->container_hexid), &(container->cID), &gerr)) {
 		GSERRORCAUSE(gserr, gerr, "Invalid hexadecimal container ID");
 		g_error_free(gerr);
 		free(container);
@@ -46,20 +29,20 @@ gs_container_init_from_location(gs_grid_storage_t *client,
 
 	if (location->container_name)
 		g_strlcpy(container->info.name, location->container_name,
-				sizeof(container->info.name)-1);
+			sizeof(container->info.name) - 1);
 
 	if (location->container_hexid)
 		g_strlcpy(container->str_cID, location->container_hexid,
-				sizeof(container->str_cID)-1);
+			sizeof(container->str_cID) - 1);
 
 	return container;
 }
 
-gs_content_t*
-gs_container_get_content_from_raw(gs_grid_storage_t *client,
-		struct meta2_raw_content_s *raw, gs_error_t **gserr)
+gs_content_t *
+gs_container_get_content_from_raw(gs_grid_storage_t * client,
+	struct meta2_raw_content_s * raw, gs_error_t ** gserr)
 {
-	gchar str_hex[STRLEN_CONTAINERID+1];
+	gchar str_hex[STRLEN_CONTAINERID + 1];
 	struct gs_container_location_s *location;
 	gs_content_t *result = NULL;
 
@@ -70,7 +53,8 @@ gs_container_get_content_from_raw(gs_grid_storage_t *client,
 
 	/* Now locates the content's container */
 	bzero(str_hex, sizeof(str_hex));
-	buffer2str(raw->container_id, sizeof(container_id_t), str_hex, sizeof(str_hex));
+	buffer2str(raw->container_id, sizeof(container_id_t), str_hex,
+		sizeof(str_hex));
 	location = gs_locate_container_by_hexid(client, str_hex, gserr);
 	if (!location) {
 		GSERRORSET(gserr, "Container reference not found for CID[%s]", str_hex);
@@ -87,12 +71,14 @@ gs_container_get_content_from_raw(gs_grid_storage_t *client,
 	}
 
 	/* Initiates the content part */
-	g_strlcpy(result->info.path, raw->path, MIN(sizeof(result->info.path)-1,sizeof(raw->path)));
+	g_strlcpy(result->info.path, raw->path, MIN(sizeof(result->info.path) - 1,
+			sizeof(raw->path)));
 	result->info.size = raw->size;
 	map_content_from_raw(result, raw);
 
 	/* Initiates the container part */
-	result->info.container = gs_container_init_from_location(client, location, gserr);
+	result->info.container =
+		gs_container_init_from_location(client, location, gserr);
 	if (!result->info.container) {
 		gs_container_location_free(location);
 		gs_content_free(result);
@@ -104,4 +90,3 @@ gs_container_get_content_from_raw(gs_grid_storage_t *client,
 	gs_container_location_free(location);
 	return result;
 }
-

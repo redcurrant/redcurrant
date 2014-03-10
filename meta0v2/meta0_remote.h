@@ -1,26 +1,9 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file meta0_remote.h
  */
 
 #ifndef __META0_REMOTE_H__
-# define __META0_REMOTE_H__ 1
+#define __META0_REMOTE_H__ 1
 
 /**
  * @addtogroup meta0v2_remote
@@ -29,7 +12,7 @@
 
 #include <glib.h>
 
-#include <metatypes.h>
+#include <metautils/lib/metatypes.h>
 
 /** The request name when requesting the whole meta0 cache */
 #define NAME_MSGNAME_M0_GETALL "REQ_M0_GETALL"
@@ -80,7 +63,7 @@
  *            function fails
  * @return  a GSList of meta0_info_t
  */
-GSList *meta0_remote_get_meta1_all(addr_info_t *m0a, gint ms, GError **err);
+GSList *meta0_remote_get_meta1_all(addr_info_t * m0a, gint ms, GError ** err);
 
 
 /**
@@ -90,8 +73,8 @@ GSList *meta0_remote_get_meta1_all(addr_info_t *m0a, gint ms, GError **err);
  * @param err
  * @return
  */
-GSList *meta0_remote_get_meta1_one(addr_info_t *m0a, gint ms,
-		const guint8 *prefix, GError **err);
+GSList *meta0_remote_get_meta1_one(addr_info_t * m0a, gint ms,
+	const guint8 * prefix, GError ** err);
 
 
 /**
@@ -109,7 +92,7 @@ GSList *meta0_remote_get_meta1_one(addr_info_t *m0a, gint ms,
  *            function fails
  * @return 0 if the function fails, 1 in case of success.
  */
-gint meta0_remote_cache_refresh(addr_info_t *m0a, gint ms, GError **err);
+gint meta0_remote_cache_refresh(addr_info_t * m0a, gint ms, GError ** err);
 
 
 /**
@@ -120,18 +103,19 @@ gint meta0_remote_cache_refresh(addr_info_t *m0a, gint ms, GError **err);
  * @param err
  * @return
  */
-gint meta0_remote_fill(addr_info_t *m0a, gint ms, gchar **urls,
-		guint nbreplicas, GError **err);
+gint meta0_remote_fill(addr_info_t * m0a, gint ms, gchar ** urls,
+	guint nbreplicas, GError ** err);
 
 /**
  * @param m0a
  * @param ms
  * @param nbreplicas
+ * @param nodist true if the distance between every affected meta1 is not mandatory
  * @param err
  * @return
  */
-gint meta0_remote_fill_v2(addr_info_t *m0a, gint ms,
-		guint nbreplicas, GError **err);
+gint meta0_remote_fill_v2(addr_info_t * m0a, gint ms,
+	guint nbreplicas, gboolean nodist, GError ** err);
 
 /**
  * @param m0a
@@ -139,19 +123,8 @@ gint meta0_remote_fill_v2(addr_info_t *m0a, gint ms,
  * @param err
  * @return
  */
-gint meta0_remote_assign(addr_info_t *m0a, gint ms, gboolean nocheck,GError **err);
-
-/**
- * @param m0a
- * @param ms
- * @param urls
- * @param err
- * @return
- */
-gint meta0_remote_disable_meta1(addr_info_t *m0a, gint ms, gchar **urls,
-		 gboolean nocheck, GError **err);
-
-gchar ** meta0_remote_get_meta1_info(addr_info_t *m0a, gint ms, GError **err);
+gint meta0_remote_assign(addr_info_t * m0a, gint ms, gboolean nocheck,
+	GError ** err);
 
 /**
  * @param m0a
@@ -160,8 +133,10 @@ gchar ** meta0_remote_get_meta1_info(addr_info_t *m0a, gint ms, GError **err);
  * @param err
  * @return
  */
-gint
-meta0_remote_destroy_meta1ref(addr_info_t *m0a, gint ms, gchar *urls, GError **err);
+gint meta0_remote_disable_meta1(addr_info_t * m0a, gint ms, gchar ** urls,
+	gboolean nocheck, GError ** err);
+
+gchar **meta0_remote_get_meta1_info(addr_info_t * m0a, gint ms, GError ** err);
 
 /**
  * @param m0a
@@ -171,7 +146,19 @@ meta0_remote_destroy_meta1ref(addr_info_t *m0a, gint ms, gchar *urls, GError **e
  * @return
  */
 gint
-meta0_remote_destroy_meta0zknode(addr_info_t *m0a, gint ms, gchar *urls, GError **err);
+ meta0_remote_destroy_meta1ref(addr_info_t * m0a, gint ms, gchar * urls,
+	GError ** err);
+
+/**
+ * @param m0a
+ * @param ms
+ * @param urls
+ * @param err
+ * @return
+ */
+gint
+ meta0_remote_destroy_meta0zknode(addr_info_t * m0a, gint ms, gchar * urls,
+	GError ** err);
 
 /** @} */
 

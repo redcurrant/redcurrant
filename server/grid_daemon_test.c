@@ -1,30 +1,11 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
 
-#include "./loggers.h"
-#include "./network_server.h"
-#include "./grid_daemon.h"
-#include "./transport_gridd.h"
-#include "./common_main.h"
+#include "network_server.h"
+#include "grid_daemon.h"
+#include "transport_gridd.h"
 
 static GString *url = NULL;
 
@@ -59,8 +40,8 @@ static struct grid_main_option_s *
 main_get_options(void)
 {
 	static struct grid_main_option_s options[] = {
-		{"Endpoint", OT_STRING, {.str=&url}, "URL to bind to"},
-		{NULL, 0, {.i=0}, NULL}
+		{"Endpoint", OT_STRING, {.str = &url}, "URL to bind to"},
+		{NULL, 0, {.i = 0}, NULL}
 	};
 
 	return options;
@@ -109,8 +90,7 @@ static struct grid_main_callbacks main_callbacks = {
 };
 
 int
-main(int argc, char ** argv)
+main(int argc, char **argv)
 {
 	return grid_main_cli(argc, argv, &main_callbacks);
 }
-

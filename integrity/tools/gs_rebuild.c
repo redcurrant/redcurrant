@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gs_rebuild"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gs_rebuild"
 #endif
 #include <stdlib.h>
 #include <string.h>
@@ -28,22 +8,18 @@
 #include <signal.h>
 #include <attr/xattr.h>
 
-#include <glib.h>
-#include <glib/gstdio.h>
-
-#include <metatypes.h>
-#include <metautils.h>
-#include <metacomm.h>
-#include <common_main.h>
-#include <gridcluster.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
+#include <cluster/lib/gridcluster.h>
 
 #include "./repair.h"
 #include "../lib/chunk_db.h"
 
 #define BROKEN_PATTERN "[.0-9]+:[0-9]+:([^:]+):([^:]*):.*"
 
-struct broken_element_s {
-	gchar str_cid[STRLEN_CONTAINERID+1];
+struct broken_element_s
+{
+	gchar str_cid[STRLEN_CONTAINERID + 1];
 	gchar *str_path;
 };
 
@@ -53,10 +29,13 @@ static time_t sleep_inter_refresh = 1000L;
 
 static GHashTable *ht_broken = NULL;
 
+// m2v1_list declared in libintegrity
+GSList *m2v1_list = NULL;
+
 /* ------------------------------------------------------------------------- */
 
 static time_t
-timer_get_elapsed_millis(GTimer *timer)
+timer_get_elapsed_millis(GTimer * timer)
 {
 	time_t t;
 	gdouble d;
@@ -89,7 +68,7 @@ sleep_between_refreshs(void)
 /* ------------------------------------------------------------------------- */
 
 static void
-service_info_free_gslist(GSList **pList)
+service_info_free_gslist(GSList ** pList)
 {
 	if (!pList || !*pList)
 		return;
@@ -99,18 +78,21 @@ service_info_free_gslist(GSList **pList)
 }
 
 static void
-service_info_trace_gslist(GSList *list, const gchar *tag)
+service_info_trace_gslist(GSList * list, const gchar * tag)
 {
 	GSList *l;
 	struct service_info_s *si;
 
-	if (!TRACE_ENABLED())
+	if (!TRACE_ENABLED()) {
+		(void) tag;
 		return;
- 	for (l=list; l ;l=l->next) {
+	}
+	for (l = list; l; l = l->next) {
 		if (!(si = l->data))
 			TRACE("%s NULL", tag);
 		else {
 			gchar *str = service_info_to_string(si);
+
 			TRACE("%s%s", tag, str);
 			g_free(str);
 		}
@@ -135,6 +117,7 @@ static void
 broken_element_gclean(gpointer d, gpointer ignored)
 {
 	struct broken_element_s *broken;
+
 	(void) ignored;
 	if (NULL != (broken = d)) {
 		if (broken->str_path)
@@ -144,7 +127,7 @@ broken_element_gclean(gpointer d, gpointer ignored)
 }
 
 static void
-broken_element_clean_gslist(GSList **pList)
+broken_element_clean_gslist(GSList ** pList)
 {
 	if (!pList || !*pList)
 		return;
@@ -153,10 +136,11 @@ broken_element_clean_gslist(GSList **pList)
 	*pList = NULL;
 }
 
-static struct broken_element_s*
+static struct broken_element_s *
 broken_element_dup(struct broken_element_s *orig)
 {
 	struct broken_element_s *copy;
+
 	copy = g_memdup(orig, sizeof(*orig));
 	if (orig->str_path)
 		copy->str_path = g_strdup(orig->str_path);
@@ -172,31 +156,33 @@ broken_element_get_key(struct broken_element_s *broken)
 }
 
 static void
-holder_dump(GHashTable *ht, const gchar *tag)
+holder_dump(GHashTable * ht, const gchar * tag)
 {
 	GHashTableIter iter;
 	gpointer k, v;
 
-	if (!TRACE_ENABLED())
+	if (!TRACE_ENABLED()) {
+		(void) tag;
 		return;
+	}
 
 	TRACE("%sBroken elements holder ++++++++", tag);
 	g_hash_table_iter_init(&iter, ht);
 	while (g_hash_table_iter_next(&iter, &k, &v))
-		TRACE("%s%s", tag, (gchar*)k);
+		TRACE("%s%s", tag, (gchar *) k);
 }
 
-static GHashTable*
+static GHashTable *
 holder_new(void)
 {
 	return g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 }
 
 static void
-_holder_save_content(GHashTable *ht, struct broken_element_s *broken)
+_holder_save_content(GHashTable * ht, struct broken_element_s *broken)
 {
 	gchar *str_key;
-	
+
 	if (!broken)
 		return;
 
@@ -205,7 +191,7 @@ _holder_save_content(GHashTable *ht, struct broken_element_s *broken)
 }
 
 static void
-_holder_save_container(GHashTable *ht, struct broken_element_s *broken)
+_holder_save_container(GHashTable * ht, struct broken_element_s *broken)
 {
 	struct broken_element_s fake;
 	gchar *str_key;
@@ -224,52 +210,58 @@ static void
 holder_forget(struct broken_element_s *broken)
 {
 	gchar *str_key;
-	
+
 	if (!broken)
-		return ;
+		return;
 
 	str_key = broken_element_get_key(broken);
 	g_hash_table_remove(ht_broken, str_key);
 	g_free(str_key);
 }
 
-static GHashTable*
-holder_keep_new(GSList *all, GSList **result)
+static GHashTable *
+holder_keep_new(GSList * all, GSList ** result)
 {
 	GHashTable *ht_new;
 	GSList *l, *list_new = NULL;
 
 	*result = NULL;
 	ht_new = holder_new();
-	for (l=all; l ;l=l->next) {
+	for (l = all; l; l = l->next) {
 		struct broken_element_s *broken = l->data;
 
 
 		/* Shortcut: whole container already broken? */
 		if (g_hash_table_lookup(ht_broken, broken->str_cid)) {
 			_holder_save_container(ht_new, broken);
-			TRACE("agent told [%s:%s], but container already broken in old elements",
+			TRACE
+				("agent told [%s:%s], but container already broken in old elements",
 				broken->str_cid, broken->str_path);
 			continue;
 		}
 		if (g_hash_table_lookup(ht_new, broken->str_cid)) {
-			TRACE("agent told [%s:%s], but container already broken in new elements",
+			TRACE
+				("agent told [%s:%s], but container already broken in new elements",
 				broken->str_cid, broken->str_path);
 			continue;
 		}
 
 		/* Now manage this particular element */
 		gchar *str_key = broken_element_get_key(broken);
+
 		if (broken->str_path) {
 			if (g_hash_table_lookup(ht_broken, str_key)) {
 				_holder_save_content(ht_new, broken);
-				TRACE("agent told [%s] but already known in old elements", str_key);
+				TRACE("agent told [%s] but already known in old elements",
+					str_key);
 			}
 			else if (g_hash_table_lookup(ht_new, str_key)) {
-				TRACE("agent told [%s] but already known in new elements", str_key);
+				TRACE("agent told [%s] but already known in new elements",
+					str_key);
 			}
 			else {
-				list_new = g_slist_prepend(list_new, broken_element_dup(broken));
+				list_new =
+					g_slist_prepend(list_new, broken_element_dup(broken));
 				_holder_save_content(ht_new, broken);
 				GRID_DEBUG("New broken content stored [%s]", str_key);
 			}
@@ -284,6 +276,7 @@ holder_keep_new(GSList *all, GSList **result)
 
 	/* Save the list and return the old hash_table */
 	GHashTable *tmp = ht_broken;
+
 	ht_broken = ht_new;
 	*result = list_new;
 	return tmp;
@@ -291,7 +284,7 @@ holder_keep_new(GSList *all, GSList **result)
 
 /* -------------------------------------------------------------------------- */
 
-static gchar*
+static gchar *
 rawx_get_volume(struct service_info_s *si)
 {
 	gchar volname[1024];
@@ -306,23 +299,24 @@ rawx_get_volume(struct service_info_s *si)
 
 	if (!service_tag_get_value_string(tag, volname, sizeof(volname), NULL))
 		return g_strdup("/");
-	
+
 	return g_strdup(volname);
 }
 
-static gs_grid_storage_t*
-get_grid_client(GError **err)
+static gs_grid_storage_t *
+get_grid_client(GError ** err)
 {
 	gs_error_t *gserr = NULL;
 	gs_grid_storage_t *gs_client = NULL;
 
 	gs_client = gs_grid_storage_init2(ns_name, 60000, 60000, &gserr);
 	if (!gs_client) {
-		GSETCODE(err, gs_error_get_code(gserr), "%s", gs_error_get_message(gserr));
+		GSETCODE(err, gs_error_get_code(gserr), "%s",
+			gs_error_get_message(gserr));
 		gs_error_free(gserr);
 		return NULL;
 	}
-	
+
 	gs_grid_storage_set_timeout(gs_client, GS_TO_RAWX_CNX, 30000, NULL);
 	gs_grid_storage_set_timeout(gs_client, GS_TO_RAWX_OP, 90000, NULL);
 	gs_grid_storage_set_timeout(gs_client, GS_TO_M0_CNX, 30000, NULL);
@@ -338,7 +332,8 @@ get_grid_client(GError **err)
 }
 
 static gboolean
-manage_broken_element_for_rawx(gs_grid_storage_t *gs_client, struct broken_element_s *broken, struct service_info_s *si)
+manage_broken_element_for_rawx(gs_grid_storage_t * gs_client,
+	struct broken_element_s *broken, struct service_info_s *si)
 {
 	gboolean rc;
 	gchar *vol_root = NULL;
@@ -347,32 +342,36 @@ manage_broken_element_for_rawx(gs_grid_storage_t *gs_client, struct broken_eleme
 
 	vol_root = rawx_get_volume(si);
 	if (broken->str_path)
-		rc = get_content_chunks(vol_root, broken->str_cid, broken->str_path, &list_of_chunks, &error_local);
+		rc = get_content_chunks(vol_root, broken->str_cid, broken->str_path,
+			&list_of_chunks, &error_local);
 	else
-		rc = get_container_chunks(vol_root, broken->str_cid, &list_of_chunks, &error_local);
+		rc = get_container_chunks(vol_root, broken->str_cid, &list_of_chunks,
+			&error_local);
 
 	if (!rc) {
 		GRID_ERROR("Cannot get information about [%s:%s] in [%s] : %s",
-				broken->str_cid, broken->str_path, vol_root,
-				gerror_get_message(error_local));
+			broken->str_cid, broken->str_path, vol_root,
+			gerror_get_message(error_local));
 		goto label_exit;
 	}
 
 	if (!list_of_chunks) {
 		GRID_DEBUG("No information available about [%s:%s] in [%s]",
-				broken->str_cid, broken->str_path, vol_root);
+			broken->str_cid, broken->str_path, vol_root);
 		goto label_exit;
 	}
 
 	GRID_DEBUG("Repairing [%s:%s] for [%s]",
-			broken->str_cid, broken->str_path, vol_root);
+		broken->str_cid, broken->str_path, vol_root);
 	rc = TRUE;
-	for (l=list_of_chunks; l ;l=l->next) {
+	for (l = list_of_chunks; l; l = l->next) {
 		gchar *path = l->data;
 
-		if (meta2_repair_from_rawx(path, vol_root, &(si->addr), gs_client, &error_local)) {
+		if (meta2_repair_from_rawx(path, vol_root, &(si->addr), gs_client,
+				&error_local)) {
 			if (error_local)
-				GRID_INFO("Repaired the reference of [%s], but some errors occured : %s",
+				GRID_INFO
+					("Repaired the reference of [%s], but some errors occured : %s",
 					path, gerror_get_message(error_local));
 			else
 				GRID_INFO("Repaired the reference of [%s]", path);
@@ -380,7 +379,7 @@ manage_broken_element_for_rawx(gs_grid_storage_t *gs_client, struct broken_eleme
 		else {
 			rc = FALSE;
 			GRID_INFO("Could not repair the reference of [%s] : %s",
-					path, gerror_get_message(error_local));
+				path, gerror_get_message(error_local));
 		}
 		if (error_local)
 			g_clear_error(&error_local);
@@ -395,8 +394,8 @@ label_exit:
 	return rc;
 }
 
-static GSList*
-get_rawx_services(GError **err)
+static GSList *
+get_rawx_services(GError ** err)
 {
 	GSList *local_services;
 
@@ -408,11 +407,13 @@ get_rawx_services(GError **err)
 	}
 
 	if (DEBUG_ENABLED())
-		GRID_DEBUG("Found [%u] services on this host", g_slist_length(local_services));
+		GRID_DEBUG("Found [%u] services on this host",
+			g_slist_length(local_services));
 
 	GSList *result = NULL;
 	GSList *l;
-	for (l=local_services; l ;l=l->next) {
+
+	for (l = local_services; l; l = l->next) {
 		struct service_info_s *si, *copy;
 
 		if (!(si = l->data))
@@ -428,8 +429,8 @@ get_rawx_services(GError **err)
 	return result;
 }
 
-static GSList*
-get_broken_containers(GError **err)
+static GSList *
+get_broken_containers(GError ** err)
 {
 	GSList *all_broken, *l, *result = NULL;
 	GRegex *regex;
@@ -445,11 +446,12 @@ get_broken_containers(GError **err)
 
 	regex = g_regex_new(BROKEN_PATTERN, G_REGEX_CASELESS, 0, err);
 	if (!regex) {
-		GSETERROR(err, "Invalid RegEx for broken elements : '%s'", BROKEN_PATTERN);
+		GSETERROR(err, "Invalid RegEx for broken elements : '%s'",
+			BROKEN_PATTERN);
 		goto label_exit;
 	}
 
-	for (l=all_broken; l ;l=l->next) {
+	for (l = all_broken; l; l = l->next) {
 		gchar *str, *str_cid, *str_path;
 		struct broken_element_s local;
 		GMatchInfo *mi = NULL;
@@ -462,7 +464,7 @@ get_broken_containers(GError **err)
 			str_path = g_match_info_fetch(mi, 2);
 
 			bzero(&local, sizeof(local));
-			g_strlcpy(local.str_cid, str_cid, sizeof(local.str_cid)-1);
+			g_strlcpy(local.str_cid, str_cid, sizeof(local.str_cid) - 1);
 			local.str_path = str_path && *str_path ? g_strdup(str_path) : NULL;
 			result = g_slist_prepend(result, g_memdup(&local, sizeof(local)));
 
@@ -478,11 +480,11 @@ get_broken_containers(GError **err)
 label_exit:
 	g_slist_foreach(all_broken, g_free1, NULL);
 	g_slist_free(all_broken);
-	return result;	
+	return result;
 }
 
 static gboolean
-manage_new_broken_elements(GSList *list_new)
+manage_new_broken_elements(GSList * list_new)
 {
 	container_id_t cid;
 	GSList *list_of_rawx;
@@ -494,7 +496,8 @@ manage_new_broken_elements(GSList *list_new)
 	local_error = NULL;
 	gs_client = get_grid_client(&local_error);
 	if (!gs_client) {
-		GRID_ERROR("Cannot get the GridClient : %s", gerror_get_message(local_error));
+		GRID_ERROR("Cannot get the GridClient : %s",
+			gerror_get_message(local_error));
 		g_clear_error(&local_error);
 		return FALSE;
 	}
@@ -507,34 +510,41 @@ manage_new_broken_elements(GSList *list_new)
 			GRID_DEBUG("No RAWX on this host!");
 		else {
 			GRID_ERROR("Could not get the local RAWX from the gridagent : %s",
-					gerror_get_message(local_error));
+				gerror_get_message(local_error));
 			g_clear_error(&local_error);
 		}
 		return FALSE;
 	}
 
-	GRID_INFO("Found [%u] RAWX for [%s] on this host", g_slist_length(list_of_rawx), ns_name);
+	GRID_INFO("Found [%u] RAWX for [%s] on this host",
+		g_slist_length(list_of_rawx), ns_name);
 	service_info_trace_gslist(list_of_rawx, "local rawx : ");
 
-	for (l_broken=list_new; l_broken ;l_broken=l_broken->next) {
+	for (l_broken = list_new; l_broken; l_broken = l_broken->next) {
 
 		broken = l_broken->data;
 
-		for (l_rawx=list_of_rawx; l_rawx ;l_rawx=l_rawx->next) {
-			(void) manage_broken_element_for_rawx(gs_client, broken, l_rawx->data);
+		for (l_rawx = list_of_rawx; l_rawx; l_rawx = l_rawx->next) {
+			(void) manage_broken_element_for_rawx(gs_client, broken,
+				l_rawx->data);
 		}
 
-		if (!container_id_hex2bin(broken->str_cid, strlen(broken->str_cid), &cid, &local_error)) {
-			GRID_ERROR("Cannot parse the container_id : %s", gerror_get_message(local_error));
+		if (!container_id_hex2bin(broken->str_cid, strlen(broken->str_cid),
+				&cid, &local_error)) {
+			GRID_ERROR("Cannot parse the container_id : %s",
+				gerror_get_message(local_error));
 			continue;
 		}
 
-		for (l_rawx=list_of_rawx; l_rawx ;l_rawx=l_rawx->next) {
+		for (l_rawx = list_of_rawx; l_rawx; l_rawx = l_rawx->next) {
 			local_error = NULL;
-			if (!fixed_erroneous_content(ns_name, cid, &local_error, broken->str_path)) {
+			if (!fixed_erroneous_content(ns_name, cid, &local_error,
+					broken->str_path)) {
 				holder_forget(broken);
-				GRID_ERROR("Cannot notify the conscience that [%s]:[%s] has been repaired : %s",
-						broken->str_cid, broken->str_path, gerror_get_message(local_error));
+				GRID_ERROR
+					("Cannot notify the conscience that [%s]:[%s] has been repaired : %s",
+					broken->str_cid, broken->str_path,
+					gerror_get_message(local_error));
 			}
 			if (local_error)
 				g_clear_error(&local_error);
@@ -561,7 +571,8 @@ main_action_one_loop(void)
 	list_broken = get_broken_containers(&local_error);
 	if (!list_broken) {
 		if (local_error) {
-			GRID_ERROR("Could not get the broken elements from the conscience : %s",
+			GRID_ERROR
+				("Could not get the broken elements from the conscience : %s",
 				gerror_get_message(local_error));
 			g_error_free(local_error);
 		}
@@ -572,7 +583,8 @@ main_action_one_loop(void)
 		return;
 	}
 	if (DEBUG_ENABLED())
-		GRID_DEBUG("Got [%u] broken elements from the gridagent", g_slist_length(list_broken));
+		GRID_DEBUG("Got [%u] broken elements from the gridagent",
+			g_slist_length(list_broken));
 
 	/* Keep only those not yet considered as broken */
 	ht_previous = holder_keep_new(list_broken, &list_new);
@@ -585,9 +597,11 @@ main_action_one_loop(void)
 	if (!list_new)
 		g_hash_table_destroy(ht_previous);
 	else {
-		GRID_INFO("About to recover [%u] new broken elements", g_slist_length(list_new));
+		GRID_INFO("About to recover [%u] new broken elements",
+			g_slist_length(list_new));
 		if (manage_new_broken_elements(list_new)) {
-			GRID_INFO("Tried to recover the [%u] broken elements", g_slist_length(list_new));
+			GRID_INFO("Tried to recover the [%u] broken elements",
+				g_slist_length(list_new));
 			/* commit the changes to  */
 			g_hash_table_destroy(ht_previous);
 		}
@@ -613,13 +627,13 @@ static gboolean
 main_configure(int argc, char **args)
 {
 	ht_broken = holder_new();
-	
+
 	if (argc != 1) {
 		GRID_ERROR("Missing namespace argument");
 		return FALSE;
 	}
 
-	if (sizeof(ns_name) <= g_strlcpy(ns_name, args[0], sizeof(ns_name)-1)) {
+	if (sizeof(ns_name) <= g_strlcpy(ns_name, args[0], sizeof(ns_name) - 1)) {
 		GRID_ERROR("Namespace name too long");
 		return FALSE;
 	}
@@ -651,28 +665,26 @@ main_action(void)
 	}
 }
 
-static struct grid_main_option_s*
+static struct grid_main_option_s *
 main_get_options(void)
 {
 	static struct grid_main_option_s options[] = {
-		{NULL, 0, {.b=0}, NULL}
+		{NULL, 0, {.b = 0}, NULL}
 	};
 
 	return options;
 }
 
-static const gchar*
+static const gchar *
 main_get_usage(void)
 {
 	static gchar xtra_usage[] =
 		"\tExpected argument: NAMESPACE\n"
-		"\t ... with NAMESPACE a namespace name declared in /etc/gridstorage.conf\n"
-		;
+		"\t ... with NAMESPACE a namespace name declared in /etc/gridstorage.conf\n";
 	return xtra_usage;
 }
 
-static struct grid_main_callbacks cb =
-{
+static struct grid_main_callbacks cb = {
 	.options = main_get_options,
 	.action = main_action,
 	.set_defaults = main_set_defaults,
@@ -687,4 +699,3 @@ main(int argc, char **argv)
 {
 	return grid_main_cli(argc, argv, &cb);
 }
-

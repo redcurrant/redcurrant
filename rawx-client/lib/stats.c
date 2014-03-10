@@ -1,35 +1,17 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "rawx.client.stats"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "rawx.client.stats"
 #endif
 
-#include "./rawx_client_internals.h"
+#include <metautils/lib/metautils.h>
 
-#include <metautils.h>
-
+#include "rawx_client_internals.h"
 
 static void
 _convert_string_to_double(gpointer key, gpointer value, gpointer data)
 {
 	gint64 value_i64;
 	gdouble value_d;
-	gchar* str_value;
+	gchar *str_value;
 	GHashTable *hash;
 
 	str_value = value;
@@ -37,7 +19,8 @@ _convert_string_to_double(gpointer key, gpointer value, gpointer data)
 
 	value_i64 = g_ascii_strtoll(str_value, NULL, 10);
 	value_d = value_i64;
-	g_hash_table_insert(hash, g_strdup(key), g_memdup(&value_d, sizeof(value_d)));
+	g_hash_table_insert(hash, g_strdup(key), g_memdup(&value_d,
+			sizeof(value_d)));
 }
 
 GHashTable *
@@ -68,25 +51,28 @@ rawx_client_get_statistics(rawx_session_t * session, GError ** err)
 	ne_add_response_body_reader(request, ne_accept_2xx, body_reader, buffer);
 
 	switch (rc = ne_request_dispatch(request)) {
-	case NE_OK:
-		if (ne_get_status(request)->klass != 2) {
-			GSETERROR(err, "RAWX returned an error");
-		}
-		else if (!(parsed = body_parser(buffer, err))) {
-			GSETERROR(err, "No statistics from the RAWX server");
-		}
-		break;
-	case NE_ERROR:
-	case NE_TIMEOUT:
-	case NE_CONNECT:
-	case NE_AUTH:
-		str_addr_size = addr_info_to_string(&(session->addr), str_addr, sizeof(str_addr));
-		GSETERROR(err, "cannot download the stats from [%.*s]' (%s)",
-		    str_addr_size, str_addr, ne_get_error(session->neon_session));
-		break;
-	default:
-		GSETERROR(err, "Unexpected return code from the neon library : %d", rc);
-		break;
+		case NE_OK:
+			if (ne_get_status(request)->klass != 2) {
+				GSETERROR(err, "RAWX returned an error");
+			}
+			else if (!(parsed = body_parser(buffer, err))) {
+				GSETERROR(err, "No statistics from the RAWX server");
+			}
+			break;
+		case NE_ERROR:
+		case NE_TIMEOUT:
+		case NE_CONNECT:
+		case NE_AUTH:
+			str_addr_size =
+				addr_info_to_string(&(session->addr), str_addr,
+				sizeof(str_addr));
+			GSETERROR(err, "cannot download the stats from [%.*s]' (%s)",
+				str_addr_size, str_addr, ne_get_error(session->neon_session));
+			break;
+		default:
+			GSETERROR(err, "Unexpected return code from the neon library : %d",
+				rc);
+			break;
 	}
 
 	g_byte_array_free(buffer, TRUE);

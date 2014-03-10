@@ -1,26 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metacomm.chunk_info"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metacomm.chunk_info"
 #endif
 
 #include "./metautils_internals.h"
@@ -87,14 +66,15 @@ chunk_id_marshall(const chunk_id_t * chunkId, GError ** err)
 	}
 
 	return gba;
-      errorLabel:
+errorLabel:
 	g_byte_array_free(gba, TRUE);
 	return NULL;
 }
 
 
 gint
-chunk_id_unmarshall(chunk_id_t * chunkId, void *src, gsize srcSize, GError ** err)
+chunk_id_unmarshall(chunk_id_t * chunkId, void *src, gsize srcSize,
+	GError ** err)
 {
 	gint rc = 0;
 	void *result = NULL;
@@ -116,14 +96,17 @@ chunk_id_unmarshall(chunk_id_t * chunkId, void *src, gsize srcSize, GError ** er
 	asn_cid = (ChunkId_t *) result;
 
 	switch (decRet.code) {
-	case RC_OK:
-		break;
-	case RC_FAIL:
-		GSETERROR(err, "Cannot parse the serialized chunk_info_t sequence (%i consumed)", decRet.consumed);
-		return -1;
-	case RC_WMORE:
-		GSETERROR(err, "Cannot parse the serialized chunk_info_t sequence (uncomplete)");
-		return 0;
+		case RC_OK:
+			break;
+		case RC_FAIL:
+			GSETERROR(err,
+				"Cannot parse the serialized chunk_info_t sequence (%i consumed)",
+				decRet.consumed);
+			return -1;
+		case RC_WMORE:
+			GSETERROR(err,
+				"Cannot parse the serialized chunk_info_t sequence (uncomplete)");
+			return 0;
 	}
 
 	rc = chunk_id_ASN2API(asn_cid, chunkId) ? 1 : -1;
@@ -136,4 +119,3 @@ chunk_id_unmarshall(chunk_id_t * chunkId, void *src, gsize srcSize, GError ** er
 
 	return 1;
 }
-

@@ -1,55 +1,37 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "grid.meta2.disp"
+#define G_LOG_DOMAIN "grid.meta2.disp"
 #endif
 
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
-#include <metatypes.h>
-#include <metautils.h>
-#include <metacomm.h>
-#include <hc_url.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
 
 #include <glib.h>
 
-#include <transport_gridd.h>
+#include <server/transport_gridd.h>
+#include <server/gridd_dispatcher_filters.h>
 
-#include "../server/gridd_dispatcher_filters.h"
-
-#include "./meta2_macros.h"
-#include "./meta2_filter_context.h"
-#include "./meta2_filters.h"
-#include "./meta2_backend_internals.h"
-#include "./meta2_bean.h"
-#include "./meta2v2_remote.h"
-#include "./generic.h"
-#include "./autogen.h"
-
-#define TRACE_FILTER() GRID_TRACE2("%s", __FUNCTION__)
+#include <meta2v2/meta2_macros.h>
+#include <meta2v2/meta2_filter_context.h>
+#include <meta2v2/meta2_filters.h>
+#include <meta2v2/meta2_backend_internals.h>
+#include <meta2v2/meta2_bean.h>
+#include <meta2v2/meta2v2_remote.h>
+#include <meta2v2/generic.h>
+#include <meta2v2/autogen.h>
 
 struct on_bean_ctx_s *
-_on_bean_ctx_init(struct gridd_reply_ctx_s *reply)
+_on_bean_ctx_init(struct gridd_filter_ctx_s *ctx,
+	struct gridd_reply_ctx_s *reply)
 {
-	struct on_bean_ctx_s * obc = g_malloc0(sizeof(struct on_bean_ctx_s));
+	struct on_bean_ctx_s *obc = g_malloc0(sizeof(struct on_bean_ctx_s));
+
 	obc->l = NULL;
+	obc->first = TRUE;
+	obc->ctx = ctx;
 	obc->reply = reply;
 	return obc;
 }
@@ -58,11 +40,32 @@ void
 _on_bean_ctx_send_list(struct on_bean_ctx_s *obc, gboolean final)
 {
 	/* marshall the list, send and clean it */
-	if(NULL != obc->l) {
+	struct meta2_backend_s *m2b = meta2_filter_ctx_get_backend(obc->ctx);
+	struct hc_url_s *url = meta2_filter_ctx_get_url(obc->ctx);
+	struct event_config_s *evt_config = meta2_backend_get_event_config(m2b,
+		hc_url_get(url, HCURL_NS));
+
+	if (NULL != obc->l) {
 		obc->reply->add_body(bean_sequence_marshall(obc->l));
-		_bean_cleanl2(obc->l);
+		if (event_is_enabled(evt_config)) {
+			/* beans will be clean by context */
+			if (obc->first) {
+				obc->first = FALSE;
+				meta2_filter_ctx_set_input_udata(obc->ctx, obc->l,
+					(GDestroyNotify) _bean_cleanl2);
+			}
+			else {
+				meta2_filter_ctx_set_input_udata(obc->ctx,
+					g_slist_prepend(
+						(GSList *) meta2_filter_ctx_get_input_udata(obc->ctx),
+						obc->l), (GDestroyNotify) _bean_cleanl2);
+			}
+		}
+		else {
+			_bean_cleanl2(obc->l);
+		}
 	}
-	if(final)
+	if (final)
 		obc->reply->send_reply(200, "OK");
 	else
 		obc->reply->send_reply(206, "CONTINUE");
@@ -72,19 +75,27 @@ _on_bean_ctx_send_list(struct on_bean_ctx_s *obc, gboolean final)
 void
 _on_bean_ctx_clean(struct on_bean_ctx_s *obc)
 {
-	if(!obc)
+	if (!obc)
 		return;
-	if(obc->l) {
-		_bean_cleanl2(obc->l);
+
+	struct meta2_backend_s *m2b = meta2_filter_ctx_get_backend(obc->ctx);
+	struct hc_url_s *url = meta2_filter_ctx_get_url(obc->ctx);
+	struct event_config_s *evt_config = meta2_backend_get_event_config(m2b,
+		hc_url_get(url, HCURL_NS));
+
+	if (obc->l) {
+		if (!event_is_enabled(evt_config))
+			_bean_cleanl2(obc->l);
 		obc->l = NULL;
 	}
 	obc->reply = NULL;
+	obc->ctx = NULL;
 	g_free(obc);
 }
 
 int
 meta2_filter_fill_subject(struct gridd_filter_ctx_s *ctx,
-		struct gridd_reply_ctx_s *reply)
+	struct gridd_reply_ctx_s *reply)
 {
 	struct hc_url_s *url;
 
@@ -92,10 +103,10 @@ meta2_filter_fill_subject(struct gridd_filter_ctx_s *ctx,
 	url = meta2_filter_ctx_get_url(ctx);
 	if (hc_url_has(url, HCURL_REFERENCE))
 		reply->subject("%s|%s", hc_url_get(url, HCURL_WHOLE),
-				hc_url_get(url, HCURL_HEXID));
+			hc_url_get(url, HCURL_HEXID));
 	else
 		reply->subject("%s|%s", hc_url_get(url, HCURL_NS),
-				hc_url_get(url, HCURL_HEXID));
+			hc_url_get(url, HCURL_HEXID));
 	return FILTER_OK;
 }
 
@@ -109,7 +120,7 @@ meta2_filter_fill_subject(struct gridd_filter_ctx_s *ctx,
 
 int
 meta2_filter_pack_url(struct gridd_filter_ctx_s *ctx,
-		struct gridd_reply_ctx_s *reply)
+	struct gridd_reply_ctx_s *reply)
 {
 	struct hc_url_s *url = NULL;
 	const char *tmp = NULL;
@@ -125,7 +136,7 @@ meta2_filter_pack_url(struct gridd_filter_ctx_s *ctx,
 	}
 
 	GRID_DEBUG("HEXID : %s", hc_url_get(url, HCURL_HEXID));
-	if(hc_url_has(url, HCURL_HEXID)) {
+	if (hc_url_has(url, HCURL_HEXID)) {
 		hexid = g_strdup(hc_url_get(url, HCURL_HEXID));
 	}
 
@@ -134,34 +145,45 @@ meta2_filter_pack_url(struct gridd_filter_ctx_s *ctx,
 	FILL_URL_FIELD(M2V1_KEY_REFID, HCURL_HEXID);
 	FILL_URL_FIELD(M2V1_KEY_PATH, HCURL_PATH);
 
-	if(!hc_url_has(url, HCURL_NS))  {
-		const struct meta2_backend_s *backend = meta2_filter_ctx_get_backend(ctx);
+	if (!hc_url_has(url, HCURL_NS)) {
+		const struct meta2_backend_s *backend =
+			meta2_filter_ctx_get_backend(ctx);
 		url = hc_url_set(url, HCURL_NS, backend->ns_name);
 	}
 
-	if(NULL != hexid) {
+	if (NULL != hexid) {
 		hc_url_set(url, HCURL_HEXID, hexid);
 		g_free(hexid);
 	}
+
+	// Hack in case there was "?version=XXX" in M2V1_KEY_PATH
+	struct hc_url_s *url2 = hc_url_init(hc_url_get(url, HCURL_WHOLE));
+
+	hc_url_set(url, HCURL_PATH, hc_url_get(url2, HCURL_PATH));
+	if (hc_url_has(url2, HCURL_SNAPORVERS)) {
+		hc_url_set(url, HCURL_SNAPORVERS, hc_url_get(url2, HCURL_SNAPORVERS));
+	}
+	hc_url_clean(url2);
 
 	return FILTER_OK;
 }
 
 int
 meta2_filter_fail_reply(struct gridd_filter_ctx_s *ctx,
-		struct gridd_reply_ctx_s *reply)
+	struct gridd_reply_ctx_s *reply)
 {
 	GError *e = NULL;
 
 	TRACE_FILTER();
 	e = meta2_filter_ctx_get_error(ctx);
-	if(NULL != e) {
+	if (NULL != e) {
 		GRID_DEBUG("Error defined by KO execution filter, return it");
 		reply->send_error(0, e);
-	} else {
+	}
+	else {
 		GRID_DEBUG("Error not defined by KO execution filter, return 500");
 		reply->send_error(0, NEWERROR(500,
-					"Request execution failed : No error"));
+				"Request execution failed : No error"));
 	}
 
 	return FILTER_OK;
@@ -169,7 +191,7 @@ meta2_filter_fail_reply(struct gridd_filter_ctx_s *ctx,
 
 int
 meta2_filter_success_reply(struct gridd_filter_ctx_s *ctx,
-		struct gridd_reply_ctx_s *reply)
+	struct gridd_reply_ctx_s *reply)
 {
 	TRACE_FILTER();
 	(void) ctx;
@@ -179,7 +201,7 @@ meta2_filter_success_reply(struct gridd_filter_ctx_s *ctx,
 
 int
 meta2_filter_not_implemented_reply(struct gridd_filter_ctx_s *ctx,
-		struct gridd_reply_ctx_s *reply)
+	struct gridd_reply_ctx_s *reply)
 {
 	TRACE_FILTER();
 	(void) ctx;

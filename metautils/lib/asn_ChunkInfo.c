@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metacomm.chunk_info.asn"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metacomm.chunk_info.asn"
 #endif
 
 #include <errno.h>
@@ -45,16 +25,19 @@ chunk_info_ASN2API(const ChunkInfo_t * asn, chunk_info_t * api)
 	/*id */
 
 	/* id.id */
-	memcpy(&(api->id.id), asn->id.id.buf, MIN(sizeof(api->id.id), (size_t) asn->id.id.size));
+	memcpy(&(api->id.id), asn->id.id.buf, MIN(sizeof(api->id.id),
+			(size_t) asn->id.id.size));
 
 	/* id.addr */
 	addr_info_ASN2API(&(asn->id.addr), &(api->id.addr));
 
 	/* id.vol */
-	memcpy(api->id.vol, asn->id.vol.buf, MIN(LIMIT_LENGTH_VOLUMENAME, asn->id.vol.size));
+	memcpy(api->id.vol, asn->id.vol.buf, MIN(LIMIT_LENGTH_VOLUMENAME,
+			asn->id.vol.size));
 
 	memset(api->hash, 0x00, sizeof(chunk_hash_t));
-	memcpy(api->hash, asn->md5.buf, MIN(sizeof(chunk_hash_t), (size_t) asn->md5.size));
+	memcpy(api->hash, asn->md5.buf, MIN(sizeof(chunk_hash_t),
+			(size_t) asn->md5.size));
 
 	/*position */
 	asn_INTEGER_to_uint32(&(asn->position), &(api->position));
@@ -80,7 +63,8 @@ chunk_info_API2ASN(const chunk_info_t * api, ChunkInfo_t * asn)
 	/*id */
 
 	/* id.id */
-	OCTET_STRING_fromBuf(&(asn->id.id), (const char*)api->id.id, sizeof(api->id.id));
+	OCTET_STRING_fromBuf(&(asn->id.id), (const char *) api->id.id,
+		sizeof(api->id.id));
 
 	/* id.addr */
 	addr_info_API2ASN(&(api->id.addr), &(asn->id.addr));
@@ -100,7 +84,8 @@ chunk_info_API2ASN(const chunk_info_t * api, ChunkInfo_t * asn)
 	/*nb */
 	asn_uint32_to_INTEGER(&(asn->nb), api->nb);
 
-	OCTET_STRING_fromBuf(&(asn->md5), (const char*)api->hash, sizeof(chunk_hash_t));
+	OCTET_STRING_fromBuf(&(asn->md5), (const char *) api->hash,
+		sizeof(chunk_hash_t));
 
 	return TRUE;
 }
@@ -132,7 +117,7 @@ chunk_id_API2ASN(const chunk_id_t * api, ChunkId_t * asn)
 		return FALSE;
 
 	/* id.id */
-	OCTET_STRING_fromBuf(&(asn->id), (const char*)api->id, sizeof(api->id));
+	OCTET_STRING_fromBuf(&(asn->id), (const char *) api->id, sizeof(api->id));
 
 	/* id.addr */
 	addr_info_API2ASN(&(api->addr), &(asn->addr));
@@ -153,7 +138,8 @@ chunk_id_ASN2API(const ChunkId_t * asn, chunk_id_t * api)
 		return FALSE;
 
 	/* id */
-	memcpy(&(api->id), asn->id.buf, MIN(sizeof(api->id), (size_t) asn->id.size));
+	memcpy(&(api->id), asn->id.buf, MIN(sizeof(api->id),
+			(size_t) asn->id.size));
 
 	/* addr */
 	addr_info_ASN2API(&(asn->addr), &(api->addr));

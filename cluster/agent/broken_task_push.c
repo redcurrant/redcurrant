@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "gridcluster.agent.broken"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gridcluster.agent.broken"
 #endif
 
 #include <stdlib.h>
@@ -27,56 +7,56 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <metatypes.h>
-#include <metautils.h>
-#include <metacomm.h>
+#include <metautils/lib/metacomm.h>
+#include <cluster/module/module.h>
 
 #include "./agent.h"
 #include "./asn1_request_worker.h"
 #include "./broken_workers.h"
-#include "./connect.h"
 #include "./io_scheduler.h"
 #include "./namespace_get_task_worker.h"
 #include "./task_scheduler.h"
-#include "../module/module.h"
 
 
 #define TASK_ID "broken_task_push"
 
-struct session_data_s {
+struct session_data_s
+{
 	gchar ns[LIMIT_LENGTH_NSNAME];
-	gchar task_id[sizeof(TASK_ID)+1+LIMIT_LENGTH_NSNAME];
+	gchar task_id[sizeof(TASK_ID) + 1 + LIMIT_LENGTH_NSNAME];
 };
 
 static int
-asn1_error_handler(worker_t *worker, GError **error)
+asn1_error_handler(worker_t * worker, GError ** error)
 {
 	struct session_data_s *sdata;
+
 	TRACE_POSITION();
-	sdata = asn1_worker_get_session_data( worker );
+	sdata = asn1_worker_get_session_data(worker);
 	if (sdata) {
 		GSETERROR(error, "[task_id=%s] Request failed", sdata->task_id);
 		task_done(sdata->task_id);
 	}
-        return 0;
+	return 0;
 }
 
 static int
-asn1_final_handler(worker_t *worker, GError **error)
+asn1_final_handler(worker_t * worker, GError ** error)
 {
 	struct session_data_s *sdata;
-	(void)error;
+
+	(void) error;
 	TRACE_POSITION();
-	sdata = asn1_worker_get_session_data( worker );
+	sdata = asn1_worker_get_session_data(worker);
 	if (sdata) {
 		DEBUG("[task_id=%s] Request successful", sdata->task_id);
 		task_done(sdata->task_id);
 	}
-        return 1;
+	return 1;
 }
 
 static gboolean
-send_list( struct namespace_data_s *ns_data, GSList *list, GError **error )
+send_list(struct namespace_data_s *ns_data, GSList * list, GError ** error)
 {
 	struct session_data_s *sdata;
 	worker_t *asn1_worker;
@@ -84,12 +64,12 @@ send_list( struct namespace_data_s *ns_data, GSList *list, GError **error )
 
 	TRACE_POSITION();
 
-	gba=NULL;
-	sdata=NULL;
-	asn1_worker=NULL;
-	
-	/*prepare the payload*/
-	gba = meta2_maintenance_names_marshall( list, error );
+	gba = NULL;
+	sdata = NULL;
+	asn1_worker = NULL;
+
+	/*prepare the payload */
+	gba = meta2_maintenance_names_marshall(list, error);
 	if (!gba) {
 		GSETERROR(error, "Failed to marshall volume_stat list");
 		return FALSE;
@@ -98,17 +78,21 @@ send_list( struct namespace_data_s *ns_data, GSList *list, GError **error )
 
 	/* prepare the ASN.1 session data */
 	sdata = g_try_malloc0(sizeof(struct session_data_s));
-	g_strlcpy(sdata->ns,ns_data->name,LIMIT_LENGTH_NSNAME-1);
-	g_snprintf(sdata->task_id,sizeof(sdata->task_id), TASK_ID".%s",ns_data->name);
-	
-	asn1_worker = create_asn1_worker(&(ns_data->ns_info.addr), NAME_MSGNAME_CS_PUSH_BROKEN_CONT);
-	asn1_worker_set_handlers(asn1_worker, agent_asn1_default_response_handler, asn1_error_handler, asn1_final_handler);
+	g_strlcpy(sdata->ns, ns_data->name, LIMIT_LENGTH_NSNAME - 1);
+	g_snprintf(sdata->task_id, sizeof(sdata->task_id), TASK_ID ".%s",
+		ns_data->name);
+
+	asn1_worker =
+		create_asn1_worker(&(ns_data->ns_info.addr),
+		NAME_MSGNAME_CS_PUSH_BROKEN_CONT);
+	asn1_worker_set_handlers(asn1_worker, agent_asn1_default_response_handler,
+		asn1_error_handler, asn1_final_handler);
 	asn1_worker_set_session_data(asn1_worker, sdata, g_free);
-	asn1_worker_set_request_body(asn1_worker,gba);
-	g_byte_array_free(gba,FALSE);
+	asn1_worker_set_request_body(asn1_worker, gba);
+	g_byte_array_free(gba, FALSE);
 
 	if (!asn1_request_worker(asn1_worker, error)) {
-		free_asn1_worker(asn1_worker,TRUE);
+		free_asn1_worker(asn1_worker, TRUE);
 		GSETERROR(error, "Failed to send asn1 request");
 		return FALSE;
 	}
@@ -117,83 +101,76 @@ send_list( struct namespace_data_s *ns_data, GSList *list, GError **error )
 }
 
 static gboolean
-task_action(gpointer task_param, GError **error)
+task_action(gpointer task_param, GError ** error)
 {
-	gchar task_id[sizeof(TASK_ID)+LIMIT_LENGTH_NSNAME+1];
+	gchar task_id[sizeof(TASK_ID) + LIMIT_LENGTH_NSNAME + 1];
 	struct namespace_data_s *ns_data;
 	int counter;
 	GSList *l, *list_tmp;
 
 	TRACE_POSITION();
-	
+
 	if (!task_param) {
-		GSETERROR(error,"Invalid task parameter");
+		GSETERROR(error, "Invalid task parameter");
 		return FALSE;
 	}
 
-	g_snprintf(task_id, sizeof(task_id), TASK_ID".%s", (gchar*)task_param);
+	g_snprintf(task_id, sizeof(task_id), TASK_ID ".%s", (gchar *) task_param);
 	task_done(task_id);
-	ns_data = get_namespace((gchar*)task_param, error);
+	ns_data = get_namespace((gchar *) task_param, error);
 	if (!ns_data) {
-		GSETERROR(error,"Namespace [%s] not (yet) managed", (gchar*)task_param);
+		GSETERROR(error, "Namespace [%s] not (yet) managed",
+			(gchar *) task_param);
 		return FALSE;
 	}
-	
+
 	if (!ns_data->configured) {
 		if (ns_data->list_broken) {
-			g_slist_foreach( ns_data->list_broken, g_free1, NULL);
-			g_slist_free( ns_data->list_broken );
+			g_slist_foreach(ns_data->list_broken, g_free1, NULL);
+			g_slist_free(ns_data->list_broken);
 			ns_data->list_broken = NULL;
 		}
-		GSETERROR(error,"Namespace not configured");
+		GSETERROR(error, "Namespace not configured");
 		return 0;
 	}
-	
+
 	list_tmp = NULL;
-	for (counter=0,l=ns_data->list_broken; l ;l=l->next) {
+	for (counter = 0, l = ns_data->list_broken; l; l = l->next) {
 		if (!l->data)
 			continue;
-		/*transfer in the temporary list*/
-		list_tmp = g_slist_prepend( list_tmp, l->data );
+		/*transfer in the temporary list */
+		list_tmp = g_slist_prepend(list_tmp, l->data);
 		l->data = NULL;
 		counter++;
-		if (counter>128) {
-			send_list(ns_data,list_tmp,error);
-			g_slist_foreach( list_tmp, g_free1, NULL );
-			g_slist_free( list_tmp );
+		if (counter > 128) {
+			send_list(ns_data, list_tmp, error);
+			g_slist_foreach(list_tmp, g_free1, NULL);
+			g_slist_free(list_tmp);
 			list_tmp = NULL;
 			counter = 0;
 		}
 	}
-	
+
 	if (list_tmp) {
-		send_list(ns_data,list_tmp,error);
-		g_slist_foreach( list_tmp, g_free1, NULL );
-		g_slist_free( list_tmp );
+		send_list(ns_data, list_tmp, error);
+		g_slist_foreach(list_tmp, g_free1, NULL);
+		g_slist_free(list_tmp);
 	}
 
-	g_slist_free( ns_data->list_broken );
+	g_slist_free(ns_data->list_broken);
 	ns_data->list_broken = NULL;
 	return TRUE;
 }
 
-NAMESPACE_TASK_CREATOR(task_worker,TASK_ID,task_action,cluster_update_freq);
+NAMESPACE_TASK_CREATOR(task_worker, TASK_ID, task_action, period_push_broken);
 
 int
-agent_start_broken_task_push(GError **error)
+agent_start_broken_task_push(GError ** error)
 {
-	task_t *task = NULL;
-
-	TRACE_POSITION();
-
-	task = g_try_new0(task_t, 1);
-	if (task == NULL) {
-		GSETERROR(error, "Memory allocation failure");
-		return 0;
-	}
+	task_t *task = g_malloc0(sizeof(task_t));
 
 	task->id = g_strdup(TASK_ID);
-	task->period = 1;
+	task->period = 5;
 	task->task_handler = task_worker;
 
 	if (!add_task_to_schedule(task, error)) {
@@ -202,6 +179,5 @@ agent_start_broken_task_push(GError **error)
 		return 0;
 	}
 
-	return(1);
+	return (1);
 }
-

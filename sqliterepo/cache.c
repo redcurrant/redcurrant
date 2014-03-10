@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "grid.sqlx.cache"
+#define G_LOG_DOMAIN "sqliterepo"
 #endif
 
 #include <stddef.h>
@@ -28,14 +8,11 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
 
-#include "../metautils/lib/hashstr.h"
-#include "../metautils/lib/metautils.h"
-
-#include "./internals.h"
-#include "./sqliterepo.h"
-#include "./cache.h"
+#include "sqliterepo.h"
+#include "cache.h"
+#include "internals.h"
 
 #define GET(R,I) ((R)->bases + (I))
 
@@ -49,42 +26,42 @@ struct beacon_s
 
 enum sqlx_base_status_e
 {
-	SQLX_BASE_FREE=1,
-	SQLX_BASE_IDLE,	  /*!< without user */
-	SQLX_BASE_USED,	  /*!< with users. count_open then
-						 * tells how many threads have marked the base
-						 * to be kept open, and owner tells if the lock
-						 * os currently owned by a thread. */
+	SQLX_BASE_FREE = 1,
+	SQLX_BASE_IDLE,				/*!< without user */
+	SQLX_BASE_IDLE_HOT,			/*!< without user */
+	SQLX_BASE_USED,				/*!< with users. count_open then
+								 * tells how many threads have marked the base
+								 * to be kept open, and owner tells if the lock
+								 * os currently owned by a thread. */
+	SQLX_BASE_CLOSING,			// base being closed, wait for notification and retry on it
 };
 
 struct sqlx_base_s
 {
-	hashstr_t *name; /*!< This is registered in the DB */
+	hashstr_t *name;			/*!< This is registered in the DB */
 
-	gint index; /*!< self reference */
-
-	guint32 count_locks; /*!< Counts the number of locks asked by the same
-						   user. This is the way we manage recursive locks.
-						   Changed under the global lock. */
-
-	guint32 count_open; /*!< Counts the number of times this base has been
-						  explicitely opened by the user. Changed under the
-						  base-local lock. */
-
-	enum sqlx_base_status_e status; /*!< Changed under the global lock */
-
-	GTimeVal last_update; /*!< Changed under the global lock */
-
-	GThread *owner; /*!< The current owner of the database. Changed under the
-					  global lock */
+	GThread *owner;				/*!< The current owner of the database. Changed under the
+								   global lock */
 	GCond *cond;
 
 	gpointer handle;
 
-	struct {
+	GTimeVal last_update;		/*!< Changed under the global lock */
+
+	struct
+	{
 		gint prev;
 		gint next;
-	} link; /*< Used to build a doubly-linked list */
+	} link;						/*< Used to build a doubly-linked list */
+
+	guint32 heat;
+
+	guint32 count_open;			/*!< Counts the number of times this base has been
+								   explicitely opened and locked by the user. */
+
+	gint index;					/*!< self reference */
+
+	enum sqlx_base_status_e status;	/*!< Changed under the global lock */
 };
 
 typedef struct sqlx_base_s sqlx_base_t;
@@ -94,36 +71,31 @@ struct sqlx_cache_s
 	gboolean used;
 
 	GMutex *lock;
-	GHashTable *bases_by_name;
+	GTree *bases_by_name;
 	guint bases_count;
 	sqlx_base_t *bases;
 	GCond **cond_array;
 	gsize cond_count;
 
+	guint32 heat_threshold;
+	time_t cool_grace_delay;
+	time_t hot_grace_delay;
+
 	/* Doubly linked lists of tables, one by status */
 	struct beacon_s beacon_free;
 	struct beacon_s beacon_idle;
+	struct beacon_s beacon_idle_hot;
 	struct beacon_s beacon_used;
 
 	sqlx_cache_close_hook close_hook;
 };
 
-static GQuark gquark_log = 0;
-
 /* ------------------------------------------------------------------------- */
 
-static inline int
-i_have_the_lock(sqlx_base_t *base)
-{
-	if (!base->count_locks || !base->owner)
-		return 0;
-	return base->owner == g_thread_self();
-}
-
 static inline gboolean
-base_id_out(sqlx_cache_t *cache, gint bd)
+base_id_out(sqlx_cache_t * cache, gint bd)
 {
-	return bd<0 || (guint)bd >= cache->bases_count;
+	return (bd < 0) || ((guint) bd) >= cache->bases_count;
 }
 
 static inline const gchar *
@@ -134,8 +106,12 @@ sqlx_status_to_str(enum sqlx_base_status_e status)
 			return "FREE";
 		case SQLX_BASE_IDLE:
 			return "IDLE";
+		case SQLX_BASE_IDLE_HOT:
+			return "IDLE_HOT";
 		case SQLX_BASE_USED:
 			return "USED";
+		case SQLX_BASE_CLOSING:
+			return "CLOSING";
 		default:
 			return "?";
 	}
@@ -143,36 +119,35 @@ sqlx_status_to_str(enum sqlx_base_status_e status)
 
 #ifdef HAVE_EXTRA_DEBUG
 static void
-sqlx_base_debug_func(const gchar *from, sqlx_base_t *base)
+sqlx_base_debug_func(const gchar * from, sqlx_base_t * base)
 {
 	(void) from;
 	(void) base;
 
-	SQLX_ASSERT(base);
+	EXTRA_ASSERT(base);
 	GRID_TRACE2("BASE [%d/%s]"
-			" %"G_GUINT32_FORMAT"/%"G_GUINT32_FORMAT
-			" LIST=%s [%d,%d]"
-			" (%s)",
-			base->index, (base->name ? hashstr_str(base->name) : ""),
-			base->count_open, base->count_locks,
-			sqlx_status_to_str(base->status),
-			base->link.prev, base->link.next,
-			from);
+		" %" G_GUINT32_FORMAT
+		" LIST=%s [%d,%d]"
+		" (%s)",
+		base->index, (base->name ? hashstr_str(base->name) : ""),
+		base->count_open,
+		sqlx_status_to_str(base->status),
+		base->link.prev, base->link.next, from);
 }
 
-# define sqlx_base_debug(From,Base) do { sqlx_base_debug_func(From,Base); } while (0)
+#define sqlx_base_debug(From,Base) do { sqlx_base_debug_func(From,Base); } while (0)
 #else
-# define sqlx_base_debug(From,Base) do {  } while (0)
+#define sqlx_base_debug(From,Base) do {  } while (0)
 #endif
 
 static inline sqlx_base_t *
-sqlx_get_by_id(sqlx_cache_t *cache, gint i)
+sqlx_get_by_id(sqlx_cache_t * cache, gint i)
 {
 	return base_id_out(cache, i) ? NULL : cache->bases + i;
 }
 
 static inline sqlx_base_t *
-sqlx_next_by_id(sqlx_cache_t *cache, gint i)
+sqlx_next_by_id(sqlx_cache_t * cache, gint i)
 {
 	sqlx_base_t *current;
 
@@ -182,7 +157,7 @@ sqlx_next_by_id(sqlx_cache_t *cache, gint i)
 }
 
 static inline sqlx_base_t *
-sqlx_prev_by_id(sqlx_cache_t *cache, gint i)
+sqlx_prev_by_id(sqlx_cache_t * cache, gint i)
 {
 	sqlx_base_t *current;
 
@@ -192,14 +167,13 @@ sqlx_prev_by_id(sqlx_cache_t *cache, gint i)
 }
 
 static inline gint
-sqlx_base_get_id(sqlx_base_t *base)
+sqlx_base_get_id(sqlx_base_t * base)
 {
 	return base ? base->index : -1;
 }
 
 static inline void
-SQLX_REMOVE(sqlx_cache_t *cache, sqlx_base_t *base,
-		struct beacon_s *beacon)
+SQLX_REMOVE(sqlx_cache_t * cache, sqlx_base_t * base, struct beacon_s *beacon)
 {
 	sqlx_base_t *next, *prev;
 
@@ -225,8 +199,8 @@ SQLX_REMOVE(sqlx_cache_t *cache, sqlx_base_t *base,
 }
 
 static inline void
-SQLX_UNSHIFT(sqlx_cache_t *cache, sqlx_base_t *base,
-		struct beacon_s *beacon, enum sqlx_base_status_e status)
+SQLX_UNSHIFT(sqlx_cache_t * cache, sqlx_base_t * base,
+	struct beacon_s *beacon, enum sqlx_base_status_e status)
 {
 	sqlx_base_t *first;
 
@@ -246,51 +220,50 @@ SQLX_UNSHIFT(sqlx_cache_t *cache, sqlx_base_t *base,
 }
 
 static inline void
-sqlx_save_id(sqlx_cache_t *cache, sqlx_base_t *base)
+sqlx_save_id(sqlx_cache_t * cache, sqlx_base_t * base)
 {
-	gpointer pointer_index;
+	gpointer pointer_index = GINT_TO_POINTER(base->index + 1);
 
-	pointer_index = GINT_TO_POINTER(base->index + 1);
-	g_hash_table_insert(cache->bases_by_name, base->name, pointer_index);
+	g_tree_replace(cache->bases_by_name, base->name, pointer_index);
 }
 
 static inline gint
-sqlx_lookup_id(sqlx_cache_t *cache, const hashstr_t *hs)
+sqlx_lookup_id(sqlx_cache_t * cache, const hashstr_t * hs)
 {
-	gint result = -1;
-	gpointer lookup_result;
+	gpointer lookup_result = g_tree_lookup(cache->bases_by_name, hs);
 
-	lookup_result = g_hash_table_lookup(cache->bases_by_name, hs);
-	if (lookup_result != NULL)
-		result = GPOINTER_TO_INT(lookup_result);
-
-	return result - 1;
+	return !lookup_result ? -1 : (GPOINTER_TO_INT(lookup_result) - 1);
 }
 
 static inline void
-sqlx_base_remove_from_list(sqlx_cache_t *cache, sqlx_base_t *base)
+sqlx_base_remove_from_list(sqlx_cache_t * cache, sqlx_base_t * base)
 {
-	enum sqlx_base_status_e status = base->status;
-
-	switch (status) {
+	switch (base->status) {
 		case SQLX_BASE_FREE:
 			SQLX_REMOVE(cache, base, &(cache->beacon_free));
 			return;
 		case SQLX_BASE_IDLE:
 			SQLX_REMOVE(cache, base, &(cache->beacon_idle));
 			return;
+		case SQLX_BASE_IDLE_HOT:
+			SQLX_REMOVE(cache, base, &(cache->beacon_idle_hot));
+			return;
 		case SQLX_BASE_USED:
 			SQLX_REMOVE(cache, base, &(cache->beacon_used));
+			return;
+		case SQLX_BASE_CLOSING:
+			EXTRA_ASSERT(base->link.prev < 0);
+			EXTRA_ASSERT(base->link.next < 0);
 			return;
 	}
 }
 
 static inline void
-sqlx_base_add_to_list(sqlx_cache_t *cache, sqlx_base_t *base,
-		enum sqlx_base_status_e status)
+sqlx_base_add_to_list(sqlx_cache_t * cache, sqlx_base_t * base,
+	enum sqlx_base_status_e status)
 {
-	SQLX_ASSERT(base->link.prev < 0);
-	SQLX_ASSERT(base->link.next < 0);
+	EXTRA_ASSERT(base->link.prev < 0);
+	EXTRA_ASSERT(base->link.next < 0);
 
 	switch (status) {
 		case SQLX_BASE_FREE:
@@ -298,32 +271,39 @@ sqlx_base_add_to_list(sqlx_cache_t *cache, sqlx_base_t *base,
 			return;
 		case SQLX_BASE_IDLE:
 			SQLX_UNSHIFT(cache, base, &(cache->beacon_idle), SQLX_BASE_IDLE);
-			g_get_current_time(&(base->last_update));
+			return;
+		case SQLX_BASE_IDLE_HOT:
+			SQLX_UNSHIFT(cache, base, &(cache->beacon_idle_hot),
+				SQLX_BASE_IDLE_HOT);
 			return;
 		case SQLX_BASE_USED:
 			SQLX_UNSHIFT(cache, base, &(cache->beacon_used), SQLX_BASE_USED);
+			return;
+		case SQLX_BASE_CLOSING:
+			base->status = status;
 			return;
 	}
 }
 
 static inline void
-sqlx_base_move_to_list(sqlx_cache_t *cache, sqlx_base_t *base,
-		enum sqlx_base_status_e status)
+sqlx_base_move_to_list(sqlx_cache_t * cache, sqlx_base_t * base,
+	enum sqlx_base_status_e status)
 {
-	enum sqlx_base_status_e status0 = base->status;
-	sqlx_base_remove_from_list(cache, base);
-	sqlx_base_add_to_list(cache, base, status);
+	register enum sqlx_base_status_e status0;
 
-	(void) status0;
+	if (status != (status0 = base->status)) {
+		sqlx_base_remove_from_list(cache, base);
+		sqlx_base_add_to_list(cache, base, status);
+	}
+
 	GRID_TRACE2("BASE [%d/%s] moved from %s to %s",
-			base->index,
-			hashstr_str(base->name),
-			sqlx_status_to_str(status0),
-			sqlx_status_to_str(status));
+		base->index,
+		hashstr_str(base->name),
+		sqlx_status_to_str(status0), sqlx_status_to_str(status));
 }
 
-static inline sqlx_base_t*
-sqlx_poll_free_base(sqlx_cache_t *cache)
+static inline sqlx_base_t *
+sqlx_poll_free_base(sqlx_cache_t * cache)
 {
 	sqlx_base_t *base;
 
@@ -337,20 +317,18 @@ sqlx_poll_free_base(sqlx_cache_t *cache)
 }
 
 static inline GError *
-sqlx_base_reserve(sqlx_cache_t *cache, const hashstr_t *hs,
-		sqlx_base_t **result)
+sqlx_base_reserve(sqlx_cache_t * cache, const hashstr_t * hs,
+	sqlx_base_t ** result)
 {
 	sqlx_base_t *base;
 
 	if (!(base = sqlx_poll_free_base(cache)))
-		return g_error_new(gquark_log, SQLX_RC_TOOMANY, "too many bases");
+		return NEWERROR(500, "too many bases");
 
 	/* base reserved and in PENDING state */
 	base->name = hashstr_dup(hs);
-	base->count_locks = 0;
-	base->count_open = 0;
+	base->count_open = 1;
 	base->handle = NULL;
-	g_get_current_time(&(base->last_update));
 	base->owner = g_thread_self();
 	sqlx_base_move_to_list(cache, base, SQLX_BASE_USED);
 	sqlx_save_id(cache, base);
@@ -358,35 +336,6 @@ sqlx_base_reserve(sqlx_cache_t *cache, const hashstr_t *hs,
 	sqlx_base_debug(__FUNCTION__, base);
 	*result = base;
 	return NULL;
-}
-
-static void
-__base_lock(sqlx_cache_t *cache, sqlx_base_t *base)
-{
-	GThread *self = g_thread_self();
-
-	if (!base->owner) {
-		base->owner = self;
-		base->count_locks = 1;
-	}
-	else if (base->owner == self)
-		base->count_locks ++;
-	else {
-		while (base->owner && base->owner != self)
-			g_cond_wait(base->cond, cache->lock);
-		base->count_locks = 1;
-		base->owner = self;
-	}
-}
-
-static void
-__base_unlock(sqlx_base_t *base)
-{
-	if (base->count_locks) {
-		if (-- base->count_locks)
-			return;
-	}
-	base->owner = NULL;
 }
 
 /**
@@ -401,80 +350,89 @@ __base_unlock(sqlx_base_t *base)
  * - The cache-wide lock is still owned
  */
 static void
-_expire_base(sqlx_cache_t *cache, sqlx_base_t *b)
+_expire_base(sqlx_cache_t * cache, sqlx_base_t * b)
 {
-	hashstr_t *n;
+	hashstr_t *n = b->name;
+	gpointer handle = b->handle;
 
 	sqlx_base_debug("FREEING", b);
-	SQLX_ASSERT(b->owner != NULL);
+	EXTRA_ASSERT(b->owner != NULL);
+	EXTRA_ASSERT(b->count_open == 0);
+	EXTRA_ASSERT(b->status == SQLX_BASE_USED);
+
+	sqlx_base_move_to_list(cache, b, SQLX_BASE_CLOSING);
 
 	/* the base is for the given thread, it is time to REALLY close it.
 	 * But this can take a lot of time. So we can release the pool,
-	 * free the handlei and unlock the cache */
+	 * free the handle and unlock the cache */
 	g_cond_signal(b->cond);
 	g_mutex_unlock(cache->lock);
 	if (cache->close_hook)
-		cache->close_hook(b->handle);
-	b->handle = NULL;
+		cache->close_hook(handle);
 	g_mutex_lock(cache->lock);
 
-	n = b->name;
-	b->count_locks = 0;
+	b->handle = NULL;
 	b->owner = NULL;
 	b->name = NULL;
-	b->count_locks = 0;
 	b->count_open = 0;
 	b->last_update.tv_sec = b->last_update.tv_usec = 0;
 	sqlx_base_move_to_list(cache, b, SQLX_BASE_FREE);
-	g_hash_table_remove(cache->bases_by_name, n);
+
+	g_tree_remove(cache->bases_by_name, n);
 
 	g_free(n);
 }
 
 static gint
-sqlx_expire_first_idle_base(const gchar *func, sqlx_cache_t *cache, GTimeVal *pivot)
+_expire_specific_base(sqlx_cache_t * cache, sqlx_base_t * b, GTimeVal * now,
+	time_t grace_delay)
 {
-	gint bd_idle;
-	sqlx_base_t *b;
+	if (now) {
+		GTimeVal pivot;
 
-	(void) func;
-	GRID_TRACE2("%s(%p,[%ld,%ld])", __FUNCTION__, (void*)cache,
-			pivot?pivot->tv_sec:0, pivot?pivot->tv_usec:0);
-
-	SQLX_ASSERT(cache != NULL);
-
-	/* Poll the next idle base */
-	bd_idle = cache->beacon_idle.last;
-	if (bd_idle < 0) {
-		GRID_TRACE2("No idle base");
-		return 0;
+		memcpy(&pivot, now, sizeof(GTimeVal));
+		g_time_val_add(&pivot, grace_delay * -1000000L);
+		if (gtv_bigger(&(b->last_update), &pivot))
+			return 0;
 	}
-
-	b = GET(cache, bd_idle);
-
-	if (pivot && gtv_bigger(&(b->last_update), pivot))
-		return 0;
 
 	/* At this point, I have the global lock, and the base is IDLE.
 	 * We know no one have the lock on it. So we make the base USED
 	 * and we get the lock on it. because we have the lock, it is
 	 * protected from other uses */
 
-	SQLX_ASSERT(b->count_open == 0);
-	SQLX_ASSERT(b->count_locks == 0);
-	SQLX_ASSERT(b->owner == NULL);
+	EXTRA_ASSERT(b->status == SQLX_BASE_IDLE
+		|| b->status == SQLX_BASE_IDLE_HOT);
+	EXTRA_ASSERT(b->count_open == 0);
+	EXTRA_ASSERT(b->owner == NULL);
 
-	b->count_open = 1; /* make it used ... */
-	b->owner = g_thread_self(); /* ...by the current thread */
+	/* make it used and locked by the current thread */
+	b->owner = g_thread_self();
 	sqlx_base_move_to_list(cache, b, SQLX_BASE_USED);
-	b->count_locks = 1; /* make it locked */
 
 	_expire_base(cache, b);
 	return 1;
 }
 
+static gint
+sqlx_expire_first_idle_base(sqlx_cache_t * cache, GTimeVal * now)
+{
+	gint rc = 0, bd_idle;
+
+	/* Poll the next idle base, and respect the increasing order of the 'heat' */
+	if (0 <= (bd_idle = cache->beacon_idle.last))
+		rc = _expire_specific_base(cache, GET(cache, bd_idle), now,
+			cache->cool_grace_delay);
+
+	if (!rc && 0 <= (bd_idle = cache->beacon_idle_hot.last))
+		rc = _expire_specific_base(cache, GET(cache, bd_idle), now,
+			cache->hot_grace_delay);
+
+	return rc;
+}
+
 static void
-sqlx_cache_reset_bases(sqlx_cache_t *cache, guint max)
+sqlx_cache_reset_bases(sqlx_cache_t * cache, guint max)
 {
 	guint old, i;
 
@@ -486,6 +444,7 @@ sqlx_cache_reset_bases(sqlx_cache_t *cache, guint max)
 	else {
 		BEACON_RESET(&(cache->beacon_free));
 		BEACON_RESET(&(cache->beacon_idle));
+		BEACON_RESET(&(cache->beacon_idle_hot));
 		BEACON_RESET(&(cache->beacon_used));
 
 		if (cache->bases)
@@ -495,8 +454,9 @@ sqlx_cache_reset_bases(sqlx_cache_t *cache, guint max)
 		cache->bases_count = max;
 		cache->bases = g_malloc0(cache->bases_count * sizeof(sqlx_base_t));
 
-		for (i = cache->bases_count - 1; i!=0 ;i--) {
+		for (i = cache->bases_count - 1; i != 0; i--) {
 			sqlx_base_t *base = cache->bases + i;
+
 			base->index = i;
 			base->link.prev = base->link.next = -1;
 			SQLX_UNSHIFT(cache, base, &(cache->beacon_free), SQLX_BASE_FREE);
@@ -504,7 +464,7 @@ sqlx_cache_reset_bases(sqlx_cache_t *cache, guint max)
 		}
 
 		GRID_INFO("SQLX cache size change from %u to %u", old,
-				cache->bases_count);
+			cache->bases_count);
 	}
 
 	g_mutex_unlock(cache->lock);
@@ -513,20 +473,19 @@ sqlx_cache_reset_bases(sqlx_cache_t *cache, guint max)
 /* ------------------------------------------------------------------------- */
 
 sqlx_cache_t *
-sqlx_cache_set_max_bases(sqlx_cache_t *cache, guint max)
+sqlx_cache_set_max_bases(sqlx_cache_t * cache, guint max)
 {
 	GRID_TRACE2("%s(%p,%u)", __FUNCTION__, cache, max);
-	SQLX_ASSERT(cache != NULL);
-	SQLX_ASSERT(max < 65536);
+	EXTRA_ASSERT(cache != NULL);
+	EXTRA_ASSERT(max < 65536);
 	sqlx_cache_reset_bases(cache, max);
 	return cache;
 }
 
 sqlx_cache_t *
-sqlx_cache_set_close_hook(sqlx_cache_t *cache,
-		sqlx_cache_close_hook hook)
+sqlx_cache_set_close_hook(sqlx_cache_t * cache, sqlx_cache_close_hook hook)
 {
-	SQLX_ASSERT(cache != NULL);
+	EXTRA_ASSERT(cache != NULL);
 	cache->close_hook = hook;
 	return cache;
 }
@@ -537,24 +496,23 @@ sqlx_cache_init(void)
 	guint i;
 	sqlx_cache_t *cache;
 
-	if (!gquark_log)
-		gquark_log = g_quark_from_static_string(G_LOG_DOMAIN);
-
 	cache = g_malloc0(sizeof(*cache));
+	cache->cool_grace_delay = SQLX_GRACE_DELAY_COOL;
+	cache->hot_grace_delay = SQLX_GRACE_DELAY_HOT;
+	cache->heat_threshold = 1;
 	cache->used = FALSE;
 	cache->lock = g_mutex_new();
-	cache->bases_by_name = g_hash_table_new_full(
-			(GHashFunc)hashstr_hash,
-			(GEqualFunc)hashstr_equal,
-			NULL, NULL);
+	cache->bases_by_name = g_tree_new_full(hashstr_quick_cmpdata,
+		NULL, NULL, NULL);
 	cache->bases_count = SQLX_MAX_BASES;
 	cache->cond_count = SQLX_MAX_COND;
-	cache->cond_array = g_malloc0(cache->cond_count * sizeof(void*));
+	cache->cond_array = g_malloc0(cache->cond_count * sizeof(void *));
 	BEACON_RESET(&(cache->beacon_free));
 	BEACON_RESET(&(cache->beacon_idle));
+	BEACON_RESET(&(cache->beacon_idle_hot));
 	BEACON_RESET(&(cache->beacon_used));
 
-	for (i=0; i<cache->cond_count ;i++)
+	for (i = 0; i < cache->cond_count; i++)
 		cache->cond_array[i] = g_cond_new();
 
 	sqlx_cache_reset_bases(cache, cache->bases_count);
@@ -562,27 +520,29 @@ sqlx_cache_init(void)
 }
 
 void
-sqlx_cache_clean(sqlx_cache_t *cache)
+sqlx_cache_clean(sqlx_cache_t * cache)
 {
 	guint i, bd;
 
-	if (!gquark_log)
-		gquark_log = g_quark_from_static_string(G_LOG_DOMAIN);
-
-	GRID_DEBUG("%s(%p) *** CLEANUP ***", __FUNCTION__, (void*)cache);
+	GRID_DEBUG("%s(%p) *** CLEANUP ***", __FUNCTION__, (void *) cache);
 	if (!cache)
 		return;
 
 	if (cache->bases) {
-		for (bd=0; bd < cache->bases_count ;bd++) {
+		for (bd = 0; bd < cache->bases_count; bd++) {
 			sqlx_base_t *base = cache->bases + bd;
 
 			switch (base->status) {
 				case SQLX_BASE_FREE:
 					break;
 				case SQLX_BASE_IDLE:
+				case SQLX_BASE_IDLE_HOT:
 				case SQLX_BASE_USED:
 					sqlx_base_debug(__FUNCTION__, base);
+					break;
+				case SQLX_BASE_CLOSING:
+					GRID_ERROR
+						("Base being closed while the cache is being cleaned");
 					break;
 			}
 		}
@@ -592,29 +552,29 @@ sqlx_cache_clean(sqlx_cache_t *cache)
 	if (cache->lock)
 		g_mutex_free(cache->lock);
 	if (cache->cond_array) {
-		for (i=0; i<cache->cond_count ;i++)
+		for (i = 0; i < cache->cond_count; i++)
 			g_cond_free(cache->cond_array[i]);
 		g_free(cache->cond_array);
 	}
 	if (cache->bases_by_name)
-		g_hash_table_destroy(cache->bases_by_name);
+		g_tree_destroy(cache->bases_by_name);
 
 	g_free(cache);
 }
 
 GError *
-sqlx_cache_open_and_lock_base(sqlx_cache_t *cache, const hashstr_t *hname,
-		gint *result)
+sqlx_cache_open_and_lock_base(sqlx_cache_t * cache, const hashstr_t * hname,
+	gint * result)
 {
 	gint bd;
 	GError *err = NULL;
 	sqlx_base_t *base = NULL;
 
-	GRID_TRACE2("%s(%p,%s,%p)", __FUNCTION__, (void*)cache,
-			hname ? hashstr_str(hname) : "NULL", (void*)result);
-	SQLX_ASSERT(cache != NULL);
-	SQLX_ASSERT(hname != NULL);
-	SQLX_ASSERT(result != NULL);
+	GRID_TRACE2("%s(%p,%s,%p)", __FUNCTION__, (void *) cache,
+		hname ? hashstr_str(hname) : "NULL", (void *) result);
+	EXTRA_ASSERT(cache != NULL);
+	EXTRA_ASSERT(hname != NULL);
+	EXTRA_ASSERT(result != NULL);
 
 	g_mutex_lock(cache->lock);
 	cache->used = TRUE;
@@ -623,16 +583,13 @@ retry:
 	if (bd < 0) {
 		if (!(err = sqlx_base_reserve(cache, hname, &base))) {
 			bd = base->index;
-			base->count_open = 1;
-			sqlx_base_debug("OPEN", base);
-			__base_lock(cache, base);
-			sqlx_base_debug("LOCKED", base);
 			*result = base->index;
+			sqlx_base_debug("OPEN", base);
 		}
 		else {
 			GRID_DEBUG("No base available for [%s] (%d %s)",
-					hashstr_str(hname), err->code, err->message);
-			if (sqlx_expire_first_idle_base(__FUNCTION__, cache, NULL) >= 0) {
+				hashstr_str(hname), err->code, err->message);
+			if (sqlx_expire_first_idle_base(cache, NULL) >= 0) {
 				g_clear_error(&err);
 				goto retry;
 			}
@@ -640,87 +597,114 @@ retry:
 	}
 	else {
 		base = GET(cache, bd);
-		sqlx_base_debug("FOUND", base);
 		switch (base->status) {
+
 			case SQLX_BASE_FREE:
-				err = g_error_new(gquark_log, SQLX_RC_DESIGN_ERROR,
-						"free base referenced");
+				EXTRA_ASSERT(base->count_open == 0);
+				EXTRA_ASSERT(base->owner == NULL);
+				GRID_ERROR("free base referenced");
+				g_assert_not_reached();
 				break;
+
 			case SQLX_BASE_IDLE:
+			case SQLX_BASE_IDLE_HOT:
+				EXTRA_ASSERT(base->count_open == 0);
+				EXTRA_ASSERT(base->owner == NULL);
 				sqlx_base_move_to_list(cache, base, SQLX_BASE_USED);
-			case SQLX_BASE_USED:
-				base->count_open ++;
-				sqlx_base_debug("OPENED", base);
-				__base_lock(cache, base);
-				sqlx_base_debug("LOCKED", base);
+				base->count_open++;
+				base->owner = g_thread_self();
 				*result = base->index;
 				break;
+
+			case SQLX_BASE_USED:
+				EXTRA_ASSERT(base->count_open > 0);
+				EXTRA_ASSERT(base->owner != NULL);
+				if (base->owner != g_thread_self()) {
+					// the lock is held by another
+					g_cond_wait(base->cond, cache->lock);
+					goto retry;
+				}
+				base->owner = g_thread_self();
+				base->count_open++;
+				*result = base->index;
+				break;
+
+			case SQLX_BASE_CLOSING:
+				EXTRA_ASSERT(base->owner != NULL);
+				// Just wait for a notification then retry
+				g_cond_wait(base->cond, cache->lock);
+				goto retry;
 		}
 	}
 
-	if (base && !err)
-		sqlx_base_debug(__FUNCTION__, base);
-	if (base)
+	if (base) {
+		if (!err) {
+			sqlx_base_debug(__FUNCTION__, base);
+			EXTRA_ASSERT(base->owner == g_thread_self());
+			EXTRA_ASSERT(base->count_open > 0);
+		}
 		g_cond_signal(base->cond);
+	}
 	g_mutex_unlock(cache->lock);
 	return err;
 }
 
 GError *
-sqlx_cache_unlock_and_close_base(sqlx_cache_t *cache, gint bd, gboolean force)
+sqlx_cache_unlock_and_close_base(sqlx_cache_t * cache, gint bd, gboolean force)
 {
 	GError *err = NULL;
 	sqlx_base_t *base;
 
-	GRID_TRACE2("%s(%p,%d,%d)", __FUNCTION__, (void*)cache, bd, force);
+	GRID_TRACE2("%s(%p,%d,%d)", __FUNCTION__, (void *) cache, bd, force);
 
-	SQLX_ASSERT(cache != NULL);
+	EXTRA_ASSERT(cache != NULL);
 	if (base_id_out(cache, bd))
-		return g_error_new(gquark_log, SQLX_RC_INVALID_BASE_ID,
-				"invalid base id=%d", bd);
+		return NEWERROR(500, "invalid base id=%d", bd);
 
 	g_mutex_lock(cache->lock);
 	cache->used = TRUE;
 
-	base = GET(cache,bd);
+	base = GET(cache, bd);
 	switch (base->status) {
+
 		case SQLX_BASE_FREE:
-			err = g_error_new(gquark_log, SQLX_RC_BASE_CLOSED, "invalid base");
+			EXTRA_ASSERT(base->count_open == 0);
+			EXTRA_ASSERT(base->owner == NULL);
+			GRID_ERROR("Trying to close a free base");
+			g_assert_not_reached();
 			break;
+
 		case SQLX_BASE_IDLE:
-			err = g_error_new(gquark_log, SQLX_RC_BASE_CLOSED, "base closed");
+		case SQLX_BASE_IDLE_HOT:
+			EXTRA_ASSERT(base->count_open == 0);
+			EXTRA_ASSERT(base->owner == NULL);
+			GRID_ERROR("Trying to close a closed base");
+			g_assert_not_reached();
 			break;
+
 		case SQLX_BASE_USED:
-
-			if (!i_have_the_lock(base)) {
-				err = g_error_new(gquark_log, SQLX_RC_DESIGN_ERROR,
-						"base not locked");
-				break;
-			}
-
-			__base_lock(cache, base);
-			if (-- base->count_open <= 0) { /* to be closed */
-				SQLX_ASSERT(base->count_locks == 2);
+			EXTRA_ASSERT(base->count_open > 0);
+			// held by the current thread
+			if (!(--base->count_open)) {	// to be closed
 				if (force) {
 					_expire_base(cache, base);
 				}
 				else {
 					sqlx_base_debug("CLOSING", base);
 					base->owner = NULL;
-					base->count_locks = 0;
-					sqlx_base_move_to_list(cache, base, SQLX_BASE_IDLE);
+					if (base->heat >= cache->heat_threshold)
+						sqlx_base_move_to_list(cache, base, SQLX_BASE_IDLE_HOT);
+					else
+						sqlx_base_move_to_list(cache, base, SQLX_BASE_IDLE);
 				}
 			}
-			else { /* to be kept open */
-				if (base->count_locks < 2) {
-					err = g_error_new(gquark_log, SQLX_RC_DESIGN_ERROR,
-							"base not locked");
-					++ base->count_open;
-				}
-				else
-					__base_unlock(base);
-			}
-			__base_unlock(base);
+			break;
+
+		case SQLX_BASE_CLOSING:
+			EXTRA_ASSERT(base->owner != NULL);
+			EXTRA_ASSERT(base->owner != g_thread_self());
+			GRID_ERROR("Trying to close a base being closed");
+			g_assert_not_reached();
 			break;
 	}
 
@@ -732,50 +716,70 @@ sqlx_cache_unlock_and_close_base(sqlx_cache_t *cache, gint bd, gboolean force)
 }
 
 void
-sqlx_cache_debug(sqlx_cache_t *cache)
+sqlx_cache_debug(sqlx_cache_t * cache)
 {
-	GHashTableIter iter;
-	gpointer k, v;
-	guint bd;
+	EXTRA_ASSERT(cache != NULL);
 
-	SQLX_ASSERT(cache != NULL);
+	if (!GRID_DEBUG_ENABLED())
+		return;
 
-	GRID_DEBUG("--- REPO %p -----------------", (void*)cache);
-	GRID_DEBUG(" > used [%d, %d]",
-			cache->beacon_used.first, cache->beacon_used.last);
-	GRID_DEBUG(" > idle [%d, %d]",
-			cache->beacon_idle.first, cache->beacon_idle.last);
-	GRID_DEBUG(" > free [%d, %d]",
-			cache->beacon_free.first, cache->beacon_free.last);
+	GRID_DEBUG("--- REPO %p -----------------", (void *) cache);
+	GRID_DEBUG(" > used     [%d, %d]",
+		cache->beacon_used.first, cache->beacon_used.last);
+	GRID_DEBUG(" > idle     [%d, %d]",
+		cache->beacon_idle.first, cache->beacon_idle.last);
+	GRID_DEBUG(" > idle_hot [%d, %d]",
+		cache->beacon_idle_hot.first, cache->beacon_idle_hot.last);
+	GRID_DEBUG(" > free     [%d, %d]",
+		cache->beacon_free.first, cache->beacon_free.last);
 
 	/* Dump all the bases */
-	for (bd=0; bd < cache->bases_count ;bd++)
-		sqlx_base_debug(__FUNCTION__, GET(cache,bd));
+	for (guint bd = 0; bd < cache->bases_count; bd++)
+		sqlx_base_debug(__FUNCTION__, GET(cache, bd));
 
 	/* Now dump all te references in the hashtable */
-	g_hash_table_iter_init(&iter, cache->bases_by_name);
-	while (g_hash_table_iter_next(&iter, &k, &v))
+	gboolean runner(gpointer k, gpointer v, gpointer u)
+	{
+		(void) u;
 		GRID_DEBUG("REF %d <- %s", GPOINTER_TO_INT(v), hashstr_str(k));
+		return FALSE;
+	}
+	g_tree_foreach(cache->bases_by_name, runner, NULL);
 }
 
 guint
-sqlx_cache_expire(sqlx_cache_t *cache, guint max, GTimeVal *pivot,
-		GTimeVal *end)
+sqlx_cache_expire_all(sqlx_cache_t * cache)
 {
 	guint nb;
-	GTimeVal now;
 
-	GRID_TRACE2("%s(%p,%u,%p,%p)", __FUNCTION__, (void*)cache, max, pivot, end);
-	SQLX_ASSERT(cache != NULL);
+	EXTRA_ASSERT(cache != NULL);
+
+	g_mutex_lock(cache->lock);
+	cache->used = TRUE;
+	for (nb = 0; sqlx_expire_first_idle_base(cache, NULL); nb++) {
+	}
+	g_mutex_unlock(cache->lock);
+
+	return nb;
+}
+
+guint
+sqlx_cache_expire(sqlx_cache_t * cache, guint max, GTimeVal * end)
+{
+	guint nb;
+
+	EXTRA_ASSERT(cache != NULL);
 
 	g_mutex_lock(cache->lock);
 	cache->used = TRUE;
 
-	for (nb=0; !max || nb < max ; nb++) {
+	for (nb = 0; !max || nb < max; nb++) {
+		GTimeVal now;
+
 		g_get_current_time(&now);
 		if (end && gtv_bigger(&now, end))
 			break;
-		if (!sqlx_expire_first_idle_base(__FUNCTION__, cache, pivot))
+		if (!sqlx_expire_first_idle_base(cache, &now))
 			break;
 	}
 
@@ -784,30 +788,59 @@ sqlx_cache_expire(sqlx_cache_t *cache, guint max, GTimeVal *pivot,
 }
 
 gpointer
-sqlx_cache_get_handle(sqlx_cache_t *cache, gint bd)
+sqlx_cache_get_handle(sqlx_cache_t * cache, gint bd)
 {
 	sqlx_base_t *base;
 
-	SQLX_ASSERT(cache != NULL);
-	SQLX_ASSERT(bd >= 0);
+	EXTRA_ASSERT(cache != NULL);
+	EXTRA_ASSERT(bd >= 0);
 
-	base = GET(cache,bd);
-	SQLX_ASSERT(base != NULL);
+	base = GET(cache, bd);
+	EXTRA_ASSERT(base != NULL);
 
 	return base->handle;
 }
 
 void
-sqlx_cache_set_handle(sqlx_cache_t *cache, gint bd, gpointer sq3)
+sqlx_cache_set_handle(sqlx_cache_t * cache, gint bd, gpointer sq3)
 {
 	sqlx_base_t *base;
 
-	SQLX_ASSERT(cache != NULL);
-	SQLX_ASSERT(bd >= 0);
+	EXTRA_ASSERT(cache != NULL);
+	EXTRA_ASSERT(bd >= 0);
 
-	base = GET(cache,bd);
-	SQLX_ASSERT(base != NULL);
+	base = GET(cache, bd);
+	EXTRA_ASSERT(base != NULL);
 
 	base->handle = sq3;
 }
 
+static guint
+_count_beacon(sqlx_cache_t * cache, struct beacon_s *beacon)
+{
+	guint count = 0;
+
+	g_mutex_lock(cache->lock);
+	for (gint idx = beacon->first; idx != -1;) {
+		++count;
+		idx = GET(cache, idx)->link.next;
+	}
+	g_mutex_unlock(cache->lock);
+	return count;
+}
+
+struct cache_counts_s
+sqlx_cache_count(sqlx_cache_t * cache)
+{
+	struct cache_counts_s count;
+
+	memset(&count, 0, sizeof(count));
+	if (cache) {
+		count.max = cache->bases_count;
+		count.cold = _count_beacon(cache, &cache->beacon_idle);
+		count.hot = _count_beacon(cache, &cache->beacon_idle_hot);
+		count.used = _count_beacon(cache, &cache->beacon_used);
+	}
+
+	return count;
+}

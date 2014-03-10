@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gs-rebuild"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gs-rebuild"
 #endif
 
 #include <stdlib.h>
@@ -30,25 +10,16 @@
 #include <attr/xattr.h>
 #include <math.h>
 
-#include <glib.h>
-#include <glib/gstdio.h>
-
-#include <metatypes.h>
-#include <metautils.h>
-#include <metacomm.h>
-#include <gridcluster.h>
-#include <rawx.h>
-#include <meta2_remote.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
+#include <cluster/lib/gridcluster.h>
+#include <rawx-lib/src/rawx.h>
+#include <meta2/remote/meta2_remote.h>
 
 #include "./repair.h"
 #include "../lib/chunk_db.h"
 
-#ifdef HAVE_COMPAT
-# include <grid_location.h>
-# define RAW_CONTENT_GET_CID(R) (R)->cID
-#else
-# define RAW_CONTENT_GET_CID(R) (R)->container_id
-#endif
+#define RAW_CONTENT_GET_CID(R) (R)->container_id
 
 static int
 get_timeout(struct metacnx_ctx_s *ctx)
@@ -57,7 +28,8 @@ get_timeout(struct metacnx_ctx_s *ctx)
 }
 
 static const char *
-check_attributes(struct chunk_textinfo_s *chunk, struct content_textinfo_s *content)
+check_attributes(struct chunk_textinfo_s *chunk,
+	struct content_textinfo_s *content)
 {
 	if (!chunk)
 		return "NULL chunk";
@@ -87,16 +59,16 @@ check_attributes(struct chunk_textinfo_s *chunk, struct content_textinfo_s *cont
 		return "Chunk ID has a bad size";
 	if (64 != strlen(content->container_id))
 		return "Chunk ID has a bad size";
-		
+
 	return NULL;
 }
 
 /* ------------------------------------------------------------------------- */
 
-static gchar*
+static gchar *
 meta2_locate_recursive(guint attempts,
-		struct metacnx_ctx_s *ctx, const gchar *str_cid,
-		gs_grid_storage_t *gs_client, GError **error)
+	struct metacnx_ctx_s *ctx, const gchar * str_cid,
+	gs_grid_storage_t * gs_client, GError ** error)
 {
 	gchar *result = NULL;
 	gs_error_t *gserr = NULL;
@@ -111,14 +83,16 @@ meta2_locate_recursive(guint attempts,
 	gserr = NULL;
 	location = gs_locate_container_by_hexid(gs_client, str_cid, &gserr);
 	if (!location) {
-		GSETCODE(error, gs_error_get_code(gserr), "Memory error : %s", gs_error_get_message(gserr)); 
+		GSETCODE(error, gs_error_get_code(gserr), "Memory error : %s",
+			gs_error_get_message(gserr));
 		gs_error_free(gserr);
 		return NULL;
 	}
-	
+
 	if (!location->m2_url || !location->m2_url[0]) {
 		gs_container_location_free(location);
-		GSETCODE(error, gs_error_get_code(gserr), "Container not found", gs_error_get_message(gserr)); 
+		GSETCODE(error, gs_error_get_code(gserr), "Container not found",
+			gs_error_get_message(gserr));
 		gs_error_free(gserr);
 		return NULL;
 	}
@@ -135,11 +109,11 @@ meta2_locate_recursive(guint attempts,
 	return result;
 }
 
-static gchar*
+static gchar *
 meta2_locate(struct metacnx_ctx_s *ctx, struct meta2_raw_content_s *raw,
-		gs_grid_storage_t *gs_client, GError **error)
+	gs_grid_storage_t * gs_client, GError ** error)
 {
-	gchar str_cid[STRLEN_CONTAINERID+1];
+	gchar str_cid[STRLEN_CONTAINERID + 1];
 
 	bzero(str_cid, sizeof(str_cid));
 	container_id_to_string(raw->container_id, str_cid, sizeof(str_cid));
@@ -149,7 +123,7 @@ meta2_locate(struct metacnx_ctx_s *ctx, struct meta2_raw_content_s *raw,
 
 static gboolean
 meta2_repair_from_raw_content(struct meta2_raw_content_s *raw,
-		gs_grid_storage_t *gs_client, GError **error)
+	gs_grid_storage_t * gs_client, GError ** error)
 {
 	gboolean rc = FALSE;
 	struct metacnx_ctx_s ctx;
@@ -166,17 +140,20 @@ meta2_repair_from_raw_content(struct meta2_raw_content_s *raw,
 
 	/* Open the container */
 	guint attempts = 2;
-	for (attempts=2 ; attempts ; attempts--) {
-		if (meta2_remote_container_open(&(ctx.addr), get_timeout(&ctx), error, RAW_CONTENT_GET_CID(raw)))
+
+	for (attempts = 2; attempts; attempts--) {
+		if (meta2_remote_container_open(&(ctx.addr), get_timeout(&ctx), error,
+				RAW_CONTENT_GET_CID(raw)))
 			break;
 		if (CODE_CONTAINER_NOTFOUND == gerror_get_code(*error)) {
 			if (!metacnx_open(&ctx, error))
 				GSETERROR(error, "Cannot connect to the META2");
-			else if (meta2_remote_container_create_in_fd(ctx.fd, ctx.timeout.req, error,
-					raw->container_id, container_name))
+			else if (meta2_remote_container_create_in_fd(&(ctx.fd),
+					ctx.timeout.req, error, raw->container_id, container_name))
 				GSETERROR(error, "CONTAINER recreated [%s]", container_name);
 			else {
-				GSETERROR(error, "Container cannot be recreated [%s]", container_name);
+				GSETERROR(error, "Container cannot be recreated [%s]",
+					container_name);
 				goto label_error_close_cnx;
 			}
 		}
@@ -194,20 +171,25 @@ meta2_repair_from_raw_content(struct meta2_raw_content_s *raw,
 	/* Update content only if we have the chunk with position 0 */
 	gboolean local_rc = FALSE;
 	GError *local_error = NULL;
+
 	/* Get chunk */
-	if (raw->raw_chunks != NULL && raw->raw_chunks->data != NULL && ((struct meta2_raw_chunk_s*)raw->raw_chunks->data)->position == 0)
-		local_rc = meta2raw_remote_update_content(&ctx, &local_error, raw, FALSE);
+	if (raw->raw_chunks != NULL && raw->raw_chunks->data != NULL
+		&& ((struct meta2_raw_chunk_s *) raw->raw_chunks->data)->position == 0)
+		local_rc =
+			meta2raw_remote_update_content(&ctx, &local_error, raw, FALSE);
 	else
-		local_rc = meta2raw_remote_update_chunks(&ctx, &local_error, raw, FALSE);
+		local_rc =
+			meta2raw_remote_update_chunks(&ctx, &local_error, raw, FALSE, NULL);
 	if (local_rc == FALSE) {
 		switch (gerror_get_code(local_error)) {
 			case CODE_CONTENT_EXISTS:
 			case CODE_CONTENT_ONLINE:
 				break;
-			default: 
+			default:
 				if (error)
 					GSETCODE(error, gerror_get_code(local_error),
-						"Reference insertion failed : %s", gerror_get_message(local_error));
+						"Reference insertion failed : %s",
+						gerror_get_message(local_error));
 				else
 					g_clear_error(&local_error);
 				goto label_error_close_container;
@@ -217,7 +199,8 @@ meta2_repair_from_raw_content(struct meta2_raw_content_s *raw,
 	rc = TRUE;
 
 label_error_close_container:
-	meta2_remote_container_close(&(ctx.addr), get_timeout(&ctx), NULL, RAW_CONTENT_GET_CID(raw));
+	meta2_remote_container_close(&(ctx.addr), get_timeout(&ctx), NULL,
+		RAW_CONTENT_GET_CID(raw));
 
 label_error_close_cnx:
 	metacnx_close(&ctx);
@@ -228,9 +211,9 @@ label_error_close_cnx:
 }
 
 gboolean
-meta2_repair_from_rawx(const gchar *path,
-		const gchar *rawx_vol, const addr_info_t *rawx_addr,
-		gs_grid_storage_t *gs_client, GError **error)
+meta2_repair_from_rawx(const gchar * path,
+	const gchar * rawx_vol, const addr_info_t * rawx_addr,
+	gs_grid_storage_t * gs_client, GError ** error)
 {
 	gboolean rc;
 	struct meta2_raw_content_s *raw;
@@ -248,9 +231,9 @@ meta2_repair_from_rawx(const gchar *path,
 	return rc;
 }
 
-struct meta2_raw_content_s*
-rawx_load_raw_content(const gchar *path, const gchar *rawx_vol,
-		const addr_info_t *rawx_addr, GError **error)
+struct meta2_raw_content_s *
+rawx_load_raw_content(const gchar * path, const gchar * rawx_vol,
+	const addr_info_t * rawx_addr, GError ** error)
 {
 	const char *str_err;
 	struct chunk_textinfo_s txt_chunk;
@@ -271,7 +254,7 @@ rawx_load_raw_content(const gchar *path, const gchar *rawx_vol,
 		GSETERROR(error, "Invalid attributes");
 		goto label_error_free_attr;
 	}
-	
+
 	if (!convert_content_text_to_raw(&txt_content, raw_content, error)) {
 		GSETERROR(error, "Invalid content fields");
 		goto label_error_free_attr;
@@ -281,9 +264,9 @@ rawx_load_raw_content(const gchar *path, const gchar *rawx_vol,
 		goto label_error_free_attr;
 	}
 
-	g_strlcpy(raw_chunk->id.vol, rawx_vol, sizeof(raw_chunk->id.vol)-1);
+	g_strlcpy(raw_chunk->id.vol, rawx_vol, sizeof(raw_chunk->id.vol) - 1);
 	g_memmove(&(raw_chunk->id.addr), rawx_addr, sizeof(addr_info_t));
-	
+
 	meta2_maintenance_add_chunk(raw_content, raw_chunk);
 	meta2_maintenance_destroy_chunk(raw_chunk);
 	content_textinfo_free_content(&txt_content);
@@ -298,4 +281,3 @@ label_error_free_raw:
 	meta2_maintenance_destroy_content(raw_content);
 	return NULL;
 }
-

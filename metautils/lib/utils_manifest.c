@@ -1,26 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-
-#ifndef  LOG_DOMAIN
-# define LOG_DOMAIN "manifest"
+#ifndef  G_LOG_DOMAIN
+#define G_LOG_DOMAIN "manifest"
 #endif
 
 #include <stddef.h>
@@ -28,12 +7,15 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <glib.h>
-#include "./gs_manifest.h"
+#include "metautils_syscall.h"
+#include "metautils_sockets.h"
+#include "metautils_errors.h"
+#include "metautils_manifest.h"
 
 #define STR_SKIP_SPACES(s) do {\
 	register gchar c;\
@@ -54,23 +36,24 @@
  * ARGUMENTS NOT CHECKED
  */
 static GByteArray *
-gs_manifest_pack(const gchar *prefix, GHashTable *props)
+gs_manifest_pack(const gchar * prefix, GHashTable * props)
 {
-	void concat(GByteArray *gba, const gchar *k, const gchar *v) {
+	void concat(GByteArray * gba, const gchar * k, const gchar * v)
+	{
 		gchar *s = g_strconcat(prefix ? prefix : "", k, "=", v, "\n", NULL);
-		g_byte_array_append(gba, (guint8*)s, strlen(s));
+
+		g_byte_array_append(gba, (guint8 *) s, strlen(s));
 		g_free(s);
 	}
 
-	GByteArray *gba;
+	GByteArray *gba = g_byte_array_new();
 
-	gba = g_byte_array_new();
 	concat(gba, GS_MANIFEST_KEY_NS, g_hash_table_lookup(props, "ns"));
 	concat(gba, GS_MANIFEST_KEY_TYPE, g_hash_table_lookup(props, "type"));
 	concat(gba, GS_MANIFEST_KEY_NAME, g_hash_table_lookup(props, "name"));
 
 	/* ensure a trailing '\0' */
-	g_byte_array_append(gba, (guint8*)"", 1);
+	g_byte_array_append(gba, (guint8 *) "", 1);
 	g_byte_array_set_size(gba, gba->len - 1);
 
 	return gba;
@@ -81,8 +64,8 @@ gs_manifest_pack(const gchar *prefix, GHashTable *props)
  *
  * ARGUMENTS NOT CHECKED
  */
-static GHashTable*
-gs_manifest_load(const gchar *path, const gchar *prefix, GError **error)
+static GHashTable *
+gs_manifest_load(const gchar * path, const gchar * prefix, GError ** error)
 {
 	gchar line[512];
 	size_t prefix_len;
@@ -91,8 +74,7 @@ gs_manifest_load(const gchar *path, const gchar *prefix, GError **error)
 
 	if (!(path_in = fopen(path, "r"))) {
 		if (error)
-			*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN),
-					errno, "fopen error (%s)", strerror(errno));
+			*error = NEWERROR(errno, "fopen error (%s)", strerror(errno));
 		return NULL;
 	}
 
@@ -109,7 +91,7 @@ gs_manifest_load(const gchar *path, const gchar *prefix, GError **error)
 		if (prefix && *prefix && !g_str_has_prefix(str, prefix))
 			continue;
 
-		tokens = g_strsplit(str+prefix_len, "=", 2);
+		tokens = g_strsplit(str + prefix_len, "=", 2);
 		if (!tokens)
 			continue;
 
@@ -120,19 +102,15 @@ gs_manifest_load(const gchar *path, const gchar *prefix, GError **error)
 			STR_TRIM_TRAILING_SPACES(key);
 			STR_SKIP_SPACES(value);
 			STR_TRIM_TRAILING_SPACES(value);
-			if (*key != '#') { /* not commented */
-				if (!g_ascii_strcasecmp(key, GS_MANIFEST_KEY_NS)) 
+			if (*key != '#') {	/* not commented */
+				if (!g_ascii_strcasecmp(key, GS_MANIFEST_KEY_NS))
+					g_hash_table_insert(props, g_strdup("ns"), g_strdup(value));
+				else if (!g_ascii_strcasecmp(key, GS_MANIFEST_KEY_TYPE))
 					g_hash_table_insert(props,
-							g_strdup("ns"),
-							g_strdup(value));
-				else if (!g_ascii_strcasecmp(key, GS_MANIFEST_KEY_TYPE)) 
+						g_strdup("type"), g_strdup(value));
+				else if (!g_ascii_strcasecmp(key, GS_MANIFEST_KEY_NAME))
 					g_hash_table_insert(props,
-							g_strdup("type"),
-							g_strdup(value));
-				else if (!g_ascii_strcasecmp(key, GS_MANIFEST_KEY_NAME)) 
-					g_hash_table_insert(props,
-							g_strdup("name"),
-							g_strdup(value));
+						g_strdup("name"), g_strdup(value));
 				/* else ... ignored! */
 			}
 		}
@@ -141,19 +119,18 @@ gs_manifest_load(const gchar *path, const gchar *prefix, GError **error)
 
 	if (ferror(path_in)) {
 		if (error)
-			*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN),
-					EIO, "fread error");
+			*error = NEWERROR(EIO, "fread error");
 		return NULL;
 	}
 
 	fclose(path_in);
 
-	if (g_hash_table_size(props) == 3) 
+	if (g_hash_table_size(props) == 3)
 		return props;
 
 	g_hash_table_destroy(props);
 	if (error)
-		*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN), EAGAIN, "uncomplete manifest");
+		*error = NEWERROR(EAGAIN, "uncomplete manifest");
 	return NULL;
 }
 
@@ -167,7 +144,8 @@ gs_manifest_load(const gchar *path, const gchar *prefix, GError **error)
  * @param error
  */
 static int
-gs_manifest_check(const gchar *path, const gchar *prefix, GHashTable *props, GError **error)
+gs_manifest_check(const gchar * path, const gchar * prefix, GHashTable * props,
+	GError ** error)
 {
 	GHashTable *ht_manifest;
 	GHashTableIter iter;
@@ -184,17 +162,15 @@ gs_manifest_check(const gchar *path, const gchar *prefix, GHashTable *props, GEr
 		if (!v1) {
 			/* Partial manifest */
 			if (error)
-				*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN),
-					EINVAL, "Missing property (%s)", (gchar*)k);
+				*error = NEWERROR(EINVAL, "Missing property (%s)", (gchar *) k);
 			g_hash_table_destroy(ht_manifest);
 			return -1;
 		}
-		if (g_ascii_strcasecmp((gchar*)v1, (gchar*)v0)) {
+		if (g_ascii_strcasecmp((gchar *) v1, (gchar *) v0)) {
 			/* Different manifest */
 			if (error)
-				*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN),
-					0, "Manifest owned by someone else ('%s' vs. '%s')",
-					(gchar*)v1, (gchar*)v0);
+				*error = NEWERROR(0, "Manifest owned by someone else"
+					" ('%s' vs. '%s')", (gchar *) v1, (gchar *) v0);
 			g_hash_table_destroy(ht_manifest);
 			return 1;
 		}
@@ -206,7 +182,8 @@ gs_manifest_check(const gchar *path, const gchar *prefix, GHashTable *props, GEr
 }
 
 int
-gs_manifest_testandset(const gchar *path, const gchar *prefix, GError **error, ...)
+gs_manifest_testandset(const gchar * path, const gchar * prefix,
+	GError ** error, ...)
 {
 	int fd, errsav;
 	va_list args;
@@ -217,10 +194,11 @@ gs_manifest_testandset(const gchar *path, const gchar *prefix, GError **error, .
 	ht = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
 	for (;;) {
 		gchar *k, *v;
+
 		k = v = NULL;
-		if (!(k = va_arg(args, gchar*)))
+		if (!(k = va_arg(args, gchar *)))
 			break;
-		if (!(v = va_arg(args, gchar*)))
+		if (!(v = va_arg(args, gchar *)))
 			break;
 		if (!g_ascii_strcasecmp(k, "ns"))
 			g_hash_table_insert(ht, g_strdup("ns"), g_strdup(v));
@@ -231,8 +209,7 @@ gs_manifest_testandset(const gchar *path, const gchar *prefix, GError **error, .
 		else {
 			g_hash_table_destroy(ht);
 			if (error)
-				*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN),
-						EINVAL, "Invalid property name '%s'", k);
+				*error = NEWERROR(EINVAL, "Invalid property name '%s'", k);
 			errno = EINVAL;
 			return 0;
 		}
@@ -240,21 +217,21 @@ gs_manifest_testandset(const gchar *path, const gchar *prefix, GError **error, .
 	va_end(args);
 	if (3 != g_hash_table_size(ht)) {
 		if (error)
-			*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN),
-				EINVAL, "Missing parameter, expected values for keys"
+			*error =
+				NEWERROR(EINVAL,
+				"Missing parameter, expected values for keys"
 				" 'ns', 'url' and 'type'");
 		errno = EINVAL;
 		return 0;
 	}
 
 	/* Atomically check/create the file */
-	fd = open(path, O_WRONLY|O_CREAT|O_EXCL, 0444);
+	fd = metautils_syscall_open(path, O_WRONLY | O_CREAT | O_EXCL, 0444);
 	if (-1 == fd) {
 		if (EEXIST != errno) {
 			errsav = errno;
 			if (error)
-				*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN),
-					errsav, "open error (%s)", strerror(errsav));
+				*error = NEWERROR(errsav, "open error (%s)", strerror(errsav));
 			errno = errsav;
 			return 0;
 		}
@@ -270,40 +247,40 @@ gs_manifest_testandset(const gchar *path, const gchar *prefix, GError **error, .
 	GByteArray *gba;
 
 	gba = gs_manifest_pack(prefix, ht);
-	for (written=0; written < gba->len; ) {
-		wrc = write(fd, gba->data + written, gba->len - written);
+	for (written = 0; written < gba->len;) {
+		wrc =
+			metautils_syscall_write(fd, gba->data + written,
+			gba->len - written);
 		if (wrc < 0) {
 			errsav = errno;
 			if (error)
-				*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN),
-						errsav, "write error (%s)", strerror(errsav));
+				*error = NEWERROR(errsav, "write error (%s)", strerror(errsav));
 			errno = errsav;
 			goto label_unlink;
 		}
 		written += wrc;
 	}
 	g_byte_array_free(gba, TRUE);
-	close(fd);
+	metautils_pclose(&fd);
 
 	/* Success */
 	return 1;
 
 label_unlink:
 	errsav = errno;
-	unlink(path);
-	close(fd);
+	metautils_syscall_unlink(path);
+	metautils_pclose(&fd);
 	errno = errsav;
 	return 0;
 }
 
-GHashTable*
-gs_manifest_read(const gchar *path, const gchar *prefix, GError **error)
+GHashTable *
+gs_manifest_read(const gchar * path, const gchar * prefix, GError ** error)
 {
 	if (!path || !*path) {
 		if (error)
-			*error = g_error_new(g_quark_from_static_string(LOG_DOMAIN), EINVAL, "Invalid path");
+			*error = NEWERROR(EINVAL, "Invalid path");
 		return NULL;
 	}
 	return gs_manifest_load(path, prefix, error);
 }
-

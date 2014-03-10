@@ -1,39 +1,22 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file conscience.h
  */
 
 #ifndef _CONSCIENCE_H
-# define _CONSCIENCE_H
+#define _CONSCIENCE_H
 
 /**
  * @addtogroup gridcluster_backend
  * @{
  */
 
-# include <glib.h>
-# include <metatypes.h>
-# include <conscience_broken_holder.h>
-# include <conscience_srvtype.h>
-# include <conscience_srv.h>
-# include <gridcluster_events.h>
-# include <gridcluster_eventhandler.h>
+#include <metautils/lib/metatypes.h>
+
+#include <cluster/conscience/conscience_broken_holder.h>
+#include <cluster/conscience/conscience_srvtype.h>
+#include <cluster/conscience/conscience_srv.h>
+#include <cluster/events/gridcluster_events.h>
+#include <cluster/events/gridcluster_eventhandler.h>
 
 /**
  * Provide this value OR'ed in the conscience_srvtype_run_all() flags to
@@ -91,8 +74,8 @@ struct conscience_s
 enum mode_e
 {
 	MODE_AUTOCREATE, /**<  */
-	MODE_FALLBACK,   /**<  */
-	MODE_STRICT      /**<  */
+	MODE_FALLBACK,	 /**<  */
+	MODE_STRICT		 /**<  */
 };
 
 /* ------------------------------------------------------------------------- */
@@ -108,7 +91,8 @@ struct conscience_s *conscience_create(void);
  * @param error
  * @return
  */
-struct conscience_s *conscience_create_named(const gchar *ns_name, GError **error);
+struct conscience_s *conscience_create_named(const gchar * ns_name,
+	GError ** error);
 
 /**
  *
@@ -125,9 +109,9 @@ void conscience_destroy(struct conscience_s *conscience);
  * @param lock_mode
  * @return
  */
-struct conscience_srvtype_s *conscience_get_locked_srvtype(
-		struct conscience_s *conscience, GError ** error,
-		const gchar * type, enum mode_e mode, char lock_mode);
+struct conscience_srvtype_s *conscience_get_locked_srvtype(struct conscience_s
+	*conscience, GError ** error, const gchar * type, enum mode_e mode,
+	char lock_mode);
 
 /**
  *
@@ -152,7 +136,8 @@ void conscience_unlock_srvtypes(struct conscience_s *conscience);
  * @param conscience
  * @param lock_mode 'w','W','r','R'
  */
-void conscience_lock_broken_elements(struct conscience_s *conscience, char lock_mode);
+void conscience_lock_broken_elements(struct conscience_s *conscience,
+	char lock_mode);
 
 /**
  * Release the lock set on the conscience's broken elements storage, whatever
@@ -172,8 +157,8 @@ void conscience_unlock_broken_elements(struct conscience_s *conscience);
  * @param mode
  * @return 
  */
-struct conscience_srvtype_s *conscience_get_srvtype(struct conscience_s *conscience, GError ** error,
-    const gchar * type, enum mode_e mode);
+struct conscience_srvtype_s *conscience_get_srvtype(struct conscience_s
+	*conscience, GError ** error, const gchar * type, enum mode_e mode);
 
 /**
  * @param conscience
@@ -181,16 +166,16 @@ struct conscience_srvtype_s *conscience_get_srvtype(struct conscience_s *conscie
  * @param err
  * @return 
  */
-struct conscience_srvtype_s *conscience_init_srvtype(
-		struct conscience_s *conscience, const gchar * type, GError ** err);
+struct conscience_srvtype_s *conscience_init_srvtype(struct conscience_s
+	*conscience, const gchar * type, GError ** err);
 
 /**
  *
  * @param conscience
  * @result
  */
-struct conscience_srvtype_s *conscience_get_default_srvtype(
-		struct conscience_s *conscience);
+struct conscience_srvtype_s *conscience_get_default_srvtype(struct conscience_s
+	*conscience);
 
 /**
  *
@@ -206,7 +191,7 @@ const gchar *conscience_get_namespace(struct conscience_s *conscience);
  * @result
  */
 GSList *conscience_get_srvtype_names(struct conscience_s *conscience,
-		GError ** error);
+	GError ** error);
 
 /**
  * @param conscience
@@ -218,9 +203,9 @@ GSList *conscience_get_srvtype_names(struct conscience_s *conscience,
  * @return TRUE if the iterations succeeded ffor all the given service types, FALSE
  * if any error occurs.
  */
-gboolean conscience_run_srvtypes(struct conscience_s * conscience,
-		GError **error, guint32 flags, gchar ** names_array,
-		service_callback_f * callback, gpointer udata);
+gboolean conscience_run_srvtypes(struct conscience_s *conscience,
+	GError ** error, guint32 flags, gchar ** names_array,
+	service_callback_f * callback, gpointer udata);
 
 /** @} */
 

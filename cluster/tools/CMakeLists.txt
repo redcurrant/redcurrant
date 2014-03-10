@@ -1,7 +1,4 @@
-
-include_directories(BEFORE .
-		../../metautils/lib
-		../events ../conscience ../remote ../lib ../agent)
+include_directories(BEFORE . .. ../..)
 
 add_executable(gridcluster_cli
 		gridcluster.c)

@@ -1,22 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef __METACOMM__H__
-# define __METACOMM__H__
+#define __METACOMM__H__
 
 /**
  * @file metacomm.h
@@ -29,73 +12,7 @@
  * @{
  */
 
-# include <glib.h>
-# include <metatypes.h>
-# include <metautils.h>
-
-#define CODE_NETWORK_ERROR        1
-
-#define CODE_FINAL_OK             200
-#define CODE_IS_OK(C)            ((C)/100 == 2)
-#define CODE_IS_FINAL(C)         ((C) == CODE_FINAL_OK || !CODE_IS_OK(C))
-
-/* MASTER/SLAVE codes */
-#define CODE_BADOPFORSLAVE        301
-#define CODE_REDIRECT             303
-#define CODE_LOOP_REDIRECT        304
-#define CODE_TOOMANY_REDIRECT     305
-
-/* ACL codes */
-#define CODE_NOT_ALLOWED 	      403
-
-/* Content-related codes */
-#define CODE_CONTENT_NOTFOUND     420
-#define CODE_CONTENT_EXISTS       421
-#define CODE_CONTENT_ONLINE       422
-#define CODE_CONTENT_UNCOMPLETE   423
-#define CODE_CONTENT_PRECONDITION 424
-#define CODE_CONTENT_CORRUPTED    425
-
-/* Container-related codes */
-#define CODE_CONTAINER_MIGRATED  430
-#define CODE_CONTAINER_NOTFOUND  431
-#define CODE_CONTAINER_CLOSED    432
-#define CODE_CONTAINER_EXISTS    433
-#define CODE_CONTAINER_LOCKED    434
-#define CODE_CONTAINER_INUSE     435
-#define CODE_CONTAINER_FROZEN    436
-#define CODE_CONTAINER_DISABLED  437
-#define CODE_CONTAINER_NOTEMPTY  438
-
-/* Quotas-level codes */
-#define CODE_CONTAINER_FULL 445
-#define CODE_NAMESPACE_FULL 446
-
-/* Meta1 prefixes codes */
-#define CODE_RANGE_NOTFOUND  450	/**< refresh meta2 */
-#define CODE_RANGE_MIGRATING 451	/**< the request cannot be satisfied on this
-									   META1 due to a migration. the body
-									   might contain a list of addresses */
-#define CODE_RANGE_EXISTS    452
-
-/* Properties codes */
-#define CODE_CONTAINER_PROP_NOTFOUND    460
-#define CODE_CONTENT_PROP_NOTFOUND      461 
-#define CODE_WRONG_PROP_PREFIX          462
-#define CODE_EMPTY_CONTAINER_EVENT_LIST 463
-
-/* Resynchronisation codes */
-#define CODE_PIPETO    470 /**< Local copy more recent, send a dump */
-#define CODE_PIPEFROM  471 /**< Local copy out of date, restore it */
-
-#define CODE_POLICY_NOT_SUPPORTED 480 /**< Wrong storage policy specified */
-#define CODE_POLICY_NOT_SATISFIABLE 481 /**< No enough service or service not enough spaced */
-
-/* Internals */
-#define CODE_INTERNAL_ERROR 500 /* internal error: memory allocation... */
-
-/*Platform */
-#define CODE_PLATFORM_ERROR 600 /* platform error ; all services unavailable */
+#include <metautils/lib/metautils.h>
 
 /* A flag usable in metacnx_ctx_s.flags to keep the connection alive */
 #define METACNX_FLAGMASK_KEEPALIVE 0x00000001
@@ -187,9 +104,9 @@ struct metacnx_ctx_s
 	 */
 	struct
 	{
-		int cnx;/*<! The connection timeout */
-		int req;/*<! The request timeout */
-	} timeout;		/*<! The timeouts */
+		int cnx;				/*<! The connection timeout */
+		int req;				/*<! The request timeout */
+	} timeout;					/*<! The timeouts */
 };
 
 /**
@@ -224,7 +141,7 @@ void metacnx_destroy(struct metacnx_ctx_s *ctx);
  * @return TRUE or FALSE if an error occured (err is set)
  */
 gboolean metacnx_init(struct metacnx_ctx_s *ctx, const gchar * host,
-		int port, GError ** err);
+	int port, GError ** err);
 
 /**
  * Initialize a struct metacnx_ctx_s with URL IPv4:port or [IPv6]:port
@@ -234,8 +151,8 @@ gboolean metacnx_init(struct metacnx_ctx_s *ctx, const gchar * host,
  * @param err
  * @return TRUE or FALSE if an error occured (err is set)
  */
-gboolean metacnx_init_with_url(struct metacnx_ctx_s *ctx, const gchar *url,
-		GError ** err);
+gboolean metacnx_init_with_url(struct metacnx_ctx_s *ctx, const gchar * url,
+	GError ** err);
 
 /**
  * Initialize a struct metacnx_ctx_s with addr_info_t
@@ -246,7 +163,7 @@ gboolean metacnx_init_with_url(struct metacnx_ctx_s *ctx, const gchar *url,
  * @return TRUE or FALSE if an error occured (err is set)
  */
 gboolean metacnx_init_with_addr(struct metacnx_ctx_s *ctx,
-		const addr_info_t* addr, GError** err);
+	const addr_info_t * addr, GError ** err);
 
 /**
  * Open a connection to a META
@@ -290,7 +207,8 @@ void metacnx_close(struct metacnx_ctx_s *ctx);
  * @param bodySize
  * @return
  */
-typedef gboolean(*content_handler_f) (GError ** err, gpointer udata, gint code, guint8 * body, gsize bodySize);
+typedef gboolean(*content_handler_f) (GError ** err, gpointer udata, gint code,
+	guint8 * body, gsize bodySize);
 
 /**
  * @param err
@@ -299,17 +217,18 @@ typedef gboolean(*content_handler_f) (GError ** err, gpointer udata, gint code, 
  * @param rep
  * @return
  */
-typedef gboolean(*msg_handler_f) (GError ** err, gpointer udata, gint code, MESSAGE rep);
+typedef gboolean(*msg_handler_f) (GError ** err, gpointer udata, gint code,
+	MESSAGE rep);
 
 /**
  *
  */
 struct code_handler_s
 {
-	int code;                          /**<  */
-	guint32 flags;                     /**<  */
+	int code;						   /**<  */
+	guint32 flags;					   /**<  */
 	content_handler_f content_handler; /**<  */
-	msg_handler_f msg_handler;         /**<  */
+	msg_handler_f msg_handler;		   /**<  */
 };
 
 /**
@@ -317,8 +236,8 @@ struct code_handler_s
  */
 struct reply_sequence_data_s
 {
-	gpointer udata;               /**<  */
-	int nbHandlers;               /**<  */
+	gpointer udata;				  /**<  */
+	int nbHandlers;				  /**<  */
 	struct code_handler_s *codes; /**<  */
 };
 
@@ -330,8 +249,8 @@ struct reply_sequence_data_s
  * @return
  */
 gboolean metaXClient_reply_sequence_run_context(GError ** err,
-		struct metacnx_ctx_s *ctx, MESSAGE request,
-		struct reply_sequence_data_s *handlers);
+	struct metacnx_ctx_s *ctx, MESSAGE request,
+	struct reply_sequence_data_s *handlers);
 
 /** Wrapper around metaXClient_reply_sequence_run_context()
  *
@@ -345,7 +264,7 @@ gboolean metaXClient_reply_sequence_run_context(GError ** err,
  * @deprecated
  */
 gboolean metaXClient_reply_sequence_run(GError ** err, MESSAGE request,
-		int fd, gint ms, struct reply_sequence_data_s *data);
+	int *fd, gint ms, struct reply_sequence_data_s *data);
 
 /** Wrapper around metaXClient_reply_sequence_run_context()
  *
@@ -359,8 +278,8 @@ gboolean metaXClient_reply_sequence_run(GError ** err, MESSAGE request,
  * @deprecated
  */
 gboolean metaXClient_reply_sequence_run_from_addrinfo(GError ** err,
-		MESSAGE request, addr_info_t * addr, gint ms,
-		struct reply_sequence_data_s *data);
+	MESSAGE request, addr_info_t * addr, gint ms,
+	struct reply_sequence_data_s *data);
 
 /** @} */
 
@@ -388,7 +307,7 @@ gboolean metaXClient_reply_sequence_run_from_addrinfo(GError ** err,
  * @return
  */
 gint metaXServer_reply_simple(MESSAGE * reply, MESSAGE request, gint status,
-		const gchar * msg, GError ** err);
+	const gchar * msg, GError ** err);
 
 
 /**
@@ -405,7 +324,7 @@ gint metaXServer_reply_simple(MESSAGE * reply, MESSAGE request, gint status,
  * @return
  */
 gint metaXClient_reply_simple(MESSAGE reply, gint * status, gchar ** msg,
-		GError ** err);
+	GError ** err);
 
 
 /**
@@ -441,7 +360,6 @@ enum message_param_e
 #define message_has_VERSION(M,E) message_has_param((M),MP_VERSION,(E))
 #define message_has_BODY(M,E)    message_has_param((M),MP_BODY,(E))
 
-
 /**
  * Allocates all the internal structures of a hidden message.
  *
@@ -461,7 +379,7 @@ gint message_create(MESSAGE * m, GError ** error);
  * @param error the error structure that will be set in case of failure
  * @return 1 on sucess, 0 on error
  */
-gint message_destroy(MESSAGE m, GError ** error);
+void message_destroy(MESSAGE m, GError ** error);
 
 
 /**
@@ -492,7 +410,8 @@ gint message_has_param(MESSAGE m, enum message_param_e mp, GError ** error);
  * be NULL.
  * @return 1 on success, 0 on error
  */
-gint message_get_param(MESSAGE m, enum message_param_e mp, void **s, gsize * sSize, GError ** error);
+gint message_get_param(MESSAGE m, enum message_param_e mp, void **s,
+	gsize * sSize, GError ** error);
 
 
 /**
@@ -509,8 +428,8 @@ gint message_get_param(MESSAGE m, enum message_param_e mp, void **s, gsize * sSi
  * @param error the error structure that will be set in case of failure
  * @return 1 on success, 0 on error
  */
-gint message_set_param(MESSAGE m, enum message_param_e mp, const void *s, gsize sSize, GError ** error);
-
+gint message_set_param(MESSAGE m, enum message_param_e mp,
+	const void *s, gsize sSize, GError ** error);
 
 /**
  * Adds a new custom field in the list of the message. Now check is made to
@@ -526,7 +445,7 @@ gint message_set_param(MESSAGE m, enum message_param_e mp, const void *s, gsize 
  * @return 1 on success, 0 on error
  */
 gint message_add_field(MESSAGE m, const void *name, gsize nameSize,
-		const void *value, gsize valueSize, GError ** error);
+	const void *value, gsize valueSize, GError ** error);
 
 
 /**
@@ -541,7 +460,7 @@ gint message_add_field(MESSAGE m, const void *name, gsize nameSize,
  * @return 1 on success and found, 0 on not found, 1 on error
  */
 gint message_get_field(MESSAGE m, const void *name, gsize nameSize,
-		void **value, gsize * valueSize, GError ** error);
+	void **value, gsize * valueSize, GError ** error);
 
 /**
  *
@@ -552,7 +471,7 @@ gint message_get_field(MESSAGE m, const void *name, gsize nameSize,
  * @return 1 on success, 0 on error
  */
 gint message_del_field(MESSAGE m, const void *name, gsize nameSize,
-		GError ** error);
+	GError ** error);
 
 
 /**
@@ -573,20 +492,10 @@ gchar **message_get_field_names(MESSAGE m, GError ** error);
 
 /**
  * @param m
- * @param dom
- * @param entete
- * @param err
- * @return
- */
-gint message_print(MESSAGE m, const gchar * dom, gchar * entete, GError ** err);
-
-
-/**
- * @param m
  * @param hash
  * @param error
  * @return
- */ 
+ */
 gint message_get_fields(MESSAGE m, GHashTable ** hash, GError ** error);
 
 /**
@@ -598,7 +507,7 @@ gint message_get_fields(MESSAGE m, GHashTable ** hash, GError ** error);
  * @return
  */
 MESSAGE message_create_request(GError ** err, GByteArray * id,
-		const char *name, GByteArray * body, ...);
+	const char *name, GByteArray * body, ...);
 
 /**
  * @param m
@@ -646,7 +555,7 @@ gint message_marshall(MESSAGE m, void **s, gsize * sSize, GError ** error);
  * @param err
  * @return
  */
-GByteArray* message_marshall_gba(MESSAGE m, GError **err);
+GByteArray *message_marshall_gba(MESSAGE m, GError ** err);
 
 /**
  * Allocates a new message and Unserializes the given buffer.
@@ -668,7 +577,7 @@ gint message_unmarshall(MESSAGE m, void *s, gsize * sSize, GError ** error);
  * @param m
  * @return
  */
-GByteArray* message_marshall_gba_and_clean(MESSAGE m);
+GByteArray *message_marshall_gba_and_clean(MESSAGE m);
 
 
 /**
@@ -677,8 +586,8 @@ GByteArray* message_marshall_gba_and_clean(MESSAGE m);
  * @param cid
  * @return
  */
-GError* message_extract_cid(struct message_s *msg, const gchar *n,
-		container_id_t *cid);
+GError *message_extract_cid(struct message_s *msg, const gchar * n,
+	container_id_t * cid);
 
 /**
  * @param msg
@@ -687,8 +596,8 @@ GError* message_extract_cid(struct message_s *msg, const gchar *n,
  * @param dsize
  * @return
  */
-GError* message_extract_prefix(struct message_s *msg, const gchar *n,
-		guint8 *d, gsize *dsize);
+GError *message_extract_prefix(struct message_s *msg, const gchar * n,
+	guint8 * d, gsize * dsize);
 
 /**
  * @param msg
@@ -697,8 +606,8 @@ GError* message_extract_prefix(struct message_s *msg, const gchar *n,
  * @param flag
  * @return
  */
-GError* message_extract_flag(struct message_s *msg, const gchar *n,
-		gboolean mandatory, gboolean *flag);
+GError *message_extract_flag(struct message_s *msg, const gchar * n,
+	gboolean mandatory, gboolean * flag);
 
 /*!
  * @param msg
@@ -706,8 +615,8 @@ GError* message_extract_flag(struct message_s *msg, const gchar *n,
  * @param mandatory
  * @param flags
  */
-GError* message_extract_flags32(struct message_s *msg, const gchar *n,
-		gboolean mandatory, guint32 *flags);
+GError *message_extract_flags32(struct message_s *msg, const gchar * n,
+	gboolean mandatory, guint32 * flags);
 
 /**
  * @param msg
@@ -716,8 +625,8 @@ GError* message_extract_flags32(struct message_s *msg, const gchar *n,
  * @param dst_size
  * @return
  */
-GError* message_extract_string(struct message_s *msg, const gchar *n, gchar *dst,
-		gsize dst_size);
+GError *message_extract_string(struct message_s *msg, const gchar * n,
+	gchar * dst, gsize dst_size);
 
 /**
  * @param msg
@@ -725,8 +634,8 @@ GError* message_extract_string(struct message_s *msg, const gchar *n, gchar *dst
  * @param i64
  * @return
  */
-GError* message_extract_strint64(struct message_s *msg, const gchar *n,
-		gint64 *i64);
+GError *message_extract_strint64(struct message_s *msg, const gchar * n,
+	gint64 * i64);
 
 /**
  * @param msg
@@ -734,8 +643,8 @@ GError* message_extract_strint64(struct message_s *msg, const gchar *n,
  * @param u
  * @return
  */
-GError* message_extract_struint(struct message_s *msg, const gchar *n,
-		guint *u);
+GError *message_extract_struint(struct message_s *msg, const gchar * n,
+	guint * u);
 
 /**
  * @param res
@@ -744,7 +653,8 @@ GError* message_extract_struint(struct message_s *msg, const gchar *n,
  * @param err
  * @return
  */
-typedef gint (body_decoder_f)(GSList **res, const void *b, gsize *bs, GError **err);
+typedef gint(body_decoder_f) (GSList ** res, const void *b, gsize * bs,
+	GError ** err);
 
 /**
  * @param msg
@@ -752,22 +662,22 @@ typedef gint (body_decoder_f)(GSList **res, const void *b, gsize *bs, GError **e
  * @param decoder
  * @return
  */
-GError* message_extract_body_encoded(struct message_s *msg, GSList **result,
-		body_decoder_f decoder);
+GError *message_extract_body_encoded(struct message_s *msg, GSList ** result,
+	body_decoder_f decoder);
 
 /** Upon success, ensures result will be a printable string with a trailing \0
  * @param msg
  * @param result
  * @return
  */
-GError* message_extract_body_string(struct message_s *msg, gchar **result);
+GError *message_extract_body_string(struct message_s *msg, gchar ** result);
 
 /**
  * @param msg
  * @param result
  * @return
  */
-GError* message_extract_body_gba(struct message_s *msg, GByteArray **result);
+GError *message_extract_body_gba(struct message_s *msg, GByteArray ** result);
 
 /**
  * @param msg
@@ -776,15 +686,15 @@ GError* message_extract_body_gba(struct message_s *msg, GByteArray **result);
  * @param result
  * @return
  */
-GError* message_extract_header_gba(struct message_s *msg, const gchar *n,
-		gboolean mandatory, GByteArray **result);
+GError *message_extract_header_gba(struct message_s *msg, const gchar * n,
+	gboolean mandatory, GByteArray ** result);
 
 /**
  * @param msg
  * @param result
  * @return
  */
-GError* message_extract_body_strv(struct message_s *msg, gchar ***result);
+GError *message_extract_body_strv(struct message_s *msg, gchar *** result);
 
 
 /** @} */
@@ -805,7 +715,7 @@ GError* message_extract_body_strv(struct message_s *msg, gchar ***result);
  * @return
  */
 gint namespace_info_unmarshall_one(struct namespace_info_s **ni,
-		const void *s, gsize *sSize, GError **err);
+	const void *s, gsize * sSize, GError ** err);
 
 DECLARE_MARSHALLER(namespace_info_list_marshall);
 DECLARE_MARSHALLER_GBA(namespace_info_list_marshall_gba);
@@ -826,15 +736,6 @@ DECLARE_MARSHALLER(addr_info_marshall);
 DECLARE_MARSHALLER_GBA(addr_info_marshall_gba);
 DECLARE_UNMARSHALLER(addr_info_unmarshall);
 DECLARE_BODY_MANAGER(addr_info_concat);
-
-DECLARE_MARSHALLER(volume_info_marshall);
-DECLARE_MARSHALLER_GBA(volume_info_marshall_gba);
-DECLARE_UNMARSHALLER(volume_info_unmarshall);
-DECLARE_MARSHALLER(meta1_info_marshall);
-
-DECLARE_MARSHALLER(volume_stat_marshall);
-DECLARE_MARSHALLER_GBA(volume_stat_marshall_gba);
-DECLARE_UNMARSHALLER(volume_stat_unmarshall);
 
 DECLARE_MARSHALLER(path_info_marshall);
 DECLARE_MARSHALLER_GBA(path_info_marshall_gba);
@@ -864,39 +765,25 @@ DECLARE_UNMARSHALLER(service_info_unmarshall);
 DECLARE_MARSHALLER_GBA(service_info_marshall_gba);
 DECLARE_BODY_MANAGER(service_info_concat);
 
-DECLARE_MARSHALLER_GBA(meta1_info_marshall_gba);
-DECLARE_UNMARSHALLER(meta1_info_unmarshall);
-DECLARE_MARSHALLER(meta1_stat_marshall);
-DECLARE_MARSHALLER_GBA(meta1_stat_marshall_gba);
-DECLARE_UNMARSHALLER(meta1_stat_unmarshall);
+DECLARE_MARSHALLER_GBA(meta2_property_marshall_gba);
+DECLARE_MARSHALLER(meta2_property_marshall);
+DECLARE_UNMARSHALLER(meta2_property_unmarshall);
+DECLARE_BODY_MANAGER(meta2_property_concat);
 
-DECLARE_MARSHALLER(     meta2_info_marshall);
-DECLARE_MARSHALLER_GBA( meta2_info_marshall_gba);
-DECLARE_UNMARSHALLER(   meta2_info_unmarshall);
+DECLARE_MARSHALLER_GBA(meta2_raw_content_header_marshall_gba);
+DECLARE_MARSHALLER(meta2_raw_content_header_marshall);
+DECLARE_UNMARSHALLER(meta2_raw_content_header_unmarshall);
+DECLARE_BODY_MANAGER(meta2_raw_content_header_concat);
 
-DECLARE_MARSHALLER(     meta2_stat_marshall);
-DECLARE_MARSHALLER_GBA( meta2_stat_marshall_gba);
-DECLARE_UNMARSHALLER(   meta2_stat_unmarshall);
+DECLARE_MARSHALLER_GBA(meta2_raw_content_v2_marshall_gba);
+DECLARE_MARSHALLER(meta2_raw_content_v2_marshall);
+DECLARE_UNMARSHALLER(meta2_raw_content_v2_unmarshall);
+DECLARE_BODY_MANAGER(meta2_raw_content_v2_concat);
 
-DECLARE_MARSHALLER_GBA( meta2_property_marshall_gba);
-DECLARE_MARSHALLER(     meta2_property_marshall);
-DECLARE_UNMARSHALLER(   meta2_property_unmarshall);
-DECLARE_BODY_MANAGER(   meta2_property_concat);
-
-DECLARE_MARSHALLER_GBA( meta2_raw_content_header_marshall_gba);
-DECLARE_MARSHALLER(     meta2_raw_content_header_marshall);
-DECLARE_UNMARSHALLER(   meta2_raw_content_header_unmarshall);
-DECLARE_BODY_MANAGER(   meta2_raw_content_header_concat);
-
-DECLARE_MARSHALLER_GBA( meta2_raw_content_v2_marshall_gba);
-DECLARE_MARSHALLER(     meta2_raw_content_v2_marshall);
-DECLARE_UNMARSHALLER(   meta2_raw_content_v2_unmarshall);
-DECLARE_BODY_MANAGER(   meta2_raw_content_v2_concat);
-
-DECLARE_MARSHALLER_GBA( meta2_raw_chunk_marshall_gba);
-DECLARE_MARSHALLER(     meta2_raw_chunk_marshall);
-DECLARE_UNMARSHALLER(   meta2_raw_chunk_unmarshall);
-DECLARE_BODY_MANAGER(   meta2_raw_chunk_concat);
+DECLARE_MARSHALLER_GBA(meta2_raw_chunk_marshall_gba);
+DECLARE_MARSHALLER(meta2_raw_chunk_marshall);
+DECLARE_UNMARSHALLER(meta2_raw_chunk_unmarshall);
+DECLARE_BODY_MANAGER(meta2_raw_chunk_concat);
 
 
 /**
@@ -904,7 +791,7 @@ DECLARE_BODY_MANAGER(   meta2_raw_chunk_concat);
  * @param err a pointer to the error structure being returned
  * @return NULL in case of error or a valid ASN.1 form of the given servccie_info
  */
-GByteArray* service_info_marshall_1(service_info_t *si, GError **err);
+GByteArray *service_info_marshall_1(service_info_t * si, GError ** err);
 
 /**
  * @param cnx
@@ -915,15 +802,15 @@ GByteArray* service_info_marshall_1(service_info_t *si, GError **err);
  * @return
  */
 GSList *service_info_sequence_request(struct metacnx_ctx_s *cnx, GError ** err,
-		const gchar * req_name, GByteArray * body, ...);
+	const gchar * req_name, GByteArray * body, ...);
 
 /**
  * @param container
  * @param err
  * @return
  */
-GByteArray *meta1_raw_container_marshall(struct meta1_raw_container_s *container,
-		GError ** err);
+GByteArray *meta1_raw_container_marshall(struct meta1_raw_container_s
+	*container, GError ** err);
 
 /**
  * @param buf
@@ -932,7 +819,7 @@ GByteArray *meta1_raw_container_marshall(struct meta1_raw_container_s *container
  * @return
  */
 struct meta1_raw_container_s *meta1_raw_container_unmarshall(guint8 * buf,
-		gsize buf_len, GError ** err);
+	gsize buf_len, GError ** err);
 
 /**
  * @param bytes
@@ -941,14 +828,14 @@ struct meta1_raw_container_s *meta1_raw_container_unmarshall(guint8 * buf,
  * @return
  */
 gboolean simple_integer_unmarshall(const guint8 * bytes, gsize size,
-		gint64 * result);
+	gint64 * result);
 
 /**
  * @param i64
  * @param err
  * @return
  */
-GByteArray* simple_integer_marshall_gba(gint64 i64, GError **err);
+GByteArray *simple_integer_marshall_gba(gint64 i64, GError ** err);
 
 /**
  * Serializes the content structure into its ASN.1 representation.
@@ -956,8 +843,8 @@ GByteArray* simple_integer_marshall_gba(gint64 i64, GError **err);
  * @param err
  * @return
  */
-GByteArray *meta2_maintenance_marshall_content(
-		struct meta2_raw_content_s *content, GError ** err);
+GByteArray *meta2_maintenance_marshall_content(struct meta2_raw_content_s
+	*content, GError ** err);
 
 /**
  * Unserializes the ASN.1 encoded content structure. The returned
@@ -967,8 +854,9 @@ GByteArray *meta2_maintenance_marshall_content(
  * @param err
  * @return
  */
-struct meta2_raw_content_s *meta2_maintenance_content_unmarshall_bytearray(
-		GByteArray * encoded_content, GError ** err);
+struct meta2_raw_content_s
+	*meta2_maintenance_content_unmarshall_bytearray(GByteArray *
+	encoded_content, GError ** err);
 
 /**
  * @param buf
@@ -976,8 +864,8 @@ struct meta2_raw_content_s *meta2_maintenance_content_unmarshall_bytearray(
  * @param err
  * @return
  */
-struct meta2_raw_content_s *meta2_maintenance_content_unmarshall_buffer(
-		guint8 * buf, gsize buf_size, GError ** err);
+struct meta2_raw_content_s *meta2_maintenance_content_unmarshall_buffer(guint8 *
+	buf, gsize buf_size, GError ** err);
 
 /**
  * @param chunkId
@@ -993,7 +881,8 @@ GByteArray *chunk_id_marshall(const chunk_id_t * chunkId, GError ** err);
  * @param err
  * @return
  */
-gint chunk_id_unmarshall(chunk_id_t * chunkId, void *src, gsize srcSize, GError ** err);
+gint chunk_id_unmarshall(chunk_id_t * chunkId, void *src, gsize srcSize,
+	GError ** err);
 
 /**
  * Returns the unserialized form of the String sequence as a linked list
@@ -1003,8 +892,8 @@ gint chunk_id_unmarshall(chunk_id_t * chunkId, void *src, gsize srcSize, GError 
  * @param err
  * @return
  */
-GSList *meta2_maintenance_arrays_unmarshall_bytearray(
-		GByteArray * encoded_form, GError ** err);
+GSList *meta2_maintenance_arrays_unmarshall_bytearray(GByteArray * encoded_form,
+	GError ** err);
 
 /**
  * Returns the unserialized form of the String sequence as a linked list
@@ -1015,7 +904,8 @@ GSList *meta2_maintenance_arrays_unmarshall_bytearray(
  * @param err
  * @return
  */
-GSList *meta2_maintenance_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, GError ** err);
+GSList *meta2_maintenance_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len,
+	GError ** err);
 
 /**
  * Returns the unserialized form of the String sequence as a linked list
@@ -1025,7 +915,8 @@ GSList *meta2_maintenance_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, 
  * @param err
  * @return
  */
-GSList *meta2_maintenance_names_unmarshall_bytearray(GByteArray * encoded_form, GError ** err);
+GSList *meta2_maintenance_names_unmarshall_bytearray(GByteArray * encoded_form,
+	GError ** err);
 
 /**
  * Returns the unserialized form of the String sequence as a linked list
@@ -1035,7 +926,8 @@ GSList *meta2_maintenance_names_unmarshall_bytearray(GByteArray * encoded_form, 
  * @param buf_len
  * @param err
  */
-GSList *meta2_maintenance_names_unmarshall_buffer(const guint8 * buf, gsize buf_len, GError ** err);
+GSList *meta2_maintenance_names_unmarshall_buffer(const guint8 * buf,
+	gsize buf_len, GError ** err);
 
 /**
  * @param names
@@ -1058,8 +950,8 @@ GByteArray *meta2_maintenance_arrays_marshall(GSList * arrays, GError ** err);
  * @param err
  * @return
  */
-GSList *meta2_maintenance_sized_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, gsize array_size,
-		GError ** err);
+GSList *meta2_maintenance_sized_arrays_unmarshall_buffer(guint8 * buf,
+	gsize buf_len, gsize array_size, GError ** err);
 
 /**
  * @param encoded
@@ -1067,7 +959,8 @@ GSList *meta2_maintenance_sized_arrays_unmarshall_buffer(guint8 * buf, gsize buf
  * @param err
  * @return
  */
-GSList *meta2_maintenance_sized_arrays_unmarshall_bytearray(GByteArray * encoded, gsize array_size, GError ** err);
+GSList *meta2_maintenance_sized_arrays_unmarshall_bytearray(GByteArray *
+	encoded, gsize array_size, GError ** err);
 
 /**
  * Serializes a list of arrays of fixed sized (given as the second argument)
@@ -1076,7 +969,8 @@ GSList *meta2_maintenance_sized_arrays_unmarshall_bytearray(GByteArray * encoded
  * @param err
  * @return
  */
-GByteArray *meta2_maintenance_sized_arrays_marshall(GSList * arrays, gsize array_size, GError ** err);
+GByteArray *meta2_maintenance_sized_arrays_marshall(GSList * arrays,
+	gsize array_size, GError ** err);
 
 
 /**
@@ -1086,7 +980,8 @@ GByteArray *meta2_maintenance_sized_arrays_marshall(GSList * arrays, gsize array
  * @param err
  * @return the serialized ASN1 data in a GByteArray
  */
-GByteArray* namespace_info_marshall(struct namespace_info_s * namespace_info, GError ** err);
+GByteArray *namespace_info_marshall(struct namespace_info_s *namespace_info,
+	const char *version, GError ** err);
 
 /**
  * Unserialize a namespace_info from ASN1
@@ -1096,7 +991,8 @@ GByteArray* namespace_info_marshall(struct namespace_info_s * namespace_info, GE
  * @param err
  * @return the namespace_info_t struct
  */
-namespace_info_t* namespace_info_unmarshall(const guint8 * buf, gsize buf_len, GError ** err);
+namespace_info_t *namespace_info_unmarshall(const guint8 * buf, gsize buf_len,
+	GError ** err);
 
 /** @} */
 

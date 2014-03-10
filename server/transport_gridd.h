@@ -1,34 +1,18 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file transport_gridd.h
  */
 
 #ifndef GRID__TRANSPORT_GRIDD__H
-# define GRID__TRANSPORT_GRIDD__H 1
+#define GRID__TRANSPORT_GRIDD__H 1
+#include <glib.h>
 
-# ifndef INNER_STAT_NAME_REQ_COUNTER
-#  define INNER_STAT_NAME_REQ_COUNTER "gridd.counter.allreq"
-# endif
+#ifndef INNER_STAT_NAME_REQ_COUNTER
+#define INNER_STAT_NAME_REQ_COUNTER "gridd.counter.allreq"
+#endif
 
-# ifndef INNER_STAT_NAME_REQ_TIME
-#  define INNER_STAT_NAME_REQ_TIME "gridd.counter.alltime"
-# endif
+#ifndef INNER_STAT_NAME_REQ_TIME
+#define INNER_STAT_NAME_REQ_TIME "gridd.counter.alltime"
+#endif
 
 /**
  * @defgroup server_transgrid GRIDD transport
@@ -60,44 +44,44 @@ struct gridd_reply_ctx_s
 	 * @param name
 	 * @param value
 	 */
-	void (*add_header) (const gchar *name, GByteArray *value);
-	
+	void (*add_header) (const gchar * name, GByteArray * value);
+
 	/**
 	 * @param body
 	 */
-	void (*add_body)   (GByteArray *body);
+	void (*add_body) (GByteArray * body);
 
 	/**
 	 * @param code
 	 * @param message
 	 */
-	void (*send_reply) (gint code, gchar *message);
-	
+	void (*send_reply) (gint code, gchar * message);
+
 	/**
 	 * @param code
 	 * @param err
 	 */
-	void (*send_error) (gint code, GError *err);
+	void (*send_error) (gint code, GError * err);
 
 	/**
 	 * @param fmt
 	 * @param ...
 	 */
-	void (*subject) (const gchar *fmt, ...);
+	void (*subject) (const gchar * fmt, ...);
 
 	/**
 	 * @param key
 	 * @param data
 	 * @param cleanup
 	 */
-	void (*register_cnx_data) (const gchar *key, gpointer data,
-			GDestroyNotify cleanup);
+	void (*register_cnx_data) (const gchar * key, gpointer data,
+		GDestroyNotify cleanup);
 
 	/* Dissociates the data or does nothing if data not present */
-	void (*forget_cnx_data) (const gchar *key);
+	void (*forget_cnx_data) (const gchar * key);
 
 	/* Return a data previously associated, or NULL if not found. */
-	gpointer (*get_cnx_data) (const gchar *key);
+	     gpointer(*get_cnx_data) (const gchar * key);
 
 
 	/* --------------------------------
@@ -132,8 +116,9 @@ struct gridd_request_descr_s
 	 *         the connection. A TRUE value if the connection might be
 	 *         kept open.
 	 */
-	gboolean (*handler) (struct gridd_reply_ctx_s *reply,
-			gpointer group_data, gpointer handler_data);
+	     
+		gboolean(*handler) (struct gridd_reply_ctx_s * reply,
+		gpointer group_data, gpointer handler_data);
 
 	gpointer handler_data;
 };
@@ -146,11 +131,9 @@ struct gridd_request_descr_s
  * @param group_data a 
  * @return
  */
-GError *
-transport_gridd_dispatcher_add_requests(
-		struct gridd_request_dispatcher_s *dispatcher,
-		const struct gridd_request_descr_s *descr,
-		gpointer group_data);
+GError *transport_gridd_dispatcher_add_requests(struct
+	gridd_request_dispatcher_s *dispatcher,
+	const struct gridd_request_descr_s *descr, gpointer group_data);
 
 /**
  * Build an optimized gridd_request dispatcher, without any request
@@ -158,7 +141,7 @@ transport_gridd_dispatcher_add_requests(
  *
  * @return
  */
-struct gridd_request_dispatcher_s * transport_gridd_build_empty_dispatcher(void);
+struct gridd_request_dispatcher_s *transport_gridd_build_empty_dispatcher(void);
 
 /**
  * Build an optimized gridd_request dispatcher, based on a set of
@@ -173,9 +156,8 @@ struct gridd_request_dispatcher_s * transport_gridd_build_empty_dispatcher(void)
  * @param u
  * @return
  */
-struct gridd_request_dispatcher_s * transport_gridd_build_dispatcher(
-		const struct gridd_request_descr_s *descriptions,
-		gpointer u);
+struct gridd_request_dispatcher_s *transport_gridd_build_dispatcher(const struct
+	gridd_request_descr_s *descriptions, gpointer u);
 
 /**
  * Cleans a GRIDD request dispatcher and all the internal structures
@@ -196,7 +178,7 @@ void gridd_request_dispatcher_clean(struct gridd_request_dispatcher_s *disp);
  * @param client
  */
 void transport_gridd_factory0(struct gridd_request_dispatcher_s *disp,
-		struct network_client_s *client);
+	struct network_client_s *client);
 
 /**
  * Wrapper over transport_gridd_factory0() to provide a factory function,
@@ -220,13 +202,13 @@ transport_gridd_factory(gpointer dispatcher, struct network_client_s *client)
  * @param dispatcher
  */
 void gridd_register_requests_stats(struct grid_stats_holder_s *stats,
-		struct gridd_request_dispatcher_s *dispatcher);
+	struct gridd_request_dispatcher_s *dispatcher);
 
 /**
  * All these requests ignore their first argument
  * @return
  */
-const struct gridd_request_descr_s* gridd_get_common_requests(void);
+const struct gridd_request_descr_s *gridd_get_common_requests(void);
 
 /** @} */
 

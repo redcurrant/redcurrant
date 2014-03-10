@@ -1,28 +1,7 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "hc.tools"
-#endif
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "hc.tools"
+#define G_LOG_DOMAIN "hc.tools"
 #endif
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -34,15 +13,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../../../metautils/lib/metautils.h"
-#include "../../../metautils/lib/common_main.h"
-#include "../../../metautils/lib/loggers.h"
-
-#include "../lib/grid_client.h"
 #include "../lib/gs_internals.h"
 
 #ifndef FREEP
-# define FREEP(F,P) do { if (!(P)) return; F(P); (P) = NULL; } while (0)
+#define FREEP(F,P) do { if (!(P)) return; F(P); (P) = NULL; } while (0)
 #endif
 
 static gboolean flag_xml = FALSE;
@@ -54,19 +28,20 @@ static gchar **action_args = NULL;
 static container_id_t cid;
 
 static void
-dump_properties(gchar **s)
+dump_properties(gchar ** s)
 {
 	if (!flag_xml) {
-		for (; s && *s ; s++)
+		for (; s && *s; s++)
 			g_print("   [%s]\n", *s);
 	}
 	else {
 		g_print("<properties>\n");
-		for (; s && *s ; s++) {
+		for (; s && *s; s++) {
 			gchar **ssplit = g_strsplit(*s, "=", 2);
+
 			if (!ssplit)
 				g_print("<!-- Invalid %s -->\n", *s);
- 			else {
+			else {
 				if (!*ssplit)
 					g_print("<!-- Invalid %s -->\n", *s);
 				else {
@@ -86,20 +61,23 @@ static void
 help_get(void)
 {
 	g_printerr("usage: %s get <NS>/<REF>\n\n", g_get_prgname());
-	g_printerr("    NS: Honeycomb namespace, if you don't know this, please contact your Honeycomb namespace administrator\n");
-	g_printerr("    REF: The reference you want to create. A reference if mandatory to work with services in Honeycomb.\n");
+	g_printerr
+		("    NS: Honeycomb namespace, if you don't know this, please contact your Honeycomb namespace administrator\n");
+	g_printerr
+		("    REF: The reference you want to create. A reference if mandatory to work with services in Honeycomb.\n");
 }
 
 static gboolean
-func_get(gs_grid_storage_t *hc)
+func_get(gs_grid_storage_t * hc)
 {
 	gs_error_t *e;
-	gchar *keys[] = {"meta2.quota", NULL};
+	gchar *keys[] = { "meta2.quota", NULL };
 	gchar **values = NULL;
 
 	if (!(e = hc_get_reference_property(hc, reference, keys, &values))) {
 		if (!*values)
-			g_printerr("No property [%s] associated to the reference [%s]\n", keys[0], reference);
+			g_printerr("No property [%s] associated to the reference [%s]\n",
+				keys[0], reference);
 		dump_properties(values);
 		g_strfreev(values);
 		values = NULL;
@@ -116,17 +94,21 @@ static void
 help_set(void)
 {
 	g_printerr("usage: %s set <NS>/<REF> SIZE\n\n", g_get_prgname());
-	g_printerr("    NS: Honeycomb namespace, if you don't know this, please contact your Honeycomb namespace administrator\n");
-	g_printerr("    REF: The reference you want to create. A reference if mandatory to work with services in Honeycomb.\n");
-	g_printerr("    SIZE: The sequence number for the given (service,container) association\n");
+	g_printerr
+		("    NS: Honeycomb namespace, if you don't know this, please contact your Honeycomb namespace administrator\n");
+	g_printerr
+		("    REF: The reference you want to create. A reference if mandatory to work with services in Honeycomb.\n");
+	g_printerr
+		("    SIZE: The sequence number for the given (service,container) association\n");
 }
 
 static gboolean
-func_set(gs_grid_storage_t *hc)
+func_set(gs_grid_storage_t * hc)
 {
 	container_info_t cinfo;
-	GSList list = {.data = &cinfo, .next = NULL};
-	addr_info_t *m1a;
+	GSList list = {.data = &cinfo,.next = NULL };
+	addr_info_t *m1a = NULL;
+	gchar strm1a[64];
 	gboolean rc;
 	GError *e = NULL;
 
@@ -137,14 +119,15 @@ func_set(gs_grid_storage_t *hc)
 
 	cinfo.size = g_ascii_strtoll(action_args[0], NULL, 10);
 	memcpy(cinfo.id, cid, sizeof(container_id_t));
-	
-	if (!(m1a = gs_resolve_meta1v2(hc, cid, 0, NULL, &e))) {
+
+	if (!(m1a = gs_resolve_meta1v2(hc, cid, NULL, 0, NULL, &e))) {
 		g_printerr("%s\n", e->message);
 		g_clear_error(&e);
 		return FALSE;
 	}
 
-	rc = meta1_remote_update_containers(m1a, &list, 60001, &e);
+	addr_info_to_string(m1a, strm1a, sizeof(strm1a));
+	rc = meta1_remote_update_containers(strm1a, &list, 60001, &e);
 	addr_info_clean(m1a);
 	m1a = NULL;
 
@@ -160,12 +143,14 @@ func_set(gs_grid_storage_t *hc)
 
 /* ------------------------------------------------------------------------- */
 
-struct action_s {
+struct action_s
+{
 	const gchar *name;
-	gboolean (*job) (gs_grid_storage_t *hc);
+	      gboolean(*job) (gs_grid_storage_t * hc);
 };
 
-struct help_s {
+struct help_s
+{
 	const gchar *name;
 	void (*help) (void);
 };
@@ -173,21 +158,21 @@ struct help_s {
 static struct action_s actions[] = {
 	{"set", func_set},
 	{"get", func_get},
-	{NULL,  NULL},
+	{NULL, NULL},
 };
 
 static struct help_s helps[] = {
 	{"set", help_set},
 	{"get", help_get},
-	{NULL,  NULL},
+	{NULL, NULL},
 };
 
 static void
-_call_action(gs_grid_storage_t *hc)
+_call_action(gs_grid_storage_t * hc)
 {
 	struct action_s *paction;
 
-	for (paction=actions; paction->name ;paction++) {
+	for (paction = actions; paction->name; paction++) {
 		if (0 != g_ascii_strcasecmp(paction->name, action))
 			continue;
 		if (!paction->job(hc))
@@ -200,13 +185,13 @@ _call_action(gs_grid_storage_t *hc)
 }
 
 static gboolean
-_call_help(const gchar *a)
+_call_help(const gchar * a)
 {
 	struct help_s *phelp;
 
-	for (phelp=helps; phelp->name ;phelp++) {
+	for (phelp = helps; phelp->name; phelp++) {
 		if (!g_ascii_strcasecmp(phelp->name, a)) {
-		 	phelp->help();
+			phelp->help();
 			return TRUE;
 		}
 	}
@@ -224,8 +209,10 @@ gsquota_action(void)
 	hc = gs_grid_storage_init(namespace, &hc_error);
 
 	if (!hc) {
-		g_printerr("Failed to load namespace [%s]. Please ensure /etc/gridstorage.conf.d/%s file exists.\n"
-				"If not, please contact your Honeycomb namespace administrator.\n", namespace, namespace);
+		g_printerr
+			("Failed to load namespace [%s]. Please ensure /etc/gridstorage.conf.d/%s file exists.\n"
+			"If not, please contact your Honeycomb namespace administrator.\n",
+			namespace, namespace);
 		return;
 	}
 
@@ -238,9 +225,9 @@ static struct grid_main_option_s *
 gsquota_get_options(void)
 {
 	static struct grid_main_option_s gsquota_options[] = {
-		{ "OutputXML", OT_BOOL, {.b = &flag_xml},
+		{"OutputXML", OT_BOOL, {.b = &flag_xml},
 			"Write XML instead of the default key=value output"},
-		{NULL, 0, {.i=0}, NULL}
+		{NULL, 0, {.i = 0}, NULL}
 	};
 
 	return gsquota_options;
@@ -279,8 +266,7 @@ gsquota_usage(void)
 	return "<command> [<args>]\n"
 		"\nThe available hcdir commands are:\n"
 		"   set    Force the quota of the container\n"
-		"   get    Gets and dumps the quota of a container\n"
-		"\n";
+		"   get    Gets and dumps the quota of a container\n" "\n";
 }
 
 static gboolean
@@ -304,7 +290,7 @@ gsquota_configure(int argc, char **argv)
 		g_print("usage: %s %s", g_get_prgname(), gsquota_usage());
 		return TRUE;
 	}
-	
+
 	if (argc < 2) {
 		g_printerr("Invalid arguments number");
 		return FALSE;
@@ -324,19 +310,18 @@ gsquota_configure(int argc, char **argv)
 	reference = tmp[1];
 	g_free(tmp);
 	tmp = NULL;
-	
-	action_args = g_strdupv(argv+2);
+
+	action_args = g_strdupv(argv + 2);
 	return TRUE;
 }
 
-struct grid_main_callbacks gsquota_callbacks =
-{
-	.options =       gsquota_get_options,
-	.action =        gsquota_action,
-	.set_defaults =  gsquota_set_defaults,
+struct grid_main_callbacks gsquota_callbacks = {
+	.options = gsquota_get_options,
+	.action = gsquota_action,
+	.set_defaults = gsquota_set_defaults,
 	.specific_fini = gsquota_specific_fini,
-	.configure =     gsquota_configure,
-	.usage =         gsquota_usage,
+	.configure = gsquota_configure,
+	.usage = gsquota_usage,
 	.specific_stop = gsquota_specific_stop,
 };
 
@@ -346,4 +331,3 @@ main(int argc, char **args)
 	g_setenv("GS_DEBUG_GLIB2", "1", TRUE);
 	return grid_main_cli(argc, args, &gsquota_callbacks);
 }
-

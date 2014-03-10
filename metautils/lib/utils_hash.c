@@ -1,35 +1,13 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metautils"
 #endif
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "metautils"
-#endif
-#include <string.h>
 #include <errno.h>
-#include <glib.h>
 #include <openssl/sha.h>
-#include "./metautils.h"
+#include "metautils.h"
 
 gsize
-metautils_hash_content_path(const gchar *src, gsize src_size,
-	gchar *dst, gsize dst_size, gsize dst_bitlength)
+metautils_hash_content_path(const gchar * src, gsize src_size,
+	gchar * dst, gsize dst_size, gsize dst_bitlength)
 {
 	register gsize non_zero;
 	register gsize to_zero;
@@ -59,17 +37,17 @@ metautils_hash_content_path(const gchar *src, gsize src_size,
 	to_zero = non_zero ? (8 - non_zero) : 0;
 	result_bytes = dst_bitlength / 8 + (to_zero ? 1 : 0);
 	if (to_zero)
-		h_result[result_bytes-1] = (h_result[result_bytes-1] >> to_zero) << to_zero;
+		h_result[result_bytes - 1] =
+			(h_result[result_bytes - 1] >> to_zero) << to_zero;
 
 	bzero(dst, dst_size);
 	buffer2str(h_result, sizeof(h_result), dst, dst_size);
-	dst[dst_size-1]='\0';
+	dst[dst_size - 1] = '\0';
 
 	/* Trim to the latest quartet */
 	result_quartets = (dst_bitlength / 4) + ((dst_bitlength % 4) ? 1 : 0);
 	if (dst_size > result_quartets)
-		bzero(dst+result_quartets, dst_size-result_quartets);
+		bzero(dst + result_quartets, dst_size - result_quartets);
 
 	return result_quartets;
 }
-

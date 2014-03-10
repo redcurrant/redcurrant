@@ -1,22 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef __LIMITED_CACHE_H__
-# define __LIMITED_CACHE_H__
+#define __LIMITED_CACHE_H__
 
 #include <glib.h>
 
@@ -24,9 +7,10 @@
 
 typedef struct limited_cache_s limited_cache_t;
 
-typedef gpointer (*value_copier_f) (gconstpointer v);
+typedef gpointer(*value_copier_f) (gconstpointer v);
 
-struct limited_cache_callbacks {
+struct limited_cache_callbacks
+{
 	GHashFunc hash_k;
 	GEqualFunc equal_k;
 	GDestroyNotify free_k;
@@ -35,27 +19,29 @@ struct limited_cache_callbacks {
 	value_copier_f copy_v;
 };
 
-limited_cache_t* limited_cache_create (gssize limit, time_t expiration,
-	struct limited_cache_callbacks *callbacks, guint32 flags, GError **err);
+limited_cache_t *limited_cache_create(gssize limit, time_t expiration,
+	struct limited_cache_callbacks *callbacks, guint32 flags, GError ** err);
 
-void limited_cache_destroy (limited_cache_t *lc);
+void limited_cache_destroy(limited_cache_t * lc);
 
-void limited_cache_clean (limited_cache_t *lc);
+void limited_cache_clean(limited_cache_t * lc);
 
-void limited_cache_set_limit (limited_cache_t *lc, gssize s);
+void limited_cache_set_limit(limited_cache_t * lc, gssize s);
 
-gssize limited_cache_get_limit (limited_cache_t *lc);
+gssize limited_cache_get_limit(limited_cache_t * lc);
 
-time_t limited_cache_get_expiration (limited_cache_t *lc);
+time_t limited_cache_get_expiration(limited_cache_t * lc);
 
-void limited_cache_put (limited_cache_t *lc, gpointer k, gpointer v);
+void limited_cache_put(limited_cache_t * lc, gpointer k, gpointer v);
 
-gpointer limited_cache_get (limited_cache_t *lc, gconstpointer k);
+gboolean limited_cache_has(limited_cache_t * lc, gconstpointer k,
+	gpointer * p_val);
+gpointer limited_cache_get(limited_cache_t * lc, gconstpointer k);
 
-void limited_cache_del (limited_cache_t *lc, gconstpointer k);
+void limited_cache_del(limited_cache_t * lc, gconstpointer k);
 
-void limited_cache_flush (limited_cache_t *lc);
+void limited_cache_flush(limited_cache_t * lc);
 
-gssize limited_cache_get_size (limited_cache_t *lc);
+gssize limited_cache_get_size(limited_cache_t * lc);
 
 #endif /*__LIMITED_CACHE_H__*/

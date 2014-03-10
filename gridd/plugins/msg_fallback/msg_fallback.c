@@ -1,44 +1,25 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #define MODULE_NAME "fallback"
 
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN MODULE_NAME".plugin"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN MODULE_NAME".plugin"
 #endif
 
 #include <string.h>
 #include <sys/time.h>
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
 
-#include <metautils.h>
-#include <metacomm.h>
-
-#include "../../main/plugin.h"
-#include "../../main/message_handler.h"
+#include <gridd/main/plugin.h>
+#include <gridd/main/message_handler.h>
 
 
 static gint
 plugin_matcher(MESSAGE m, void *param, GError ** err)
 {
-	(void)m;
-	(void)param;
-	(void)err;
+	(void) m;
+	(void) param;
+	(void) err;
 	return 1;
 }
 
@@ -58,7 +39,8 @@ plugin_handler(MESSAGE m, gint fd, void *param, GError ** err)
 	req_ctx.request = m;
 	ctx.req_ctx = &req_ctx;
 
-	reply_context_set_message(&ctx, 404, "No message handler found, check your NS configuration");
+	reply_context_set_message(&ctx, 404,
+		"No message handler found, check your NS configuration");
 	reply_context_log_access(&ctx, "");
 
 	rc = reply_context_reply(&ctx, err);
@@ -71,7 +53,7 @@ plugin_handler(MESSAGE m, gint fd, void *param, GError ** err)
 static gint
 plugin_init(GHashTable * params, GError ** err)
 {
-	(void)params;
+	(void) params;
 	return message_handler_add("fallback", plugin_matcher, plugin_handler, err);
 }
 
@@ -79,7 +61,7 @@ plugin_init(GHashTable * params, GError ** err)
 static gint
 plugin_close(GError ** err)
 {
-	(void)err;
+	(void) err;
 	return 1;
 }
 

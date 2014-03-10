@@ -1,26 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metacomm.namespace_info.asn"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metacomm.namespace_info.asn"
 #endif
 
 #include <errno.h>
@@ -36,12 +15,12 @@
 
 
 static gboolean
-list_conversion(
-		const struct NamespaceInfoValueList *nsinfo_vlist,
-		GHashTable **ht,
-		GHashTable* (*conv_func)(GSList * pairs, gboolean copy, GError ** err))
+list_conversion(const struct NamespaceInfoValueList *nsinfo_vlist,
+	GHashTable ** ht,
+	GHashTable * (*conv_func) (GSList * pairs, gboolean copy, GError ** err))
 {
-	void _free(GSList *valuelist) {
+	void _free(GSList * valuelist)
+	{
 		if (valuelist) {
 			g_slist_foreach(valuelist, key_value_pair_gclean, NULL);
 			g_slist_free(valuelist);
@@ -51,12 +30,12 @@ list_conversion(
 
 	if (nsinfo_vlist->list.count > 0) {
 		int i;
-		GSList* valuelist = NULL;
+		GSList *valuelist = NULL;
 		GError *error = NULL;
 
 		for (i = 0; i < nsinfo_vlist->list.count; i++) {
-			Parameter_t* asn_prop;
-			key_value_pair_t* api_prop;
+			Parameter_t *asn_prop;
+			key_value_pair_t *api_prop;
 
 			if (!(asn_prop = nsinfo_vlist->list.array[i]))
 				continue;
@@ -78,8 +57,9 @@ list_conversion(
 		valuelist = NULL;
 
 		if (*ht == NULL) {
-			ERROR("Failed to convert key_value_pairs to map in namespace_info ASN to API conversion : %s",
-					gerror_get_message(error));
+			ERROR
+				("Failed to convert key_value_pairs to map in namespace_info ASN to API conversion : %s",
+				gerror_get_message(error));
 			g_clear_error(&error);
 			return FALSE;
 		}
@@ -89,14 +69,15 @@ list_conversion(
 }
 
 gboolean
-namespace_info_ASN2API(const NamespaceInfo_t *asn, namespace_info_t *api)
+namespace_info_ASN2API(const NamespaceInfo_t * asn, namespace_info_t * api)
 {
 	if (!api || !asn)
 		return FALSE;
 
 	bzero(api, sizeof(*api));
 
-	if (!list_conversion(&(asn->options), &(api->options), key_value_pairs_convert_to_map))
+	if (!list_conversion(&(asn->options), &(api->options),
+			key_value_pairs_convert_to_map))
 		return FALSE;
 
 	memcpy(api->name, asn->name.buf, MIN(LIMIT_LENGTH_NSNAME, asn->name.size));
@@ -110,18 +91,27 @@ namespace_info_ASN2API(const NamespaceInfo_t *asn, namespace_info_t *api)
 	/* broken and snapshot counters not yet managed */
 	api->versions.snapshot = api->versions.broken = 0LL;
 
-	if ( NULL != asn->storagePolicy ) {
-		if (!list_conversion(asn->storagePolicy, &(api->storage_policy), key_value_pairs_convert_to_map))
+	if (NULL != asn->storagePolicy) {
+		if (!list_conversion(asn->storagePolicy, &(api->storage_policy),
+				key_value_pairs_convert_to_map))
 			return FALSE;
 	}
 
-	if ( NULL != asn->dataSecurity ) {
-		if (!list_conversion(asn->dataSecurity, &(api->data_security), key_value_pairs_convert_to_map))
+	if (NULL != asn->dataSecurity) {
+		if (!list_conversion(asn->dataSecurity, &(api->data_security),
+				key_value_pairs_convert_to_map))
 			return FALSE;
 	}
 
-	if ( NULL != asn->dataTreatments ) {
-		if (!list_conversion(asn->dataTreatments, &(api->data_treatments), key_value_pairs_convert_to_map))
+	if (NULL != asn->dataTreatments) {
+		if (!list_conversion(asn->dataTreatments, &(api->data_treatments),
+				key_value_pairs_convert_to_map))
+			return FALSE;
+	}
+
+	if (NULL != asn->storageClass) {
+		if (!list_conversion(asn->storageClass, &(api->storage_class),
+				key_value_pairs_convert_to_map))
 			return FALSE;
 	}
 
@@ -129,19 +119,19 @@ namespace_info_ASN2API(const NamespaceInfo_t *asn, namespace_info_t *api)
 
 }
 
-static gboolean 
-hashtable_conversion(
-		GHashTable *ht,
-		struct NamespaceInfoValueList *nsinfo_vlist,
-		GSList* (*conv_func)(GHashTable * ht, gboolean do_copy, GError **err))
+static gboolean
+hashtable_conversion(GHashTable * ht,
+	struct NamespaceInfoValueList *nsinfo_vlist,
+	GSList * (*conv_func) (GHashTable * ht, gboolean do_copy, GError ** err))
 {
-	GSList* result = NULL, *p = NULL;
+	GSList *result = NULL, *p = NULL;
 	GError *error = NULL;
 
 	result = (conv_func(ht, TRUE, &error));
 	if (result == NULL && error != NULL) {
-		ERROR("Failed to convert map to key_value_pairs in namespace_info API to ASN conversion : %s",
-				gerror_get_message(error));
+		ERROR
+			("Failed to convert map to key_value_pairs in namespace_info API to ASN conversion : %s",
+			gerror_get_message(error));
 		g_clear_error(&error);
 		return FALSE;
 	}
@@ -149,10 +139,10 @@ hashtable_conversion(
 	if (result != NULL) {
 		/* fill the array */
 		for (p = result; p != NULL; p = p->next) {
-			key_value_pair_t* api_prop;
-			Parameter_t* asn_prop;
+			key_value_pair_t *api_prop;
+			Parameter_t *asn_prop;
 
-			if (!(api_prop = (key_value_pair_t*)p->data))
+			if (!(api_prop = (key_value_pair_t *) p->data))
 				continue;
 			if (!(asn_prop = g_try_malloc0(sizeof(Parameter_t))))
 				continue;
@@ -172,39 +162,64 @@ hashtable_conversion(
 }
 
 gboolean
-namespace_info_API2ASN(const namespace_info_t * api, NamespaceInfo_t * asn)
+namespace_info_API2ASN(const namespace_info_t * api, gint64 vers,
+	NamespaceInfo_t * asn)
 {
 	if (!api || !asn)
 		return FALSE;
-	
-	if (api->options && !hashtable_conversion(api->options, &(asn->options), key_value_pairs_convert_from_map))
+
+	if (api->options
+		&& !hashtable_conversion(api->options, &(asn->options),
+			key_value_pairs_convert_from_map))
 		return FALSE;
 
-	OCTET_STRING_fromBuf(&(asn->name), api->name, MIN(strlen(api->name), LIMIT_LENGTH_NSNAME));
+	OCTET_STRING_fromBuf(&(asn->name), api->name, MIN(strlen(api->name),
+			LIMIT_LENGTH_NSNAME));
 	addr_info_API2ASN(&(api->addr), &(asn->addr));
 	asn_int64_to_INTEGER(&(asn->chunkSize), api->chunk_size);
 
 	asn_int64_to_INTEGER(&(asn->versionEvtcfg), api->versions.evtcfg);
 	asn_int64_to_INTEGER(&(asn->versionSrvcfg), api->versions.srvcfg);
 	asn_int64_to_INTEGER(&(asn->versionNscfg), api->versions.nscfg);
+	/* marshall this namespace info part only for recent comm */
+	if (vers >= 17) {
+		TRACE("vers >= 17");
+		if (NULL != api->storage_policy) {
+			asn->storagePolicy =
+				g_malloc0(sizeof(struct NamespaceInfoValueList));
+			if (!hashtable_conversion(api->storage_policy, asn->storagePolicy,
+					key_value_pairs_convert_from_map))
+				return FALSE;
+		}
 
-	if ( NULL != api->storage_policy) {
-		asn->storagePolicy = g_malloc0(sizeof(struct NamespaceInfoValueList));
-		if(!hashtable_conversion(api->storage_policy, asn->storagePolicy, key_value_pairs_convert_from_map))
-			return FALSE;
+		if (NULL != api->data_security) {
+			asn->dataSecurity =
+				g_malloc0(sizeof(struct NamespaceInfoValueList));
+			if (!hashtable_conversion(api->data_security, asn->dataSecurity,
+					key_value_pairs_convert_from_map))
+				return FALSE;
+		}
+
+		if (NULL != api->data_treatments) {
+			asn->dataTreatments =
+				g_malloc0(sizeof(struct NamespaceInfoValueList));
+			if (!hashtable_conversion(api->data_treatments, asn->dataTreatments,
+					key_value_pairs_convert_from_map))
+				return FALSE;
+		}
+
+		if (vers >= 18) {
+			if (NULL != api->storage_class) {
+				asn->storageClass =
+					g_malloc0(sizeof(struct NamespaceInfoValueList));
+				if (!hashtable_conversion(api->storage_class, asn->storageClass,
+						key_value_pairs_convert_from_map))
+					return FALSE;
+			}
+		}
 	}
-
-
-	if ( NULL != api->data_security ) {
-		asn->dataSecurity = g_malloc0(sizeof(struct NamespaceInfoValueList));
-		if(!hashtable_conversion(api->data_security, asn->dataSecurity, key_value_pairs_convert_from_map))
-			return FALSE;
-	}
-
-	if ( NULL != api->data_treatments ) {
-		asn->dataTreatments = g_malloc0(sizeof(struct NamespaceInfoValueList));
-		if(!hashtable_conversion(api->data_treatments, asn->dataTreatments, key_value_pairs_convert_from_map))
-			return FALSE;
+	else {
+		TRACE("vers %" G_GINT64_FORMAT " < 17", vers);
 	}
 
 	errno = 0;
@@ -215,7 +230,8 @@ namespace_info_API2ASN(const namespace_info_t * api, NamespaceInfo_t * asn)
 void
 namespace_info_cleanASN(NamespaceInfo_t * asn, gboolean only_content)
 {
-	void parameter_cleanASN(Parameter_t * asn_param) {
+	void parameter_cleanASN(Parameter_t * asn_param)
+	{
 		key_value_pair_cleanASN(asn_param, FALSE);
 	}
 
@@ -225,12 +241,14 @@ namespace_info_cleanASN(NamespaceInfo_t * asn, gboolean only_content)
 	}
 
 	asn->options.list.free = parameter_cleanASN;
-	if( NULL != asn->storagePolicy) 
+	if (NULL != asn->storagePolicy)
 		asn->storagePolicy->list.free = parameter_cleanASN;
-	if( NULL != asn->dataSecurity) 
+	if (NULL != asn->dataSecurity)
 		asn->dataSecurity->list.free = parameter_cleanASN;
-	if( NULL != asn->dataTreatments) 
+	if (NULL != asn->dataTreatments)
 		asn->dataTreatments->list.free = parameter_cleanASN;
+	if (NULL != asn->storageClass)
+		asn->storageClass->list.free = parameter_cleanASN;
 
 	if (only_content)
 		ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NamespaceInfo, asn);
@@ -239,4 +257,3 @@ namespace_info_cleanASN(NamespaceInfo_t * asn, gboolean only_content)
 
 	errno = 0;
 }
-

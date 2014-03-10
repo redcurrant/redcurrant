@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * - Read service list from local agent (GridCluster Api:list_local_services)
  * - Launch a RAWX checker thread for each RAWX service
@@ -22,15 +5,15 @@
  * - Launch a META2 checker thread for each META2 service 
  */
 
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "integrity.main"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "integrity.main"
 #endif
 
 #include <stdlib.h>
 #include <string.h>
 
-#include <metautils.h>
-#include <gridcluster.h>
+#include <metautils/lib/metautils.h>
+#include <cluster/lib/gridcluster.h>
 
 #include "./event_puller.h"
 
@@ -49,8 +32,8 @@ GAsyncQueue *broken_events_queue;
 int
 main(int argc, char **argv)
 {
-	GError* error = NULL;
-	struct integrity_loop_config_s* config = NULL;
+	GError *error = NULL;
+	struct integrity_loop_config_s *config = NULL;
 	struct scan_worker_s worker;
 
 	(void) argc;
@@ -87,10 +70,10 @@ main(int argc, char **argv)
 		g_clear_error(&error);
 		return -1;
 	}
-	
+
 	/* Init meta2_repair_event filter */
 	if (!init_meta2_repair_event_filter(&error)) {
-		ERROR("Failed to init meta2_repair_event filter : %s", error->message);	
+		ERROR("Failed to init meta2_repair_event filter : %s", error->message);
 		g_clear_error(&error);
 		return -1;
 	}
@@ -105,19 +88,23 @@ main(int argc, char **argv)
 
 	/* Init scanner thread pool */
 	init_scanning_thread();
-	
+
 	/* Register chunk_crawler in scanner thread pool */
 	worker.scanning_info_filler = fill_scanning_info_for_chunk_crawler;
-	if (!register_scanning_callback(NAME_SRVTYPE_RAWX, g_memdup(&worker, sizeof(struct scan_worker_s)), &error)) {
-		ERROR("Failed to register chunk_crawler in scanner : %s", error->message);
+	if (!register_scanning_callback(NAME_SRVTYPE_RAWX, g_memdup(&worker,
+				sizeof(struct scan_worker_s)), &error)) {
+		ERROR("Failed to register chunk_crawler in scanner : %s",
+			error->message);
 		g_clear_error(&error);
 		return -1;
 	}
 
 	/* Register chunk_checker in scanner thread pool */
 	worker.scanning_info_filler = fill_scanning_info_for_chunk_checker;
-	if (!register_scanning_callback(NAME_SRVTYPE_RAWX, g_memdup(&worker, sizeof(struct scan_worker_s)), &error)) {
-		ERROR("Failed to register chunk_checker in scanner : %s", error->message);
+	if (!register_scanning_callback(NAME_SRVTYPE_RAWX, g_memdup(&worker,
+				sizeof(struct scan_worker_s)), &error)) {
+		ERROR("Failed to register chunk_checker in scanner : %s",
+			error->message);
 		g_clear_error(&error);
 		return -1;
 	}
@@ -137,7 +124,7 @@ main(int argc, char **argv)
 	}
 
 	/* loop */
-	while(1) {
+	while (1) {
 		sleep(1);
 	}
 

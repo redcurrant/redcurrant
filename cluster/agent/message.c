@@ -1,38 +1,20 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gridcluster.agent.message"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gridcluster.agent.message"
 #endif
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 
-#include "agent.h"
-#include "message.h"
+#include "./agent.h"
+#include "./message.h"
+#include "./write_message_worker.h"
 
-void 
-request_clean(request_t *request)
+
+void
+request_clean(request_t * request)
 {
 	if (!request)
 		return;
@@ -40,12 +22,12 @@ request_clean(request_t *request)
 		g_free(request->cmd);
 	if (request->arg)
 		g_free(request->arg);
-	memset(request, 0, sizeof(request));
+	memset(request, 0, sizeof(request_t));
 	g_free(request);
 }
 
 void
-request_cleanup(worker_t *worker)
+request_cleanup(worker_t * worker)
 {
 	if (worker) {
 
@@ -63,19 +45,19 @@ request_cleanup(worker_t *worker)
 	}
 }
 
-void 
-message_clean(message_t *msg)
+void
+message_clean(message_t * msg)
 {
 	if (!msg)
 		return;
 	if (msg->data)
 		g_free(msg->data);
-	memset(msg, 0, sizeof(msg));
+	memset(msg, 0, sizeof(message_t));
 	g_free(msg);
 }
 
 void
-message_cleanup(worker_t *worker)
+message_cleanup(worker_t * worker)
 {
 	if (worker) {
 
@@ -94,7 +76,7 @@ message_cleanup(worker_t *worker)
 }
 
 int
-read_request_from_message(message_t *message, request_t *req, GError **error)
+read_request_from_message(message_t * message, request_t * req, GError ** error)
 {
 	char *data, *space;
 	guint32 length;
@@ -102,19 +84,19 @@ read_request_from_message(message_t *message, request_t *req, GError **error)
 	TRACE_POSITION();
 
 	if (message == NULL) {
-		GSETERROR(error,"Argument message can't be NULL");
-		return(0);
+		GSETERROR(error, "Argument message can't be NULL");
+		return (0);
 	}
 
 	if (req == NULL) {
 		GSETERROR(error, "Argument req can't be NULL");
-		return(0);
+		return (0);
 	}
 
-        if (!message->length) {
-                GSETERROR(error, "Can't parse empty message");
-                return(0);
-        }
+	if (!message->length) {
+		GSETERROR(error, "Can't parse empty message");
+		return (0);
+	}
 
 	length = message->length;
 	data = message->data;
@@ -124,12 +106,13 @@ read_request_from_message(message_t *message, request_t *req, GError **error)
 	if (space) {
 		int i_length = length;
 		char *post_space = space + 1;
+
 		req->cmd = g_strndup(data, space - data);
 		if ((post_space - data) < i_length) {
 			req->arg_size = i_length - (post_space - data);
 			req->arg = g_malloc0(req->arg_size + 1);
 			g_memmove(req->arg, post_space, req->arg_size);
-			req->arg[ req->arg_size ] = '\0';
+			req->arg[req->arg_size] = '\0';
 		}
 		else {
 			req->arg = NULL;
@@ -140,14 +123,15 @@ read_request_from_message(message_t *message, request_t *req, GError **error)
 		req->cmd = g_strndup(data, length);
 		req->arg_size = 0;
 		req->arg = NULL;
-        }
+	}
 
-        DEBUG("Parsed message : cmd[%s] arg[%.*s]", req->cmd, MIN(req->arg_size,32), req->arg);
-        return(1);
+	DEBUG("Parsed message : cmd[%s] arg[%.*s]", req->cmd, MIN(req->arg_size,
+			32), req->arg);
+	return (1);
 }
 
 static message_t *
-build_message_from_response(response_t *response)
+build_message_from_response(response_t * response)
 {
 	message_t *message;
 
@@ -156,15 +140,14 @@ build_message_from_response(response_t *response)
 	message->data = g_malloc0(message->length);
 
 	memcpy(message->data, &(response->status), sizeof(response->status));
-	memcpy(message->data+sizeof(response->status), response->data, response->data_size);
+	memcpy(message->data + sizeof(response->status), response->data,
+		response->data_size);
 
 	return message;
 }
 
-#include "write_message_worker.h"
-
 int
-__respond (worker_t *worker, int ok, GByteArray *content, GError **error)
+__respond(worker_t * worker, int ok, GByteArray * content, GError ** error)
 {
 	response_t response;
 	message_t *message;
@@ -173,10 +156,11 @@ __respond (worker_t *worker, int ok, GByteArray *content, GError **error)
 
 	/* init the response */
 	response.status = ok ? STATUS_OK : STATUS_ERROR;
-	if (content && content->data && content->len>0) {
+	if (content && content->data && content->len > 0) {
 		response.data = content->data;
 		response.data_size = content->len;
-	} else {
+	}
+	else {
 		response.data = 0;
 		response.data_size = 0;
 	}
@@ -193,22 +177,25 @@ __respond (worker_t *worker, int ok, GByteArray *content, GError **error)
 }
 
 
-int __respond_message (worker_t *worker, int ok, const char *msg, GError **error)
+int
+__respond_message(worker_t * worker, int ok, const char *msg, GError ** error)
 {
 	GByteArray *gba = g_byte_array_new();
+
 	if (msg)
-		g_byte_array_append( gba, (const guint8*)msg, strlen(msg));
+		g_byte_array_append(gba, (const guint8 *) msg, strlen(msg));
 	else
-		g_byte_array_append( gba, (guint8*)"no message", strlen("no message"));
-	return __respond(worker,ok,gba,error);
+		g_byte_array_append(gba, (guint8 *) "no message", strlen("no message"));
+	return __respond(worker, ok, gba, error);
 }
 
 
-int __respond_error(worker_t *worker, GError *e, GError **error)
+int
+__respond_error(worker_t * worker, GError * e, GError ** error)
 {
 	int rc;
-	rc = __respond_message(worker, 0, e?e->message:"unknown error", error);
+
+	rc = __respond_message(worker, 0, e ? e->message : "unknown error", error);
 	g_error_free(e);
 	return rc;
 }
-

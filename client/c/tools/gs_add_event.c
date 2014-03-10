@@ -1,23 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "grid.tools.event.set"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "grid.tools.event.set"
 #endif
 
 #include <assert.h>
@@ -28,16 +10,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <search.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
-#include <metautils.h>
+#include <meta2/remote/meta2_services_remote.h>
 
 #include "../lib/grid_client.h"
-#include "./gs_tools.h"
 #include "../lib/gs_internals.h"
+#include "./gs_tools.h"
+
 char *optarg;
 int optind, opterr, optopt;
 
@@ -73,39 +56,37 @@ parse_opt(int argc, char **args)
 	while ((opt = getopt(argc, args, "hqvm:d:")) != -1) {
 		switch (opt) {
 
-		case 'h':
-			flag_help = ~0;
-			break;
+			case 'h':
+				flag_help = ~0;
+				break;
 
-		case 'v':
-			flag_verbose++;
-			break;
+			case 'v':
+				flag_verbose++;
+				break;
 
-		case 'q':
-			flag_quiet = ~0;
-			break;
+			case 'q':
+				flag_quiet = ~0;
+				break;
 
-		case 'm':
-			/*meta0 url */
-			IGNORE_ARG('m');
-			if (meta0_url)
-				free(meta0_url);
-			meta0_url = strdup(optarg);
-			break;
+			case 'm':
+				/*meta0 url */
+				IGNORE_ARG('m');
+				if (meta0_url)
+					free(meta0_url);
+				meta0_url = strdup(optarg);
+				break;
 
-		case 'd':
-			/*container info */
-			IGNORE_ARG('d');
-			if (container_name)
-				free(container_name);
-			container_name = strdup(optarg);
-			break;
+			case 'd':
+				/*container info */
+				IGNORE_ARG('d');
+				if (container_name)
+					free(container_name);
+				container_name = strdup(optarg);
+				break;
 
-		case '?':
-		default:
-			/* PRINT_ERROR("unexpected %c (%s)\n", optopt, strerror(opterr));
-			return 0; */
-			break;
+			case '?':
+			default:
+				break;
 		}
 	}
 
@@ -125,7 +106,7 @@ add_event(gs_grid_storage_t * gs, const char *cName, const char *msg)
 	container_id_t cid;
 	struct metacnx_ctx_s cnx;
 	gchar *hexid = NULL;
-	gchar * meta2_url = NULL;
+	gchar *meta2_url = NULL;
 	GError *gerr = NULL;
 
 	metacnx_clear(&cnx);
@@ -139,7 +120,8 @@ add_event(gs_grid_storage_t * gs, const char *cName, const char *msg)
 		PRINT_ERROR("cannot find %s\n", cName);
 		goto exit_label;
 	}
-	if (!location->m0_url || !location->m1_url || !location->m2_url || !location->m2_url[0]) {
+	if (!location->m0_url || !location->m1_url || !location->m2_url
+		|| !location->m2_url[0]) {
 		PRINT_ERROR("cannot find %s\n", cName);
 		goto exit_label;
 	}
@@ -153,10 +135,11 @@ add_event(gs_grid_storage_t * gs, const char *cName, const char *msg)
 
 	if (!metacnx_init_with_url(&cnx, meta2_url, &gerr)) {
 		GSERRORCAUSE(gserr, gerr, "Invalid META2 address");
-		goto exit_label; 
+		goto exit_label;
 	}
 
 	container_event_t event;
+
 	bzero(&event, sizeof(event));
 	event.timestamp = time(0);
 	g_strlcpy(event.type, "test", sizeof(event.type));
@@ -180,7 +163,7 @@ add_event(gs_grid_storage_t * gs, const char *cName, const char *msg)
 exit_label:
 	return rc;
 }
-	
+
 int
 main(int argc, char **args)
 {
@@ -204,17 +187,19 @@ main(int argc, char **args)
 	if (!meta0_url || !container_name) {
 		meta0_url = strtok(args[1], "/");
 		container_name = strtok(NULL, "/");
-		event_message = args[2];		
+		event_message = args[2];
 
 		if (!meta0_url || !container_name) {
-                	PRINT_ERROR("Missing argument, please check help (-h) for more informations\n");
-                	return 1;
-        	}
+			PRINT_ERROR
+				("Missing argument, please check help (-h) for more informations\n");
+			return 1;
+		}
 	}
 
 	if (!event_message) {
-		PRINT_ERROR("Missing argument, please check help (-h) for more informations\n");
-                return 1;
+		PRINT_ERROR
+			("Missing argument, please check help (-h) for more informations\n");
+		return 1;
 	}
 
 	gs = gs_grid_storage_init(meta0_url, &err);
@@ -225,4 +210,3 @@ main(int argc, char **args)
 
 	return rc;
 }
-

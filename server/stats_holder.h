@@ -1,26 +1,9 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file stats_holder.h
  */
 
 #ifndef GRID__STATS_HOLDER__H
-# define GRID__STATS_HOLDER__H 1
+#define GRID__STATS_HOLDER__H 1
 
 /**
  * @defgroup server_stats Statistics support
@@ -31,7 +14,7 @@
  * @{
  */
 
-# include <glib.h>
+#include <glib/gtypes.h>
 
 /* Our hidden types */
 struct grid_stats_holder_s;
@@ -41,7 +24,7 @@ struct grid_single_rrd_s;
 /**
  * @return
  */
-struct grid_stats_holder_s * grid_stats_holder_init(void);
+struct grid_stats_holder_s *grid_stats_holder_init(void);
 
 /**
  * @param gsh
@@ -86,7 +69,7 @@ void grid_stats_holder_zero(struct grid_stats_holder_s *gsh);
  * @param inc
  */
 void grid_stats_holder_increment_merge(struct grid_stats_holder_s *base,
-		struct grid_stats_holder_s *inc);
+	struct grid_stats_holder_s *inc);
 
 /**
  * Internal lock acquired on gsh
@@ -96,8 +79,8 @@ void grid_stats_holder_increment_merge(struct grid_stats_holder_s *base,
  * @param output
  */
 void grid_stats_holder_foreach(struct grid_stats_holder_s *gsh,
-		const gchar *pattern,
-		gboolean (*output)(const gchar *name, guint64 value));
+	const gchar * pattern,
+	gboolean(*output) (const gchar * name, guint64 value));
 
 /* ------------------------------------------------------------------------- */
 
@@ -105,7 +88,7 @@ void grid_stats_holder_foreach(struct grid_stats_holder_s *gsh,
  * @param period
  * @return
  */
-struct grid_single_rrd_s* grid_single_rrd_create(time_t period);
+struct grid_single_rrd_s *grid_single_rrd_create(time_t period);
 
 /*!
  * @param gsr
@@ -129,8 +112,7 @@ guint64 grid_single_rrd_get(struct grid_single_rrd_s *gsr);
  * @param period
  * @return
  */
-guint64 grid_single_rrd_get_delta(struct grid_single_rrd_s *gsr,
-		time_t period);
+guint64 grid_single_rrd_get_delta(struct grid_single_rrd_s *gsr, time_t period);
 
 /*!
  * Lock internally acquired on 'gsh'

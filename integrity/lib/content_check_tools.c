@@ -1,22 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "integrity.lib.content_check_tools"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "integrity.lib.content_check_tools"
 #endif
 
 #include <stdlib.h>
@@ -33,25 +16,22 @@
 #include <sys/queue.h>
 #include <sys/socket.h>
 
-#include <glib.h>
+#include <neon/ne_basic.h>
+#include <neon/ne_request.h>
+#include <neon/ne_session.h>
+
 #include <event.h>
 #include <evdns.h>
 #include <evhttp.h>
 #include <evutil.h>
 
-#include <metautils.h>
-#include <metacomm.h>
-#include <metatypes.h>
-#include <loggers.h>
-#include <gridcluster.h>
-#include <meta2_remote.h>
-#include <storage_policy.h>
-
-#include <neon/ne_basic.h>
-#include <neon/ne_request.h>
-#include <neon/ne_session.h>
-
+// TODO FIXME replace the MD5 computation by the GLib way
 #include <openssl/md5.h>
+
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
+#include <cluster/lib/gridcluster.h>
+#include <meta2/remote/meta2_remote.h>
 
 #include "./content_check.h"
 
@@ -62,6 +42,7 @@ struct chunk_transfer_s *
 chunk_transfer_new(void)
 {
 	struct chunk_transfer_s *ct = NULL;
+
 	ct = g_malloc0(sizeof(struct chunk_transfer_s));
 	ct->src_status = CNX_NONE;
 	ct->dst_status = CNX_NONE;
@@ -74,6 +55,7 @@ struct dup_chunk_info_s *
 dup_chunk_info_new(void)
 {
 	struct dup_chunk_info_s *dci = NULL;
+
 	dci = g_malloc0(sizeof(struct dup_chunk_info_s));
 	dci->chunks = NULL;
 	dci->used_loc = NULL;
@@ -83,9 +65,9 @@ dup_chunk_info_new(void)
 void
 dup_chunk_info_clear(struct dup_chunk_info_s *dup_chunk)
 {
-	if(!dup_chunk)
+	if (!dup_chunk)
 		return;
-	if(dup_chunk->used_loc) {
+	if (dup_chunk->used_loc) {
 		g_slist_foreach(dup_chunk->used_loc, g_free1, NULL);
 		g_slist_free(dup_chunk->used_loc);
 	}
@@ -93,48 +75,51 @@ dup_chunk_info_clear(struct dup_chunk_info_s *dup_chunk)
 }
 
 void
-dup_chunk_info_add_chunk(struct dup_chunk_info_s *dup_chunk, meta2_raw_chunk_t *chunk, gchar *location)
+dup_chunk_info_add_chunk(struct dup_chunk_info_s *dup_chunk,
+	meta2_raw_chunk_t * chunk, gchar * location)
 {
-	if(!dup_chunk || !chunk || !location)
+	if (!dup_chunk || !chunk || !location)
 		return;
 	dup_chunk->chunks = g_slist_prepend(dup_chunk->chunks, chunk);
 	dup_chunk->used_loc = g_slist_prepend(dup_chunk->used_loc, location);
 }
 
 guint
-dup_chunk_info_get_copy_count(struct dup_chunk_info_s *dup_chunk)
+dup_chunk_info_get_copy_count(struct dup_chunk_info_s * dup_chunk)
 {
-	if(!dup_chunk)
+	if (!dup_chunk)
 		return 0;
 	return g_slist_length(dup_chunk->chunks);
 }
 
-GSList*
-dup_chunk_info_get_used_locations(struct dup_chunk_info_s *dup_chunk)
+GSList *
+dup_chunk_info_get_used_locations(struct dup_chunk_info_s * dup_chunk)
 {
 	return dup_chunk->used_loc;
 }
 
-GSList*
-dup_chunk_info_get_chunks(struct dup_chunk_info_s *dup_chunk)
+GSList *
+dup_chunk_info_get_chunks(struct dup_chunk_info_s * dup_chunk)
 {
 	return dup_chunk->chunks;
 }
 
 void
-chunk_transfer_set_source_uri(struct chunk_transfer_s *ct, gchar *source)
+chunk_transfer_set_source_uri(struct chunk_transfer_s *ct, gchar * source)
 {
 	ct->source_path = source;
 }
 
 void
-chunk_transfer_set_source_chunk_attrinfo(struct chunk_transfer_s *ct, chunk_attrinfo_t *src_info)
+chunk_transfer_set_source_chunk_attrinfo(struct chunk_transfer_s *ct,
+	chunk_attrinfo_t * src_info)
 {
 	ct->attrs = src_info;
 }
 
 void
-chunk_transfer_set_source_chunk(struct chunk_transfer_s *ct, meta2_raw_chunk_t *src_chunk)
+chunk_transfer_set_source_chunk(struct chunk_transfer_s *ct,
+	meta2_raw_chunk_t * src_chunk)
 {
 	ct->source_chunk = src_chunk;
 }
@@ -146,13 +131,13 @@ chunk_transfer_get_content_size(struct chunk_transfer_s *ct)
 }
 
 guint32
-chunk_transfer_get_content_nb_chunks(struct chunk_transfer_s *ct)
+chunk_transfer_get_content_nb_chunks(struct chunk_transfer_s * ct)
 {
 	return (*(ct->attrs)).nb_chunks;
 }
 
-gchar*
-chunk_transfer_get_content_path(struct chunk_transfer_s *ct)
+gchar *
+chunk_transfer_get_content_path(struct chunk_transfer_s * ct)
 {
 	return ct->attrs->content_path;
 }
@@ -163,48 +148,53 @@ chunk_transfer_get_container_id(struct chunk_transfer_s *ct, container_id_t cid)
 	memcpy(cid, (*(ct->attrs)).cid, sizeof(container_id_t));
 }
 
-gchar*
+gchar *
 chunk_transfer_get_content_sys_metadata(struct chunk_transfer_s *ct)
 {
 	return ct->attrs->sys_metadata;
 }
 
-gchar*
-chunk_transfer_get_content_usr_metadata(struct chunk_transfer_s *ct)
+gchar *
+chunk_transfer_get_content_usr_metadata(struct chunk_transfer_s * ct)
 {
 	return ct->attrs->usr_metadata;
 }
 
 void
-chunk_transfer_set_target_rawx(struct chunk_transfer_s *ct, GSList *rawx)
+chunk_transfer_set_target_rawx(struct chunk_transfer_s *ct, GSList * rawx)
 {
 	ct->dst_rawx = rawx;
 }
 
 void
-chunk_transfer_init_base_conn(struct chunk_transfer_s *ct, const gchar *host, short port)
+chunk_transfer_init_base_conn(struct chunk_transfer_s *ct, const gchar * host,
+	short port)
 {
-	ct->src_cnx = evhttp_connection_base_new(ct->evt_base, ct->evt_dns, host, port);
+	ct->src_cnx =
+		evhttp_connection_base_new(ct->evt_base, ct->evt_dns, host, port);
 	evhttp_connection_set_retries(ct->src_cnx, 3);
-        evhttp_connection_set_timeout(ct->src_cnx, 60);
+	evhttp_connection_set_timeout(ct->src_cnx, 60);
 }
 
 void
-chunk_transfer_set_base_conn_close_cb(struct chunk_transfer_s *ct, void (*cb)(struct evhttp_connection *, void *), void *arg)
+chunk_transfer_set_base_conn_close_cb(struct chunk_transfer_s *ct,
+	void (*cb) (struct evhttp_connection *, void *), void *arg)
 {
 	evhttp_connection_set_closecb(ct->src_cnx, cb, arg);
 }
 
 void
-chunk_transfer_init_req(struct chunk_transfer_s *ct, void (*cb)(struct evhttp_request *, void *), void *arg)
+chunk_transfer_init_req(struct chunk_transfer_s *ct,
+	void (*cb) (struct evhttp_request *, void *), void *arg)
 {
 	ct->src_req = evhttp_request_new(cb, arg);
-        ct->src_req->major = 1;
-        ct->src_req->minor = 0;
+	ct->src_req->major = 1;
+	ct->src_req->minor = 0;
 }
 
 void
-chunk_transfer_set_req_chunked_cb(struct chunk_transfer_s *ct, void (*cb)(struct evhttp_request *, void *))
+chunk_transfer_set_req_chunked_cb(struct chunk_transfer_s *ct,
+	void (*cb) (struct evhttp_request *, void *))
 {
 	evhttp_request_set_chunked_cb(ct->src_req, cb);
 }
@@ -213,8 +203,10 @@ int
 chunk_transfer_make_request(struct chunk_transfer_s *ct)
 {
 	int rc;
-	rc = evhttp_make_request(ct->src_cnx, ct->src_req, EVHTTP_REQ_GET, ct->source_path);
-        if(rc == 0) {
+
+	rc = evhttp_make_request(ct->src_cnx, ct->src_req, EVHTTP_REQ_GET,
+		ct->source_path);
+	if (rc == 0) {
 		GRID_DEBUG("Input started");
 		ct->src_status = CNX_STARTED;
 	}
@@ -226,7 +218,8 @@ chunk_transfer_generate_chunks_path(struct chunk_transfer_s *ct)
 {
 	static guint64 i = 0;
 
-	struct {
+	struct
+	{
 		GTimeVal now;
 		gint64 seq;
 		pid_t pid;
@@ -247,7 +240,7 @@ chunk_transfer_generate_chunks_path(struct chunk_transfer_s *ct)
 	GSList *l;
 	GChecksum *h = g_checksum_new(G_CHECKSUM_SHA256);
 
-	for (l=ct->dst_rawx; l ;l=l->next) {
+	for (l = ct->dst_rawx; l; l = l->next) {
 
 		g_get_current_time(&(bulk.now));
 		bulk.p[0] = l;
@@ -259,26 +252,29 @@ chunk_transfer_generate_chunks_path(struct chunk_transfer_s *ct)
 		bulk.r[3] = rand();
 
 		g_checksum_reset(h);
-		g_checksum_update(h, (guchar*)&bulk, sizeof(bulk));
+		g_checksum_update(h, (guchar *) & bulk, sizeof(bulk));
 		buf_size = sizeof(buf);
 		g_checksum_get_digest(h, buf, &buf_size);
-		ct->dst_chunks = g_slist_prepend(ct->dst_chunks, g_memdup(buf, buf_size));
+		ct->dst_chunks =
+			g_slist_prepend(ct->dst_chunks, g_memdup(buf, buf_size));
 	}
 
 	g_checksum_free(h);
 }
 
-struct evbuffer*
+struct evbuffer *
 chunk_transfer_get_input_buffer(struct chunk_transfer_s *ct)
 {
 	return evhttp_request_get_input_buffer(ct->src_req);
 }
 
 void
-chunk_transfer_write_to_dst(struct chunk_transfer_s *ct, gchar *buf, size_t size)
+chunk_transfer_write_to_dst(struct chunk_transfer_s *ct, gchar * buf,
+	size_t size)
 {
 	GSList *l = NULL;
-	for(l = ct->dst_bevents; l && l->data; l = l->next) {
+
+	for (l = ct->dst_bevents; l && l->data; l = l->next) {
 		bufferevent_write(l->data, buf, size);
 		bufferevent_enable(l->data, EV_WRITE);
 	}
@@ -294,22 +290,24 @@ void
 chunk_transfer_flush_dst(struct chunk_transfer_s *ct)
 {
 	GSList *l = NULL;
-	for(l = ct->dst_bevents; l && l->data; l = l->next) {
+
+	for (l = ct->dst_bevents; l && l->data; l = l->next) {
 		bufferevent_flush(l->data, EV_WRITE, BEV_FINISHED);
-		bufferevent_disable(l->data, EV_WRITE|EV_READ);
-		bufferevent_enable(l->data, EV_WRITE|EV_READ);
+		bufferevent_disable(l->data, EV_WRITE | EV_READ);
+		bufferevent_enable(l->data, EV_WRITE | EV_READ);
 	}
 	GRID_DEBUG("Flush asked to output, enabling reading");
 }
 
 const char *
-chunk_transfer_find_req_header(struct chunk_transfer_s *ct, const gchar *header)
+chunk_transfer_find_req_header(struct chunk_transfer_s *ct,
+	const gchar * header)
 {
 	return evhttp_find_header(ct->src_req->input_headers, header);
 }
 
 guint
-chunk_transfer_get_target_rawx_count(struct chunk_transfer_s *ct)
+chunk_transfer_get_target_rawx_count(struct chunk_transfer_s * ct)
 {
 	return g_slist_length(ct->dst_rawx);
 }
@@ -321,26 +319,26 @@ chunk_transfer_get_dst_status(struct chunk_transfer_s *ct)
 }
 
 static gchar *
-_get_volume_from_rawx(service_info_t *rawx)
+_get_volume_from_rawx(service_info_t * rawx)
 {
-        struct service_tag_s * vol_tag = NULL;
-        gchar vol[1024];
+	struct service_tag_s *vol_tag = NULL;
+	gchar vol[1024];
 
-        bzero(vol, sizeof(vol));
+	bzero(vol, sizeof(vol));
 	vol_tag = service_info_get_tag(rawx->tags, NAME_TAGNAME_RAWX_VOL);
 
-	if(!vol_tag)
+	if (!vol_tag)
 		return NULL;
 	service_tag_get_value_string(vol_tag, vol, sizeof(vol), NULL);
 
-        if(strlen(vol) > 0)
-                return g_strdup(vol);
-	
+	if (strlen(vol) > 0)
+		return g_strdup(vol);
+
 	return NULL;
 }
 
-GSList*
-chunk_transfer_build_target_chunk_list(struct chunk_transfer_s *ct)
+GSList *
+chunk_transfer_build_target_chunk_list(struct chunk_transfer_s * ct)
 {
 	GSList *result = NULL;
 	GSList *rawx = ct->dst_rawx;
@@ -348,14 +346,16 @@ chunk_transfer_build_target_chunk_list(struct chunk_transfer_s *ct)
 	meta2_raw_chunk_t *chunk = NULL;
 	gchar *vol;
 
-	for (; rawx && path && rawx->data && path->data ; rawx = rawx->next,path = path->next) {
+	for (; rawx && path && rawx->data && path->data;
+		rawx = rawx->next, path = path->next) {
 		chunk = meta2_raw_chunk_dup(ct->source_chunk);
 
 		/* Modify the id (hash, address and volume */
 		memset(&(chunk->id), 0, sizeof(chunk->id));
-		memcpy(&(chunk->id.addr), &(((service_info_t*)rawx->data)->addr), sizeof(addr_info_t));
+		memcpy(&(chunk->id.addr), &(((service_info_t *) rawx->data)->addr),
+			sizeof(addr_info_t));
 		chunk->id.vol[0] = '/';
-		if ((vol = _get_volume_from_rawx((service_info_t*)rawx->data))) {
+		if ((vol = _get_volume_from_rawx((service_info_t *) rawx->data))) {
 			g_strlcpy(chunk->id.vol, vol, sizeof(chunk->id.vol));
 			g_free(vol);
 		}
@@ -366,47 +366,49 @@ chunk_transfer_build_target_chunk_list(struct chunk_transfer_s *ct)
 	return result;
 }
 
-static void chunk_attrinfo_clean(chunk_attrinfo_t *attrs)
+static void
+chunk_attrinfo_clean(chunk_attrinfo_t * attrs)
 {
-	if(!attrs)
+	if (!attrs)
 		return;
-	if(attrs->content_path)
+	if (attrs->content_path)
 		g_free(attrs->content_path);
-	if(attrs->sys_metadata)
+	if (attrs->sys_metadata)
 		g_free(attrs->sys_metadata);
-	if(attrs->usr_metadata)
+	if (attrs->usr_metadata)
 		g_free(attrs->usr_metadata);
 	g_free(attrs);
 }
 
-void chunk_transfer_clear(struct chunk_transfer_s *ct)
+void
+chunk_transfer_clear(struct chunk_transfer_s *ct)
 {
 	/* dst rawx will be cleared by the caller */
-	if(!ct)
+	if (!ct)
 		return;
-	if(ct->source_path)
+	if (ct->source_path)
 		g_free(ct->source_path);
-	if(ct->dst_chunks) {
+	if (ct->dst_chunks) {
 		g_slist_foreach(ct->dst_chunks, g_free1, NULL);
 		g_slist_free(ct->dst_chunks);
 	}
-	if(ct->attrs)
+	if (ct->attrs)
 		chunk_attrinfo_clean(ct->attrs);
-	if(ct->source_chunk)
+	if (ct->source_chunk)
 		meta2_raw_chunk_clean(ct->source_chunk);
-        if (ct->src_status == CNX_NONE)
-                evhttp_request_free(ct->src_req);
+	if (ct->src_status == CNX_NONE)
+		evhttp_request_free(ct->src_req);
 
-	if(ct->src_cnx)
+	if (ct->src_cnx)
 		evhttp_connection_free(ct->src_cnx);
-	if(ct->evt_dns)
+	if (ct->evt_dns)
 		evdns_base_free(ct->evt_dns, 1);
-	if(ct->evt_base)
+	if (ct->evt_base)
 		event_base_free(ct->evt_base);
-	if(ct->dst_bevents)
+	if (ct->dst_bevents)
 		g_slist_free(ct->dst_bevents);
 	g_free(ct);
-	
+
 }
 
 /*************************************************/
@@ -414,23 +416,25 @@ void chunk_transfer_clear(struct chunk_transfer_s *ct)
 void
 srv_info_debug_display(gpointer data, gpointer udata)
 {
-	gchar *level = (gchar*) udata;
+	gchar *level = (gchar *) udata;
 	gchar *tmp = NULL;
-	tmp = service_info_to_string((service_info_t*)data);
-	if(level && g_ascii_strcasecmp(level, "INFO"))
-		GRID_INFO("Available service : %s",tmp);
+
+	tmp = service_info_to_string((service_info_t *) data);
+	if (level && g_ascii_strcasecmp(level, "INFO"))
+		GRID_INFO("Available service : %s", tmp);
 	else
-		GRID_DEBUG("Available service : %s",tmp);
+		GRID_DEBUG("Available service : %s", tmp);
 	g_free(tmp);
 }
 
 void
 raw_chunk_debug_display(gpointer data, gpointer udata)
 {
-	gchar *level = (gchar*) udata;
+	gchar *level = (gchar *) udata;
 	gchar *tmp = NULL;
-	tmp = meta2_raw_chunk_to_string((meta2_raw_chunk_t*)data);
-	if(level && g_ascii_strcasecmp(level, "INFO"))
+
+	tmp = meta2_raw_chunk_to_string((meta2_raw_chunk_t *) data);
+	if (level && g_ascii_strcasecmp(level, "INFO"))
 		GRID_INFO("chunk : %s", tmp);
 	else
 		GRID_DEBUG("chunk : %s", tmp);
@@ -438,24 +442,27 @@ raw_chunk_debug_display(gpointer data, gpointer udata)
 }
 
 service_info_t *
-get_rawx_from_raw_chunk(meta2_raw_chunk_t *c, GSList *rawx)
+get_rawx_from_raw_chunk(meta2_raw_chunk_t * c, GSList * rawx)
 {
-        GSList *l = NULL;
-        for (l = rawx; l && l->data; l = l->next) {
-                if(!addr_info_equal(&((&(c->id))->addr), &((service_info_t *) l->data)->addr))
-                        continue;
-                GRID_DEBUG("Found rawx for an in place chunk :");
-                srv_info_debug_display(l->data, NULL);
-                return ((service_info_t *) l->data);
-        }
-        return NULL;
+	GSList *l = NULL;
+
+	for (l = rawx; l && l->data; l = l->next) {
+		if (!addr_info_equal(&((&(c->id))->addr),
+				&((service_info_t *) l->data)->addr))
+			continue;
+		GRID_DEBUG("Found rawx for an in place chunk :");
+		srv_info_debug_display(l->data, NULL);
+		return ((service_info_t *) l->data);
+	}
+	return NULL;
 }
 
-chunk_attrinfo_t*
-build_chunk_attrinfo_from_content(meta2_raw_content_t *content)
+chunk_attrinfo_t *
+build_chunk_attrinfo_from_content(meta2_raw_content_t * content)
 {
 	GRID_DEBUG("Building chunk_attrinfo");
-	chunk_attrinfo_t* result = NULL;
+	chunk_attrinfo_t *result = NULL;
+
 	result = g_malloc0(sizeof(chunk_attrinfo_t));
 	GRID_DEBUG("content_path => %s", content->path);
 	result->content_path = g_strndup(content->path, strlen(content->path));
@@ -463,21 +470,27 @@ build_chunk_attrinfo_from_content(meta2_raw_content_t *content)
 	memcpy(result->cid, content->container_id, sizeof(container_id_t));
 	result->nb_chunks = content->nb_chunks;
 	result->content_size = content->size;
-	if(content->metadata && content->metadata->data && content->metadata->len > 0)
-		result->usr_metadata = g_strndup((gchar*)content->metadata->data, content->metadata->len);
-	if(content->system_metadata && content->system_metadata->data && content->system_metadata->len > 0)
-	result->sys_metadata = g_strndup((gchar*)content->system_metadata->data, content->system_metadata->len);
+	if (content->metadata && content->metadata->data
+		&& content->metadata->len > 0)
+		result->usr_metadata =
+			g_strndup((gchar *) content->metadata->data,
+			content->metadata->len);
+	if (content->system_metadata && content->system_metadata->data
+		&& content->system_metadata->len > 0)
+		result->sys_metadata =
+			g_strndup((gchar *) content->system_metadata->data,
+			content->system_metadata->len);
 	return result;
 }
 
 void
-content_check_ctx_clear(struct content_check_ctx_s *ctx) 
+content_check_ctx_clear(struct meta2_ctx_s *ctx)
 {
-	if(!ctx)
+	if (!ctx)
 		return;
-	if(ctx->ns)
+	if (ctx->ns)
 		g_free(ctx->ns);
-	if(ctx->content)
+	if (ctx->content)
 		meta2_raw_content_clean(ctx->content);
 
 	if (ctx->loc)
@@ -486,11 +499,11 @@ content_check_ctx_clear(struct content_check_ctx_s *ctx)
 		metacnx_close(ctx->m2_cnx);
 		metacnx_destroy(ctx->m2_cnx);
 	}
-	
-	if(ctx->hc) {
+
+	if (ctx->hc) {
 		gs_grid_storage_free(ctx->hc);
 	}
-	if(ctx->sp) {
+	if (ctx->sp) {
 		storage_policy_clean(ctx->sp);
 	}
 
@@ -498,34 +511,38 @@ content_check_ctx_clear(struct content_check_ctx_s *ctx)
 }
 
 static gboolean
-_check_sysmd_and_comp_info(const struct storage_policy_s *sp, const char *sysmd, const char *comp_info) 
+_check_sysmd_and_comp_info(const struct storage_policy_s *sp, const char *sysmd,
+	const char *comp_info)
 {
-	if(!sysmd)
+	if (!sysmd)
 		return FALSE;
 
 	char *p = NULL;
 
 	/* search storage-policy in sys-metadata */
 	p = g_strrstr(sysmd, "storage-policy");
-	if(!p)
+	if (!p)
 		return FALSE;
 	p = strchr(p, '=');
 	p++;
 	uint s = strlen(storage_policy_get_name(sp));
-	if(strlen(p) < s || g_ascii_strncasecmp(storage_policy_get_name(sp), p, s)) {
+
+	if (strlen(p) < s || g_ascii_strncasecmp(storage_policy_get_name(sp), p, s)) {
 		return FALSE;
 	}
 
 	/* check comp_info match sp */
 	const struct data_treatments_s *dt = storage_policy_get_data_treatments(sp);
-	if(!comp_info) {
-		if(!dt || DT_NONE == data_treatments_get_type(dt)) {
+
+	if (!comp_info) {
+		if (!dt || DT_NONE == data_treatments_get_type(dt)) {
 			return TRUE;
 		}
 		return FALSE;
-	} else {
-		if(!dt || DT_NONE == data_treatments_get_type(dt)) {
-			if(g_str_has_prefix(comp_info, "compression=off")) {
+	}
+	else {
+		if (!dt || DT_NONE == data_treatments_get_type(dt)) {
+			if (g_str_has_prefix(comp_info, "compression=off")) {
 				return TRUE;
 			}
 			return FALSE;
@@ -534,37 +551,43 @@ _check_sysmd_and_comp_info(const struct storage_policy_s *sp, const char *sysmd,
 		p = strchr(p, '=');
 		p++;
 		s = strlen(data_treatments_get_param(dt, DT_KEY_ALGO));
-		if(strlen(p) < s || g_ascii_strncasecmp(p, data_treatments_get_param(dt, DT_KEY_ALGO), s)) {
+		if (strlen(p) < s
+			|| g_ascii_strncasecmp(p, data_treatments_get_param(dt,
+					DT_KEY_ALGO), s)) {
 			return FALSE;
 		}
 		p = g_strrstr(comp_info, "compression_algorithm=");
 		p = strchr(p, '=');
 		p++;
 		s = strlen(data_treatments_get_param(dt, DT_KEY_BLOCKSIZE));
-		if(strlen(p) < s || g_ascii_strncasecmp(p, data_treatments_get_param(dt, DT_KEY_BLOCKSIZE), s)) {
+		if (strlen(p) < s
+			|| g_ascii_strncasecmp(p, data_treatments_get_param(dt,
+					DT_KEY_BLOCKSIZE), s)) {
 			return FALSE;
 		}
 		return TRUE;
 	}
 }
 
-GError*
-download_and_check_chunk(const meta2_raw_chunk_t *rc, struct storage_policy_s *sp)
+GError *
+download_and_check_chunk(const meta2_raw_chunk_t * rc,
+	struct storage_policy_s * sp)
 {
 	GError *result = NULL;
-	ne_session *session=NULL;
-	ne_request *request=NULL;
-	ne_request *request_update=NULL;
+	ne_session *session = NULL;
+	ne_request *request = NULL;
+	ne_request *request_update = NULL;
 	char chunk_hash_str[128];
 	char *update_uri = NULL;
 	int ne_rc;
 
 	MD5_CTX md5_ctx;
 
-	int data_handler (void *uData, const char *b, const size_t bSize) {
+	int data_handler(void *uData, const char *b, const size_t bSize)
+	{
 
 		(void) uData;
-		if (bSize==0)
+		if (bSize == 0)
 			return 0;
 
 		MD5_Update(&md5_ctx, b, bSize);
@@ -573,15 +596,15 @@ download_and_check_chunk(const meta2_raw_chunk_t *rc, struct storage_policy_s *s
 	}
 
 	gchar dst[128];
-	gsize dst_ip_size = sizeof(dst);
 	guint16 port = 0;
 
-	addr_info_get_addr(&(rc->id.addr), dst, dst_ip_size, &port, &result);
+	addr_info_get_addr(&(rc->id.addr), dst, sizeof(dst), &port);
 
 	session = ne_session_create("http", dst, port);
 
 	if (!session) {
-		g_set_error(&result, gquark_log, 500, "Cannot open a new WebDAV session");
+		g_set_error(&result, gquark_log, 500,
+			"Cannot open a new WebDAV session");
 		goto error_label;
 	}
 
@@ -590,11 +613,13 @@ download_and_check_chunk(const meta2_raw_chunk_t *rc, struct storage_policy_s *s
 
 	bzero(chunk_hash_str, sizeof(chunk_hash_str));
 	chunk_hash_str[0] = '/';
-	buffer2str(rc->id.id, sizeof(rc->id.id), chunk_hash_str + 1, sizeof(chunk_hash_str) - 2);
+	buffer2str(rc->id.id, sizeof(rc->id.id), chunk_hash_str + 1,
+		sizeof(chunk_hash_str) - 2);
 
-	request = ne_request_create (session, "GET", chunk_hash_str);
+	request = ne_request_create(session, "GET", chunk_hash_str);
 	if (!request) {
-		g_set_error(&result, gquark_log, 500, "WebDAV request creation error (%s)", ne_get_error(session));
+		g_set_error(&result, gquark_log, 500,
+			"WebDAV request creation error (%s)", ne_get_error(session));
 		goto error_label;
 	}
 
@@ -607,8 +632,10 @@ download_and_check_chunk(const meta2_raw_chunk_t *rc, struct storage_policy_s *s
 		case NE_OK:
 			GRID_DEBUG("Chunk check request correctly send to the rawx");
 			if (ne_get_status(request)->klass != 2) {
-				g_set_error(&result, gquark_log, 1000 + ne_get_status(request)->code, 
-					"Cannot download '%s' (%s)", chunk_hash_str, ne_get_error(session));
+				g_set_error(&result, gquark_log,
+					1000 + ne_get_status(request)->code,
+					"Cannot download '%s' (%s)", chunk_hash_str,
+					ne_get_error(session));
 				GRID_DEBUG("Error while downloading chunk");
 				goto error_label;
 			}
@@ -616,18 +643,23 @@ download_and_check_chunk(const meta2_raw_chunk_t *rc, struct storage_policy_s *s
 
 			bzero(md5, sizeof(md5));
 			MD5_Final(md5, &md5_ctx);
-			char hash_str[MD5_DIGEST_LENGTH*2+1];
-			char md5_str[MD5_DIGEST_LENGTH*2+1];
+			char hash_str[MD5_DIGEST_LENGTH * 2 + 1];
+			char md5_str[MD5_DIGEST_LENGTH * 2 + 1];
+
 			bzero(hash_str, sizeof(hash_str));
 			bzero(md5_str, sizeof(md5_str));
 			buffer2str(rc->hash, sizeof(rc->hash), hash_str, sizeof(hash_str));
 			buffer2str(md5, sizeof(md5), md5_str, sizeof(md5_str));
 
-			GRID_DEBUG("md5 calculated for downloaded chunk = %s, get from meta2 = %s", md5_str, hash_str);
+			GRID_DEBUG
+				("md5 calculated for downloaded chunk = %s, get from meta2 = %s",
+				md5_str, hash_str);
 
 			if (memcmp(rc->hash, md5, MD5_DIGEST_LENGTH) != 0) {
-				g_set_error(&result, gquark_log, CODE_CONTENT_CORRUPTED, "Chunk downloaded [%s] was corrupted"
-						" (md5 does not match meta2) : %s/%s", chunk_hash_str, hash_str, md5_str);
+				g_set_error(&result, gquark_log, CODE_CONTENT_CORRUPTED,
+					"Chunk downloaded [%s] was corrupted"
+					" (md5 does not match meta2) : %s/%s", chunk_hash_str,
+					hash_str, md5_str);
 				goto error_label;
 			}
 			break;
@@ -635,41 +667,45 @@ download_and_check_chunk(const meta2_raw_chunk_t *rc, struct storage_policy_s *s
 		case NE_ERROR:
 			GRID_DEBUG("Chunk check request error (NE_ERROR)");
 			g_set_error(&result, gquark_log, 500, "Caller error '%s' (%s)",
-					chunk_hash_str, ne_get_error(session));
+				chunk_hash_str, ne_get_error(session));
 			goto error_label;
 
 		case NE_TIMEOUT:
 			GRID_DEBUG("Chunk check request timeout (NE_TIMEOUT)");
-			g_set_error(&result, gquark_log, 10060, "Cannot download '%s' (%s) ",
-					chunk_hash_str, ne_get_error(session));
+			g_set_error(&result, gquark_log, 10060,
+				"Cannot download '%s' (%s) ", chunk_hash_str,
+				ne_get_error(session));
 			goto error_label;
 		case NE_CONNECT:
 			GRID_DEBUG("Chunk check request error (NE_CONNECT)");
 			g_set_error(&result, gquark_log, 10061, "Caller error '%s' (%s)",
-					chunk_hash_str, ne_get_error(session));
+				chunk_hash_str, ne_get_error(session));
 			goto error_label;
 		case NE_AUTH:
 			GRID_DEBUG("Chunk check request error (NE_CONNECT)");
 			g_set_error(&result, gquark_log, 500, "Caller error '%s' (%s)",
-					chunk_hash_str, ne_get_error(session));
+				chunk_hash_str, ne_get_error(session));
 			goto error_label;
 		default:
 			g_set_error(&result, gquark_log, 500, "Cannot download '%s' (%s) ",
-					chunk_hash_str, ne_get_error(session));
+				chunk_hash_str, ne_get_error(session));
 			goto error_label;
 	}
 	/* ensure chunk data treat */
 	const char *comp_info = ne_get_response_header(request, "metadatacompress");
 	const char *sysmd = ne_get_response_header(request, "content_metadata-sys");
-	if(!_check_sysmd_and_comp_info(sp, sysmd, comp_info)) {
+
+	if (sp && !_check_sysmd_and_comp_info(sp, sysmd, comp_info)) {
 		update_uri = g_strconcat(chunk_hash_str, "/update", NULL);
-		request_update = ne_request_create (session, "GET", update_uri);
+		request_update = ne_request_create(session, "GET", update_uri);
 		if (!request) {
-			g_set_error(&result, gquark_log, 500, "WebDAV request creation error (%s)", ne_get_error(session));
+			g_set_error(&result, gquark_log, 500,
+				"WebDAV request creation error (%s)", ne_get_error(session));
 			goto error_label;
 		}
 
-		ne_add_request_header(request_update, "storage-policy", storage_policy_get_name(sp));
+		ne_add_request_header(request_update, "storage-policy",
+			storage_policy_get_name(sp));
 		/* Now send the request */
 		switch (ne_rc = ne_request_dispatch(request_update)) {
 			case NE_OK:
@@ -687,33 +723,33 @@ error_label:
 		g_free(update_uri);
 
 	if (request_update)
-		ne_request_destroy (request_update);
+		ne_request_destroy(request_update);
 	if (request)
-		ne_request_destroy (request);
+		ne_request_destroy(request);
 	if (session)
-		ne_session_destroy (session);
+		ne_session_destroy(session);
 
 	return result;
 }
 
-GError*
-delete_chunk(const meta2_raw_chunk_t *rc)
+GError *
+delete_chunk(const meta2_raw_chunk_t * rc)
 {
 	GError *result = NULL;
-	ne_session *session=NULL;
-	ne_request *request=NULL;
+	ne_session *session = NULL;
+	ne_request *request = NULL;
 	char chunk_hash_str[128];
 
 	gchar dst[128];
-	gsize dst_ip_size = sizeof(dst);
 	guint16 port = 0;
 
-	addr_info_get_addr(&(rc->id.addr), dst, dst_ip_size, &port, &result);
+	addr_info_get_addr(&(rc->id.addr), dst, sizeof(dst), &port);
 
 	session = ne_session_create("http", dst, port);
 
 	if (!session) {
-		g_set_error(&result, gquark_log, 500, "Cannot open a new WebDAV session");
+		g_set_error(&result, gquark_log, 500,
+			"Cannot open a new WebDAV session");
 		goto error_label;
 	}
 
@@ -722,20 +758,23 @@ delete_chunk(const meta2_raw_chunk_t *rc)
 
 	bzero(chunk_hash_str, sizeof(chunk_hash_str));
 	chunk_hash_str[0] = '/';
-	buffer2str(rc->id.id, sizeof(rc->id.id), chunk_hash_str + 1, sizeof(chunk_hash_str) - 2);
+	buffer2str(rc->id.id, sizeof(rc->id.id), chunk_hash_str + 1,
+		sizeof(chunk_hash_str) - 2);
 
-	request = ne_request_create (session, "DELETE", chunk_hash_str);
+	request = ne_request_create(session, "DELETE", chunk_hash_str);
 	if (!request) {
-		g_set_error(&result, gquark_log, 500, "WebDAV request creation error (%s)", ne_get_error(session));
+		g_set_error(&result, gquark_log, 500,
+			"WebDAV request creation error (%s)", ne_get_error(session));
 		goto error_label;
 	}
 
-	switch (ne_request_dispatch (request))
-	{
+	switch (ne_request_dispatch(request)) {
 		case NE_OK:
 			if (ne_get_status(request)->klass != 2) {
-				g_set_error(&result, gquark_log, 1000 + ne_get_status(request)->code,
-						"cannot delete '%s' (%s)", chunk_hash_str, ne_get_error(session));
+				g_set_error(&result, gquark_log,
+					1000 + ne_get_status(request)->code,
+					"cannot delete '%s' (%s)", chunk_hash_str,
+					ne_get_error(session));
 				goto error_label;
 			}
 			break;
@@ -743,7 +782,9 @@ delete_chunk(const meta2_raw_chunk_t *rc)
 		case NE_CONNECT:
 		case NE_TIMEOUT:
 		case NE_ERROR:
-			g_set_error(&result, gquark_log, 500, "unexpected error from the WebDAV server (%s)", ne_get_error(session));
+			g_set_error(&result, gquark_log, 500,
+				"unexpected error from the WebDAV server (%s)",
+				ne_get_error(session));
 			goto error_label;
 	}
 
@@ -752,23 +793,23 @@ delete_chunk(const meta2_raw_chunk_t *rc)
 error_label:
 
 	if (request)
-		ne_request_destroy (request);
+		ne_request_destroy(request);
 	if (session)
-		ne_session_destroy (session);
+		ne_session_destroy(session);
 
 	return result;
 }
 
 gboolean
-is_rawx_reachable(const service_info_t *rawx)
+is_rawx_reachable(const service_info_t * rawx)
 {
-	ne_session *session=NULL;
-	ne_request *request=NULL;
+	ne_session *session = NULL;
+	ne_request *request = NULL;
 	int ne_rc;
 	gboolean result = FALSE;
-	GError *local_error = NULL;
 
-	int data_handler_no_op (void *uData, const char *b, const size_t bSize) {
+	int data_handler_no_op(void *uData, const char *b, const size_t bSize)
+	{
 
 		(void) uData;
 		(void) b;
@@ -778,13 +819,10 @@ is_rawx_reachable(const service_info_t *rawx)
 	}
 
 	gchar dst[128];
-	gsize dst_ip_size = sizeof(dst);
 	guint16 port = 0;
 
-	addr_info_get_addr(&(rawx->addr), dst, dst_ip_size, &port, &local_error);
-	if(local_error) {
+	if (!addr_info_get_addr(&(rawx->addr), dst, sizeof(dst), &port)) {
 		GRID_DEBUG("Failed to extract address info from rawx");
-		g_clear_error(&local_error);
 		goto end;
 	}
 
@@ -800,13 +838,11 @@ is_rawx_reachable(const service_info_t *rawx)
 	ne_set_connect_timeout(session, 10);
 	ne_set_read_timeout(session, 30);
 
-	request = ne_request_create (session, "GET", "PING");
+	request = ne_request_create(session, "GET", "PING");
 	if (!request) {
 		GRID_DEBUG("Failed to create neon request");
 		goto end;
 	}
-
-	/* ne_add_response_body_reader(request, ne_accept_2xx, data_handler_no_op, NULL); */
 
 	/* Now send the request */
 	switch (ne_rc = ne_request_dispatch(request)) {
@@ -834,9 +870,9 @@ is_rawx_reachable(const service_info_t *rawx)
 end:
 
 	if (request)
-		ne_request_destroy (request);
+		ne_request_destroy(request);
 	if (session)
-		ne_session_destroy (session);
+		ne_session_destroy(session);
 
 	return result;
 }

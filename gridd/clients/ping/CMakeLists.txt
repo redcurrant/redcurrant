@@ -1,6 +1,4 @@
-include_directories(BEFORE .
-		../../../metautils/lib
-		../../main)
+include_directories(BEFORE . ../.. ../../..)
 
 add_executable(gridc_ping action.c)
 target_link_libraries(gridc_ping metautils metacomm

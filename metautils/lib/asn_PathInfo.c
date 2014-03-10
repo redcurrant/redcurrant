@@ -1,26 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metacomm.path_info.asn"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metacomm.path_info.asn"
 #endif
 
 #include <errno.h>
@@ -40,7 +19,8 @@ path_info_ASN2API(const PathInfo_t * asn, path_info_t * api)
 		return FALSE;
 
 	memset(api->path, 0x00, LIMIT_LENGTH_CONTENTPATH);
-	memcpy(api->path, asn->path.buf, MIN(LIMIT_LENGTH_CONTENTPATH - 1, asn->path.size));
+	memcpy(api->path, asn->path.buf, MIN(LIMIT_LENGTH_CONTENTPATH - 1,
+			asn->path.size));
 	/*set the size */
 	api->size = 0;
 	if (asn->size) {
@@ -52,15 +32,20 @@ path_info_ASN2API(const PathInfo_t * asn, path_info_t * api)
 	}
 
 	/*set the user_metadata */
-	if (asn->userMetadata && asn->userMetadata->buf && asn->userMetadata->size > 0) {
+	if (asn->userMetadata && asn->userMetadata->buf
+		&& asn->userMetadata->size > 0) {
 		api->user_metadata = g_byte_array_sized_new(asn->userMetadata->size);
-		g_byte_array_append(api->user_metadata, asn->userMetadata->buf, asn->userMetadata->size);
+		g_byte_array_append(api->user_metadata, asn->userMetadata->buf,
+			asn->userMetadata->size);
 	}
 
 	/*set the system_metadata */
-	if (asn->systemMetadata && asn->systemMetadata->buf && asn->systemMetadata->size > 0) {
-		api->system_metadata = g_byte_array_sized_new(asn->systemMetadata->size);
-		g_byte_array_append(api->system_metadata, asn->systemMetadata->buf, asn->systemMetadata->size);
+	if (asn->systemMetadata && asn->systemMetadata->buf
+		&& asn->systemMetadata->size > 0) {
+		api->system_metadata =
+			g_byte_array_sized_new(asn->systemMetadata->size);
+		g_byte_array_append(api->system_metadata, asn->systemMetadata->buf,
+			asn->systemMetadata->size);
 	}
 
 	return TRUE;
@@ -90,15 +75,20 @@ path_info_API2ASN(const path_info_t * api, PathInfo_t * asn)
 	OCTET_STRING_fromBuf(&(asn->path), path_name, strlen(path_name));
 
 	/*setting the user_metadata */
-	if (api->user_metadata && api->user_metadata->data && api->user_metadata->len > 0) {
-		asn->userMetadata = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
-		    (const char*)api->user_metadata->data, api->user_metadata->len);
+	if (api->user_metadata && api->user_metadata->data
+		&& api->user_metadata->len > 0) {
+		asn->userMetadata =
+			OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
+			(const char *) api->user_metadata->data, api->user_metadata->len);
 	}
 
 	/*setting the system_metadata */
-	if (api->system_metadata && api->system_metadata->data && api->system_metadata->len > 0) {
-		asn->systemMetadata = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
-		    (const char*)api->system_metadata->data, api->system_metadata->len);
+	if (api->system_metadata && api->system_metadata->data
+		&& api->system_metadata->len > 0) {
+		asn->systemMetadata =
+			OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
+			(const char *) api->system_metadata->data,
+			api->system_metadata->len);
 	}
 
 	return TRUE;

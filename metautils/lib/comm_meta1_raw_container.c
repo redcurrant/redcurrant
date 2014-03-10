@@ -1,26 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metacomm.meta1_raw_container"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metacomm.meta1_raw_container"
 #endif
 
 #include <errno.h>
@@ -33,7 +12,8 @@
 static void
 free_asn1_container(Meta1RawContainer_t * asn1_container, gboolean content_only)
 {
-	void cleaner(AddrInfo_t *asn_addr) {
+	void cleaner(AddrInfo_t * asn_addr)
+	{
 		addr_info_cleanASN(asn_addr, FALSE);
 	}
 
@@ -45,7 +25,8 @@ free_asn1_container(Meta1RawContainer_t * asn1_container, gboolean content_only)
 	asn1_container->meta2.list.free = cleaner;
 
 	if (content_only)
-		ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_Meta1RawContainer, asn1_container);
+		ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_Meta1RawContainer,
+			asn1_container);
 	else
 		ASN_STRUCT_FREE(asn_DEF_Meta1RawContainer, asn1_container);
 
@@ -54,7 +35,8 @@ free_asn1_container(Meta1RawContainer_t * asn1_container, gboolean content_only)
 
 
 static gboolean
-container_asn1_to_api(Meta1RawContainer_t * src, struct meta1_raw_container_s *dst)
+container_asn1_to_api(Meta1RawContainer_t * src,
+	struct meta1_raw_container_s *dst)
 {
 	int i;
 
@@ -99,7 +81,8 @@ container_asn1_to_api(Meta1RawContainer_t * src, struct meta1_raw_container_s *d
 
 
 static gboolean
-container_api_to_asn1(struct meta1_raw_container_s *src, Meta1RawContainer_t * dst)
+container_api_to_asn1(struct meta1_raw_container_s *src,
+	Meta1RawContainer_t * dst)
 {
 	GSList *meta2;
 
@@ -110,8 +93,10 @@ container_api_to_asn1(struct meta1_raw_container_s *src, Meta1RawContainer_t * d
 
 	/* map simple fields */
 	OCTET_STRING_fromBuf(&(dst->id), (char *) src->id, sizeof(container_id_t));
-	OCTET_STRING_fromBuf(&(dst->name), src->name, sizeof(src->name));
-	OCTET_STRING_fromBuf(&(dst->flags), (char *) &(src->flags), sizeof(src->flags));
+	OCTET_STRING_fromBuf(&(dst->name), src->name, strnlen(src->name,
+			sizeof(src->name)));
+	OCTET_STRING_fromBuf(&(dst->flags), (char *) &(src->flags),
+		sizeof(src->flags));
 
 	/* map meta2 addr list */
 	for (meta2 = src->meta2; meta2; meta2 = meta2->next) {
@@ -153,7 +138,8 @@ write_in_gba(const void *b, gsize bSize, void *key)
 
 
 GByteArray *
-meta1_raw_container_marshall(struct meta1_raw_container_s * container, GError ** err)
+meta1_raw_container_marshall(struct meta1_raw_container_s * container,
+	GError ** err)
 {
 	asn_enc_rval_t encRet;
 	GByteArray *result = NULL;
@@ -178,7 +164,9 @@ meta1_raw_container_marshall(struct meta1_raw_container_s * container, GError **
 		GSETERROR(err, "memory allocation failure");
 		goto error_alloc_gba;
 	}
-	encRet = der_encode(&asn_DEF_Meta1RawContainer, &asn1_container, write_in_gba, result);
+	encRet =
+		der_encode(&asn_DEF_Meta1RawContainer, &asn1_container, write_in_gba,
+		result);
 	if (encRet.encoded == -1) {
 		GSETERROR(err, "ASN.1 encoding error");
 		goto error_encode;
@@ -188,12 +176,12 @@ meta1_raw_container_marshall(struct meta1_raw_container_s * container, GError **
 	free_asn1_container(&asn1_container, TRUE);
 	return result;
 
-      error_encode:
+error_encode:
 	g_byte_array_free(result, TRUE);
-      error_alloc_gba:
-      error_mapping:
+error_alloc_gba:
+error_mapping:
 	free_asn1_container(&asn1_container, TRUE);
-      error_params:
+error_params:
 	return NULL;
 }
 
@@ -216,16 +204,18 @@ meta1_raw_container_unmarshall(guint8 * buf, gsize buf_len, GError ** err)
 
 	/*deserialize the encoded form */
 	codecCtx.max_stack_size = 0;
-	decRet = ber_decode(&codecCtx, &asn_DEF_Meta1RawContainer, (void *) &asn1_container, buf, buf_len);
+	decRet =
+		ber_decode(&codecCtx, &asn_DEF_Meta1RawContainer,
+		(void *) &asn1_container, buf, buf_len);
 	switch (decRet.code) {
-	case RC_OK:
-		break;
-	case RC_FAIL:
-		GSETERROR(err, "Cannot deserialize: %s", "invalid container");
-		goto error_decode;
-	case RC_WMORE:
-		GSETERROR(err, "Cannot deserialize: %s", "uncomplete container");
-		goto error_decode;
+		case RC_OK:
+			break;
+		case RC_FAIL:
+			GSETERROR(err, "Cannot deserialize: %s", "invalid container");
+			goto error_decode;
+		case RC_WMORE:
+			GSETERROR(err, "Cannot deserialize: %s", "uncomplete container");
+			goto error_decode;
 	}
 
 	/*map the ASN.1 in a common structure */
@@ -238,10 +228,10 @@ meta1_raw_container_unmarshall(guint8 * buf, gsize buf_len, GError ** err)
 	free_asn1_container(asn1_container, FALSE);
 	return result;
 
-      error_mapping:
-      error_decode:
+error_mapping:
+error_decode:
 	free_asn1_container(asn1_container, FALSE);
-      error_container:
-      error_params:
+error_container:
+error_params:
 	return NULL;
 }

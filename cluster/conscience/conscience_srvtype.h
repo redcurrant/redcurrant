@@ -1,31 +1,13 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef __CONSCIENCE_SERVICE_TYPE_H__
-# define __CONSCIENCE_SERVICE_TYPE_H__
+#define __CONSCIENCE_SERVICE_TYPE_H__
 
 /**
  * @addtogroup gridcluster_backend
  * @{
  */
 
-# include <glib.h>
-# include <metautils.h>
-# include <conscience_srv.h>
+#include <metautils/lib/metautils.h>
+#include <cluster/conscience/conscience_srv.h>
 
 /**
  *
@@ -39,13 +21,13 @@ struct conscience_srvtype_s
 	time_t alert_frequency_limit; /**<Time limit between two zero-scored service alerts*/
 	time_t score_expiration; /**<Time interval used on the current time to know the oldest valid score time*/
 	gint32 score_variation_bound; /**<absolute upper bound to a score increase.*/
-	gchar *score_expr_str;	      /**<String form of the expression*/
+	gchar *score_expr_str;		  /**<String form of the expression*/
 	struct expr_s *score_expr;/**<Preparsed expression*/
 
 	GHashTable *config_ht;	 /**<Maps (gchar*) to (GByteArray*)*/
 	GByteArray *config_serialized;	/**<Preserialized configuration sent to the agents*/
 
-	GHashTable *services_ht;	     /**<Maps (conscience_srvid_s*) to (conscience_srv_s*)*/
+	GHashTable *services_ht;		 /**<Maps (conscience_srvid_s*) to (conscience_srv_s*)*/
 	struct conscience_srv_s services_ring;
 };
 
@@ -55,7 +37,8 @@ struct conscience_srvtype_s
  * @param udata
  * @return
  */
-typedef gboolean (service_callback_f) (struct conscience_srv_s * srv, gpointer udata);
+typedef gboolean(service_callback_f) (struct conscience_srv_s * srv,
+	gpointer udata);
 
 /* ------------------------------------------------------------------------- */
 
@@ -68,7 +51,8 @@ typedef gboolean (service_callback_f) (struct conscience_srv_s * srv, gpointer u
  * @param type the name of the new service type
  * @return a valid service-type holder, or NULL in case of failure
  */
-struct conscience_srvtype_s *conscience_srvtype_create(struct conscience_s *conscience, const char *type);
+struct conscience_srvtype_s *conscience_srvtype_create(struct conscience_s
+	*conscience, const char *type);
 
 /**
  * Frees a given service-type holder and all its internal data.
@@ -93,7 +77,7 @@ void conscience_srvtype_destroy(struct conscience_srvtype_s *srvtype);
  * @return 
  */
 gboolean conscience_srvtype_set_type_expression(struct conscience_srvtype_s
-    *srvtype, GError ** error, const gchar * expr_str);
+	*srvtype, GError ** error, const gchar * expr_str);
 
 /**
  * Removes all the servics registered uner this service-type
@@ -112,7 +96,8 @@ void conscience_srvtype_flush(struct conscience_srvtype_s *srvtype);
  * failure
  */
 struct conscience_srv_s *conscience_srvtype_register_srv(struct
-    conscience_srvtype_s *srvtype, GError ** err, const struct conscience_srvid_s *srvid);
+	conscience_srvtype_s *srvtype, GError ** err,
+	const struct conscience_srvid_s *srvid);
 
 /**
  * @param srvtype
@@ -121,7 +106,7 @@ struct conscience_srv_s *conscience_srvtype_register_srv(struct
  * @return
  */
 gboolean conscience_srvtype_refresh(struct conscience_srvtype_s *srvtype,
-    GError ** error, struct service_info_s *srvinfo, gboolean keep_score);
+	GError ** error, struct service_info_s *srvinfo, gboolean keep_score);
 
 /**
  * Removes the service-type holder all the services which
@@ -135,7 +120,7 @@ gboolean conscience_srvtype_refresh(struct conscience_srvtype_s *srvtype,
  * @return the number of service removed
  */
 gint conscience_srvtype_remove_expired(struct conscience_srvtype_s *srvtype,
-    GError ** err, service_callback_f * callback, gpointer udata);
+	GError ** err, service_callback_f * callback, gpointer udata);
 
 /**
  * Executes the given callback on all the services registered in the
@@ -152,7 +137,8 @@ gint conscience_srvtype_remove_expired(struct conscience_srvtype_s *srvtype,
  * @return TRUE on success, FALSE on failure
  */
 gboolean conscience_srvtype_run_all(struct conscience_srvtype_s *srvtype,
-    GError ** error, guint32 flags, service_callback_f * callback, gpointer udata);
+	GError ** error, guint32 flags, service_callback_f * callback,
+	gpointer udata);
 
 /**
  * Returns a service entry for the given service ID in the given service
@@ -164,7 +150,7 @@ gboolean conscience_srvtype_run_all(struct conscience_srvtype_s *srvtype,
  *  if not found or in case of failure.
  */
 struct conscience_srv_s *conscience_srvtype_get_srv(struct
-    conscience_srvtype_s *srvtype, const struct conscience_srvid_s *srvid);
+	conscience_srvtype_s *srvtype, const struct conscience_srvid_s *srvid);
 
 /**
  * Remove a registered service corresponding to the given service
@@ -173,7 +159,8 @@ struct conscience_srv_s *conscience_srvtype_get_srv(struct
  * @param srvtype a valid service-type holder
  * @param srvid a valid service Identifier
  */
-void conscience_srvtype_remove_srv(struct conscience_srvtype_s *srvtype, struct conscience_srvid_s *srvid);
+void conscience_srvtype_remove_srv(struct conscience_srvtype_s *srvtype,
+	struct conscience_srvid_s *srvid);
 
 /**
  * Counts the services registered
@@ -182,7 +169,8 @@ void conscience_srvtype_remove_srv(struct conscience_srvtype_s *srvtype, struct 
  * @param include_expired tells if the result also concerns expired services
  * @return the number of registered services matching the conditions
  */
-guint conscience_srvtype_count_srv(struct conscience_srvtype_s *srvtype, gboolean include_expired);
+guint conscience_srvtype_count_srv(struct conscience_srvtype_s *srvtype,
+	gboolean include_expired);
 
 /**
  * Get a copy of the serialized configuration of the given service-type
@@ -199,8 +187,8 @@ guint conscience_srvtype_count_srv(struct conscience_srvtype_s *srvtype, gboolea
  * @param err a GError double pointer set on error.
  * @result a newly allocated GByteArray or NULL in case of failure.
  */
-GByteArray* conscience_get_serialized_configuration(
-		struct conscience_srvtype_s *srvtype, GError ** err);
+GByteArray *conscience_get_serialized_configuration(struct conscience_srvtype_s
+	*srvtype, GError ** err);
 
 
 /**
@@ -208,8 +196,8 @@ GByteArray* conscience_get_serialized_configuration(
  * @param err
  * @return
  */
-GByteArray* conscience_srvtype_get_config(
-		struct conscience_srvtype_s * srvtype, GError ** err);
+GByteArray *conscience_srvtype_get_config(struct conscience_srvtype_s *srvtype,
+	GError ** err);
 
 
 /**

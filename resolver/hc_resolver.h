@@ -1,28 +1,12 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef HC_RESOLVER__H
-# define HC_RESOLVER__H 1
+#define HC_RESOLVER__H 1
+#include <glib.h>
 
 enum hc_resolver_flags_e
 {
 	HC_RESOLVER_NOCACHE = 0x01,
 	HC_RESOLVER_NOATIME = 0x02,
-	HC_RESOLVER_NOMAX =   0x04,
+	HC_RESOLVER_NOMAX = 0x04,
 };
 
 /* forward declarations */
@@ -32,15 +16,41 @@ struct hc_url_s;
 /* Hidden type */
 struct hc_resolver_s;
 
-/**
- * @return NULL in case of error, or a resolver ready to use
- */
-struct hc_resolver_s* hc_resolver_create(void);
+/** Simple constructor */
+struct hc_resolver_s *hc_resolver_create1(time_t now);
 
-/**
- * @param r the resolver to be destroyed
- */
+/** Calls hc_resolver_create1() with the current EPOCH time */
+struct hc_resolver_s *hc_resolver_create(void);
+
+/** Cleanup all the internal structures. */
 void hc_resolver_destroy(struct hc_resolver_s *r);
+
+/** @param d Timeout for services from meta1 */
+void hc_resolver_set_max_services(struct hc_resolver_s *r, guint d);
+
+/** @param d max cached entries from meta1 */
+void hc_resolver_set_ttl_services(struct hc_resolver_s *r, time_t d);
+
+/** @param d Timeout for services from conscience and meta0 */
+void hc_resolver_set_ttl_csm0(struct hc_resolver_s *r, time_t d);
+
+/** @param d max cached services from conscience and meta0 */
+void hc_resolver_set_max_csm0(struct hc_resolver_s *r, guint d);
+
+/** Set the internal clock of the resolver. This has to be done in order
+ * to manage expirations. */
+void hc_resolver_set_now(struct hc_resolver_s *r, time_t now);
+
+/** Applies time-based cache policies. */
+guint hc_resolver_expire(struct hc_resolver_s *r);
+
+/** Applies cardinality-based cache policies. */
+guint hc_resolver_purge(struct hc_resolver_s *r);
+
+void hc_resolver_flush_csm0(struct hc_resolver_s *r);
+
+void hc_resolver_flush_services(struct hc_resolver_s *r);
+
 
 /**
  * @param r
@@ -49,8 +59,8 @@ void hc_resolver_destroy(struct hc_resolver_s *r);
  * @param result
  * @return
  */
-GError* hc_resolve_reference_service(struct hc_resolver_s *r,
-		struct hc_url_s *url, const gchar *srvtype, gchar ***result);
+GError *hc_resolve_reference_service(struct hc_resolver_s *r,
+	struct hc_url_s *url, const gchar * srvtype, gchar *** result);
 
 /**
  * @param r
@@ -58,6 +68,28 @@ GError* hc_resolve_reference_service(struct hc_resolver_s *r,
  * @param srvtype
  */
 void hc_decache_reference_service(struct hc_resolver_s *r,
-		struct hc_url_s *url, const gchar *srvtype);
+	struct hc_url_s *url, const gchar * srvtype);
+
+
+struct hc_resolver_stats_s
+{
+	time_t clock;
+
+	struct
+	{
+		gint64 count;
+		guint max;
+		time_t ttl;
+	} csm0;
+
+	struct
+	{
+		gint64 count;
+		guint max;
+		time_t ttl;
+	} services;
+};
+
+void hc_resolver_info(struct hc_resolver_s *r, struct hc_resolver_stats_s *s);
 
 #endif

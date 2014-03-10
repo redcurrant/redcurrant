@@ -1,38 +1,22 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "integrity.main.meta2_checker"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "integrity.main.meta2_checker"
 #endif
 
 #include <string.h>
 #include <netdb.h>
 
-#include <metautils.h>
-#include <metacomm.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
 #include <grid_client.h>
-#include <meta2_remote.h>
+#include <meta2/remote/meta2_remote.h>
 
 #include "check.h"
 #include "meta2_checker.h"
 #include "../lib/meta2_check.h"
 
 
-extern GSList *gs_resolve_meta2(gs_grid_storage_t * gs, const container_id_t cID, GError ** err);
+extern GSList *gs_resolve_meta2(gs_grid_storage_t * gs,
+	const container_id_t cID, GError ** err);
 
 
 /**
@@ -45,14 +29,16 @@ extern GSList *gs_resolve_meta2(gs_grid_storage_t * gs, const container_id_t cID
  * @return TRUE or FALSE if an error occured (error is set)
  */
 static gboolean
-_find_local_meta2(GSList * list_addr_meta2, addr_info_t * addr_local_meta2, GError ** error)
+_find_local_meta2(GSList * list_addr_meta2, addr_info_t * addr_local_meta2,
+	GError ** error)
 {
 	if (g_slist_length(list_addr_meta2) < 1) {
 		GSETERROR(error, "META2 addr list is empty");
 		return FALSE;
 	}
 
-	memcpy(g_slist_nth_data(list_addr_meta2, 0), addr_local_meta2, sizeof(addr_info_t));
+	memcpy(g_slist_nth_data(list_addr_meta2, 0), addr_local_meta2,
+		sizeof(addr_info_t));
 
 	return TRUE;
 }
@@ -68,7 +54,8 @@ _find_local_meta2(GSList * list_addr_meta2, addr_info_t * addr_local_meta2, GErr
  * @return TRUE or FALSE if an error occured (error is set)
  */
 static gboolean
-_resolv_meta2(const gchar * ns_name, const container_id_t container_id, addr_info_t * addr_meta2, GError ** error)
+_resolv_meta2(const gchar * ns_name, const container_id_t container_id,
+	addr_info_t * addr_meta2, GError ** error)
 {
 	gs_error_t *client_error = NULL;
 	gs_grid_storage_t *grid = NULL;
@@ -102,12 +89,12 @@ _resolv_meta2(const gchar * ns_name, const container_id_t container_id, addr_inf
 
 	return TRUE;
 
-      error_find_local:
+error_find_local:
 	g_slist_foreach(list_addr_meta2, addr_info_gclean, NULL);
 	g_slist_free(list_addr_meta2);
-      error_resolv:
+error_resolv:
 	gs_grid_storage_free(grid);
-      error_init_grid:
+error_init_grid:
 
 	return FALSE;
 }
@@ -122,8 +109,9 @@ _resolv_meta2(const gchar * ns_name, const container_id_t container_id, addr_inf
  * @param broken a list of broken_element_s filled with check problems
  */
 static void
-_check_chunk_from_list(struct metacnx_ctx_s *ctx, const container_id_t container_id, GSList * list_raw_content,
-    GSList ** broken)
+_check_chunk_from_list(struct metacnx_ctx_s *ctx,
+	const container_id_t container_id, GSList * list_raw_content,
+	GSList ** broken)
 {
 	GError *local_error = NULL;
 	GSList *list = NULL;
@@ -134,10 +122,11 @@ _check_chunk_from_list(struct metacnx_ctx_s *ctx, const container_id_t container
 		struct meta2_raw_content_s *raw_content = NULL;
 
 		raw_content =
-		    meta2raw_remote_get_content_from_name(ctx, &local_error, container_id, str_content_name,
-		    strlen(str_content_name));
+			meta2raw_remote_get_content_from_name(ctx, &local_error,
+			container_id, str_content_name, strlen(str_content_name));
 		if (raw_content == NULL) {
-			WARN("Failed to get raw_content from META2 : %s", local_error->message);
+			WARN("Failed to get raw_content from META2 : %s",
+				local_error->message);
 			g_clear_error(&local_error);
 			local_error = NULL;
 			continue;
@@ -182,14 +171,17 @@ check_meta2(const gchar * meta2_db_path, void *data, GError ** error)
 	str_container_id = g_path_get_basename(meta2_db_path);
 	memset(container_id, 0, sizeof(container_id_t));
 	if (!hex2bin(str_container_id, container_id, sizeof(container_id_t), error)) {
-		GSETERROR(error, "Failed to convert container_id from hex [%s] to bin", str_container_id);
+		GSETERROR(error, "Failed to convert container_id from hex [%s] to bin",
+			str_container_id);
 		goto error_convert;
 	}
 
 	/* Resolv META2 */
 	memset(&addr_meta2, 0, sizeof(addr_info_t));
-	if (!_resolv_meta2(checker_data->ns_name, str_container_id, &addr_meta2, error)) {
-		GSETERROR(error, "Failed to resolv local META2 for container [%s]", str_container_id);
+	if (!_resolv_meta2(checker_data->ns_name, str_container_id, &addr_meta2,
+			error)) {
+		GSETERROR(error, "Failed to resolv local META2 for container [%s]",
+			str_container_id);
 		goto error_resolv;
 	}
 
@@ -206,14 +198,16 @@ check_meta2(const gchar * meta2_db_path, void *data, GError ** error)
 	}
 
 	/* List contents from this db */
-	list_content_names = meta2raw_remote_get_contents_names(ctx_meta2, error, container_id);
+	list_content_names =
+		meta2raw_remote_get_contents_names(ctx_meta2, error, container_id);
 	if (list_content_names == NULL) {
 		GSETERROR(error, "Failed to request get_contents_names on META2");
 		goto error_get;
 	}
 
 	/* Check all chunks */
-	_check_chunk_from_list(ctx_meta2, container_id, list_content_names, &list_broken);
+	_check_chunk_from_list(ctx_meta2, container_id, list_content_names,
+		&list_broken);
 
 	g_free(str_container_id);
 
@@ -225,14 +219,14 @@ check_meta2(const gchar * meta2_db_path, void *data, GError ** error)
 
 	return TRUE;
 
-      error_get:
+error_get:
 	if (metacnx_is_open(ctx_meta2))
 		metacnx_close(ctx_meta2);
-      error_init:
+error_init:
 	metacnx_destroy(ctx_meta2);
-      error_alloc_ctx:
-      error_resolv:
-      error_convert:
+error_alloc_ctx:
+error_resolv:
+error_convert:
 	g_free(str_container_id);
 
 	return FALSE;

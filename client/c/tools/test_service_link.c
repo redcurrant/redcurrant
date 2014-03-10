@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,13 +5,13 @@
 #include <syslog.h>
 #include <time.h>
 
-#include <glib.h>
+// TODO FIXME replace with GLib equivalent
 #include <openssl/md5.h>
 
-#include <metautils.h>
-#include <../lib/grid_client.h>
+#include <../lib/gs_internals.h>
 
-int main (int argc, char ** args)
+int
+main(int argc, char **args)
 {
 	int rc = -1;
 
@@ -52,29 +35,31 @@ int main (int argc, char ** args)
 
 	printf("Working with container [%s]\n", cname);
 
-	hc = gs_grid_storage_init( ns, &err );
-	if(!hc) {
+	hc = gs_grid_storage_init(ns, &err);
+	if (!hc) {
 		printf("failed to init hc\n");
 		return rc;
 	}
 
 	container = gs_get_container(hc, cname, 1, &err);
-	if(!container) {
+	if (!container) {
 		printf("Failed to resolve container\n");
 		goto end_label;
 	}
 
 	gs_service_t **srv_array = NULL;
+
 	srv_array = gs_container_service_get_available(container, "meta0", &err);
 	char url[256];
+
 	bzero(url, sizeof(url));
 	gs_service_get_url(srv_array[0], url, sizeof(url));
 	printf("New service linked\n");
 	printf("service url = [%s]\n", url);
 
-	if(srv_array)
-		gs_service_free_array(srv_array); 
-	
+	if (srv_array)
+		gs_service_free_array(srv_array);
+
 	srv_array = gs_container_service_get_all(container, "meta0", &err);
 
 	bzero(url, sizeof(url));
@@ -82,24 +67,23 @@ int main (int argc, char ** args)
 	printf("Already linked service :\n");
 	printf("service url = [%s]\n", url);
 
-	if(srv_array)
-		gs_service_free_array(srv_array); 
+	if (srv_array)
+		gs_service_free_array(srv_array);
 
 end_label:
 
-	if(container) {
+	if (container) {
 		gs_container_free(container);
 		container = NULL;
 	}
 
-	if(hc) {
+	if (hc) {
 		gs_grid_storage_free(hc);
 		hc = NULL;
 	}
 
-	if(err) {
+	if (err) {
 		gs_error_free(err);
-		err= NULL;
+		err = NULL;
 	}
 }
-

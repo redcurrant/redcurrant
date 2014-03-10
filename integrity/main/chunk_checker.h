@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file chunk_checker.h
  * Check chunk integrity
@@ -29,10 +12,9 @@
  * @{
  */
 
-#include <metautils.h>
-
-#include "../lib/volume_scanner.h"
-#include "config.h"
+#include <metautils/lib/metautils.h>
+#include <integrity/lib/volume_scanner.h>
+#include <integrity/main/config.h>
 
 /**
  * Extract the volume path from service tags to fill the volume_scanning_info callback user data
@@ -44,7 +26,9 @@
  *
  * @return TRUE or FALSE if an error occured (error is set)
  */
-gboolean fill_scanning_info_for_chunk_checker(struct volume_scanning_info_s *scanning_info, service_info_t * service_info, struct integrity_loop_config_s *config, GError ** error);
+gboolean fill_scanning_info_for_chunk_checker(struct volume_scanning_info_s *
+	scanning_info, service_info_t * service_info,
+	struct integrity_loop_config_s * config, GError ** error);
 
 /**
  * Check integrity and directory referencing for a chunk \n
@@ -64,7 +48,7 @@ gboolean fill_scanning_info_for_chunk_checker(struct volume_scanning_info_s *sca
  * @test Test arguments
  * 	- Execute with an unexisting chunk_path
  */
-gboolean check_chunk(const char* chunk_path, void* data, GError **error);
+gboolean check_chunk(const char *chunk_path, void *data, GError ** error);
 
 /** @} */
 

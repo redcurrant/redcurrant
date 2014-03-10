@@ -1,35 +1,17 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "integrity.lib.chunk_db"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "integrity.lib.chunk_db"
 #endif
 
 #include <string.h>
+
 #include <db.h>
+
 #include <glib/gstdio.h>
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 
-#include "chunk_db.h"
-#include "check.h"
+#include "./chunk_db.h"
+#include "./check.h"
 
 /**
  Convert a GByteArray to a string and add it to a list (GFunc to be used in g_slist_foreach)
@@ -41,59 +23,57 @@ static void
 _convert_byte_array_to_string(gpointer data, gpointer user_data)
 {
 	GByteArray *gba;
-	GSList** list;
+	GSList **list;
 
 	if (data == NULL || user_data == NULL)
 		return;
 
-	gba = (GByteArray*)data;
-	list = (GSList**)user_data;
-	
-	*list = g_slist_prepend(*list, g_strndup((gchar*)gba->data, gba->len));
+	gba = (GByteArray *) data;
+	list = (GSList **) user_data;
+
+	*list = g_slist_prepend(*list, g_strndup((gchar *) gba->data, gba->len));
 
 	g_byte_array_free(gba, TRUE);
 }
 
-static GByteArray*
-_str2gba(const gchar *str)
+static GByteArray *
+_str2gba(const gchar * str)
 {
 	GByteArray *gba;
 	int len;
 
 	len = strlen(str);
-	/*gba = g_byte_array_sized_new(len+1);*/
 	gba = g_byte_array_sized_new(len);
-	g_byte_array_append(gba, (guint8*)str, len);
-	/*gba->data[len] = '\0';*/
+	g_byte_array_append(gba, (guint8 *) str, len);
 	return gba;
 }
 
-static GByteArray*
-_get_content_key(const gchar* str_cid, const gchar* str_path)
+static GByteArray *
+_get_content_key(const gchar * str_cid, const gchar * str_path)
 {
 	GByteArray *gba;
 
 	gba = g_byte_array_new();
-	g_byte_array_append(gba, (guint8*)str_cid, strlen(str_cid));
-	g_byte_array_append(gba, (guint8*)":", 1);
-	g_byte_array_append(gba, (guint8*)str_path, strlen(str_path));
+	g_byte_array_append(gba, (guint8 *) str_cid, strlen(str_cid));
+	g_byte_array_append(gba, (guint8 *) ":", 1);
+	g_byte_array_append(gba, (guint8 *) str_path, strlen(str_path));
 	return gba;
 }
 
-static GByteArray*
-_get_container_key(const gchar* container_id)
+static GByteArray *
+_get_container_key(const gchar * container_id)
 {
 	return _str2gba(container_id);
 }
 
-static gchar*
-_get_content_db_path(const gchar* volume_root)
+static gchar *
+_get_content_db_path(const gchar * volume_root)
 {
 	return g_strconcat(volume_root, G_DIR_SEPARATOR_S, CONTENT_DB_NAME, NULL);
 }
 
-static gchar*
-_get_tmp_content_db_path(const gchar* volume_root)
+static gchar *
+_get_tmp_content_db_path(const gchar * volume_root)
 {
 	gchar *content_db_path = NULL;
 	gchar *result = NULL;
@@ -104,14 +84,14 @@ _get_tmp_content_db_path(const gchar* volume_root)
 	return result;
 }
 
-static gchar*
-_get_container_db_path(const gchar* volume_root)
+static gchar *
+_get_container_db_path(const gchar * volume_root)
 {
 	return g_strconcat(volume_root, G_DIR_SEPARATOR_S, CONTAINER_DB_NAME, NULL);
 }
 
-static gchar*
-_get_tmp_container_db_path(const gchar* volume_root)
+static gchar *
+_get_tmp_container_db_path(const gchar * volume_root)
 {
 	gchar *container_db_path = NULL;
 	gchar *result = NULL;
@@ -126,10 +106,10 @@ _get_tmp_container_db_path(const gchar* volume_root)
  Berkley db error listener. Just use log4c ERROR.
  */
 static void
-_db_err_listener(const DB_ENV *dbenv, const char *errpfx, const char *msg)
+_db_err_listener(const DB_ENV * dbenv, const char *errpfx, const char *msg)
 {
-	(void)dbenv;
-	(void)errpfx;
+	(void) dbenv;
+	(void) errpfx;
 
 	ERROR(msg);
 }
@@ -145,7 +125,7 @@ _db_err_listener(const DB_ENV *dbenv, const char *errpfx, const char *msg)
  @return TRUE or FALSE if en error occured (error is set)
  */
 static gboolean
-_open_db(const gchar* db_path, DB** db_handle, GError** error)
+_open_db(const gchar * db_path, DB ** db_handle, GError ** error)
 {
 	int rc;
 
@@ -161,7 +141,8 @@ _open_db(const gchar* db_path, DB** db_handle, GError** error)
 	(*db_handle)->set_flags(*db_handle, DB_DUPSORT);
 
 	/* Open database */
-	rc = (*db_handle)->open(*db_handle, NULL, db_path, NULL, DB_BTREE, DB_CREATE, 0);
+	rc = (*db_handle)->open(*db_handle, NULL, db_path, NULL, DB_BTREE,
+		DB_CREATE, 0);
 	if (rc != 0) {
 		GSETERROR(error, "Error from Berkley DB : %s", db_strerror(rc));
 		GSETERROR(error, "Failed to open db [%s]", db_path);
@@ -183,7 +164,8 @@ _open_db(const gchar* db_path, DB** db_handle, GError** error)
  @return TRUE or FALSE if en error occured (error is set)
  */
 static gboolean
-_get_from_db(const gchar* db_path, GByteArray* key, GSList **values, GError **error)
+_get_from_db(const gchar * db_path, GByteArray * key, GSList ** values,
+	GError ** error)
 {
 	DB *db_handle = NULL;
 	DBC *db_cursor = NULL;
@@ -224,14 +206,16 @@ _get_from_db(const gchar* db_path, GByteArray* key, GSList **values, GError **er
 		GSETERROR(error, "Failed to request db [%s]", db_path);
 		return FALSE;
 	}
-		
-        while (rc != DB_NOTFOUND) {
-		*values = g_slist_prepend(*values, g_byte_array_append(g_byte_array_new(), db_value.data, db_value.size));
+
+	while (rc != DB_NOTFOUND) {
+		*values =
+			g_slist_prepend(*values, g_byte_array_append(g_byte_array_new(),
+				db_value.data, db_value.size));
 
 		/* Request db */
 		db_key.data = key->data;
 		db_key.size = key->len;
-                rc = db_cursor->c_get(db_cursor, &db_key, &db_value, DB_NEXT_DUP);
+		rc = db_cursor->c_get(db_cursor, &db_key, &db_value, DB_NEXT_DUP);
 		TRACE("db_cursor->c_get(...,DB_NEXT_DUP) = %d", rc);
 
 		if (rc != 0 && rc != DB_NOTFOUND) {
@@ -240,10 +224,10 @@ _get_from_db(const gchar* db_path, GByteArray* key, GSList **values, GError **er
 			db_cursor->c_close(db_cursor);
 			db_handle->close(db_handle, 0);
 			return FALSE;
-		}	
-        }
+		}
+	}
 
-        db_cursor->c_close(db_cursor);
+	db_cursor->c_close(db_cursor);
 	db_handle->close(db_handle, 0);
 
 	return TRUE;
@@ -253,7 +237,8 @@ _get_from_db(const gchar* db_path, GByteArray* key, GSList **values, GError **er
  Add a key/value pair to a Berkley db
  */
 static gboolean
-_add_to_db(const gchar* db_path, GByteArray* key, GByteArray* value, GError **error)
+_add_to_db(const gchar * db_path, GByteArray * key, GByteArray * value,
+	GError ** error)
 {
 	DB *db_handle = NULL;
 	DBT db_key, db_value;
@@ -279,7 +264,8 @@ _add_to_db(const gchar* db_path, GByteArray* key, GByteArray* value, GError **er
 	rc = db_handle->put(db_handle, NULL, &db_key, &db_value, DB_NODUPDATA);
 	TRACE("db_handle->put(...,DB_NODUPDATA) = %d", rc);
 	if (rc != 0 && rc != DB_KEYEXIST) {
-		GSETERROR(error, "Failed to add new record to db [%s] : %s", db_path, db_strerror(rc));
+		GSETERROR(error, "Failed to add new record to db [%s] : %s", db_path,
+			db_strerror(rc));
 		db_handle->close(db_handle, 0);
 		return FALSE;
 	}
@@ -291,7 +277,8 @@ _add_to_db(const gchar* db_path, GByteArray* key, GByteArray* value, GError **er
 }
 
 static gboolean
-_run_db(const gchar* db_path, GError **error, gboolean (*cb)(GByteArray *gba_k, GByteArray *gba_v))
+_run_db(const gchar * db_path, GError ** error,
+	gboolean(*cb) (GByteArray * gba_k, GByteArray * gba_v))
 {
 	gboolean result;
 	DB *db_handle = NULL;
@@ -319,7 +306,7 @@ _run_db(const gchar* db_path, GError **error, gboolean (*cb)(GByteArray *gba_k, 
 	rc = db_cursor->c_get(db_cursor, &db_key, &db_value, DB_FIRST);
 	TRACE("db_cursor->c_get(...,DB_FIRST) = %d", rc);
 	if (rc != 0) {
-        	db_cursor->c_close(db_cursor);
+		db_cursor->c_close(db_cursor);
 		db_handle->close(db_handle, 0);
 		if (rc == DB_NOTFOUND)
 			return TRUE;
@@ -332,8 +319,11 @@ _run_db(const gchar* db_path, GError **error, gboolean (*cb)(GByteArray *gba_k, 
 		GByteArray *gba_k, *gba_v;
 		gboolean rc_cb;
 
-		gba_k = g_byte_array_append(g_byte_array_new(), db_key.data, db_key.size);
-		gba_v = g_byte_array_append(g_byte_array_new(), db_value.data, db_value.size);
+		gba_k =
+			g_byte_array_append(g_byte_array_new(), db_key.data, db_key.size);
+		gba_v =
+			g_byte_array_append(g_byte_array_new(), db_value.data,
+			db_value.size);
 		rc_cb = cb(gba_k, gba_v);
 		g_byte_array_free(gba_k, TRUE);
 		g_byte_array_free(gba_v, TRUE);
@@ -358,7 +348,7 @@ _run_db(const gchar* db_path, GError **error, gboolean (*cb)(GByteArray *gba_k, 
 		}
 	}
 
-        db_cursor->c_close(db_cursor);
+	db_cursor->c_close(db_cursor);
 	db_handle->close(db_handle, 0);
 	return result;
 }
@@ -366,12 +356,12 @@ _run_db(const gchar* db_path, GError **error, gboolean (*cb)(GByteArray *gba_k, 
 /* ------------------------------------------------------------------------- */
 
 gboolean
-add_chunk_to_db(const gchar* volume_root, const gchar* chunk_path, const gchar* content_name,
-		const gchar* container_id, GError **error)
+add_chunk_to_db(const gchar * volume_root, const gchar * chunk_path,
+	const gchar * content_name, const gchar * container_id, GError ** error)
 {
 	char *content_db_path = NULL;
 	char *container_db_path = NULL;
-	GByteArray* key, *value;
+	GByteArray *key, *value;
 	gboolean rc;
 
 	CHECK_ARG_POINTER(volume_root, error);
@@ -414,10 +404,10 @@ add_chunk_to_db(const gchar* volume_root, const gchar* chunk_path, const gchar* 
 }
 
 gboolean
-get_content_chunks(const gchar* volume_root, const gchar* container_id, const gchar* content_name,
-		GSList **list_chunk, GError **error)
+get_content_chunks(const gchar * volume_root, const gchar * container_id,
+	const gchar * content_name, GSList ** list_chunk, GError ** error)
 {
-	gchar* db_path = NULL;
+	gchar *db_path = NULL;
 	GByteArray *key = NULL;
 	GSList *result = NULL;
 	int rc;
@@ -437,8 +427,10 @@ get_content_chunks(const gchar* volume_root, const gchar* container_id, const gc
 		return FALSE;
 	}
 
-	if (TRACE_ENABLED())
-		TRACE("Found %u chunks for container [%s]:[%s]", g_slist_length(result), container_id, content_name);
+	if (TRACE_ENABLED()) {
+		TRACE("Found %u chunks for container [%s]:[%s]", g_slist_length(result),
+			container_id, content_name);
+	}
 
 	*list_chunk = NULL;
 	g_slist_foreach(result, _convert_byte_array_to_string, list_chunk);
@@ -447,9 +439,10 @@ get_content_chunks(const gchar* volume_root, const gchar* container_id, const gc
 }
 
 gboolean
-get_container_chunks(const gchar* volume_root, const gchar* container_id, GSList **list_chunk, GError **error)
+get_container_chunks(const gchar * volume_root, const gchar * container_id,
+	GSList ** list_chunk, GError ** error)
 {
-	gchar* db_path = NULL;
+	gchar *db_path = NULL;
 	GByteArray *key = NULL;
 	GSList *result = NULL;
 	int rc;
@@ -469,8 +462,10 @@ get_container_chunks(const gchar* volume_root, const gchar* container_id, GSList
 		return FALSE;
 	}
 
-	if (TRACE_ENABLED())
-		TRACE("Found %u chunks for container [%s]", g_slist_length(result), container_id);
+	if (TRACE_ENABLED()) {
+		TRACE("Found %u chunks for container [%s]", g_slist_length(result),
+			container_id);
+	}
 
 	*list_chunk = NULL;
 	g_slist_foreach(result, _convert_byte_array_to_string, list_chunk);
@@ -479,9 +474,10 @@ get_container_chunks(const gchar* volume_root, const gchar* container_id, GSList
 }
 
 gboolean
-list_container_chunks(const gchar* volume_root, GError **error, gboolean (*cb)(GByteArray *gba_k, GByteArray *gba_v))
+list_container_chunks(const gchar * volume_root, GError ** error,
+	gboolean(*cb) (GByteArray * gba_k, GByteArray * gba_v))
 {
-	gchar* db_path = NULL;
+	gchar *db_path = NULL;
 	int rc;
 
 	CHECK_ARG_POINTER(volume_root, error);
@@ -498,9 +494,10 @@ list_container_chunks(const gchar* volume_root, GError **error, gboolean (*cb)(G
 }
 
 gboolean
-list_content_chunks(const gchar* volume_root, GError **error, gboolean (*cb)(GByteArray *gba_k, GByteArray *gba_v))
+list_content_chunks(const gchar * volume_root, GError ** error,
+	gboolean(*cb) (GByteArray * gba_k, GByteArray * gba_v))
 {
-	gchar* db_path = NULL;
+	gchar *db_path = NULL;
 	int rc;
 
 	CHECK_ARG_POINTER(volume_root, error);
@@ -517,7 +514,7 @@ list_content_chunks(const gchar* volume_root, GError **error, gboolean (*cb)(GBy
 }
 
 void
-prepare_chunks_db(const gchar* volume_root)
+prepare_chunks_db(const gchar * volume_root)
 {
 	gchar *db_content_path = NULL;
 	gchar *db_container_path = NULL;
@@ -526,12 +523,14 @@ prepare_chunks_db(const gchar* volume_root)
 	db_container_path = _get_tmp_container_db_path(volume_root);
 
 	if (g_file_test(db_content_path, G_FILE_TEST_EXISTS)) {
-		INFO("Removing previously created tmp chunk content db [%s]", db_content_path);
+		INFO("Removing previously created tmp chunk content db [%s]",
+			db_content_path);
 		g_remove(db_content_path);
 	}
 
 	if (g_file_test(db_container_path, G_FILE_TEST_EXISTS)) {
-		INFO("Removing previously created tmp chunk container db [%s]", db_container_path);
+		INFO("Removing previously created tmp chunk container db [%s]",
+			db_container_path);
 		g_remove(db_container_path);
 	}
 
@@ -540,7 +539,7 @@ prepare_chunks_db(const gchar* volume_root)
 }
 
 void
-commit_chunks_db(const gchar* volume_root)
+commit_chunks_db(const gchar * volume_root)
 {
 	gchar *db_content_path = NULL;
 	gchar *db_container_path = NULL;
@@ -562,7 +561,7 @@ commit_chunks_db(const gchar* volume_root)
 }
 
 void
-rollback_chunks_db(const gchar* volume_root)
+rollback_chunks_db(const gchar * volume_root)
 {
 	gchar *db_content_path = NULL;
 	gchar *db_container_path = NULL;

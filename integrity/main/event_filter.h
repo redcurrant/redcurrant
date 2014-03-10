@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file event_filter.h The broken events filter engine
  */
@@ -28,20 +11,20 @@
  * @{
  */
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
+#include <integrity/main/config.h>
+#include <integrity/lib/broken_event.h>
 
-#include "config.h"
-#include "../lib/broken_event.h"
-
-extern GAsyncQueue * broken_events_queue;
+extern GAsyncQueue *broken_events_queue;
 
 /**
  * struct to store a broken event filter
  */
-struct broken_event_filter_s {
-	int location;	/*!< The location of the broken element */
-	int property;	/*!< The property broken in this element */
-	int reason;	/*!< The reason this property is broken */
+struct broken_event_filter_s
+{
+	int location;				/*!< The location of the broken element */
+	int property;				/*!< The property broken in this element */
+	int reason;					/*!< The reason this property is broken */
 };
 
 /**
@@ -52,7 +35,8 @@ struct broken_event_filter_s {
  *
  * @return TRUE or FALSE if an error occured
  */
-gboolean start_event_filter(const struct integrity_loop_config_s * config, GError ** error);
+gboolean start_event_filter(const struct integrity_loop_config_s *config,
+	GError ** error);
 
 
 /**
@@ -64,7 +48,8 @@ gboolean start_event_filter(const struct integrity_loop_config_s * config, GErro
  * 
  * @return TRUE or FALSE if an error occured (error is set)
  */
-gboolean record_broken_event(struct broken_event_s * broken_event, GError ** error);
+gboolean record_broken_event(struct broken_event_s *broken_event,
+	GError ** error);
 
 
 /**
@@ -76,7 +61,8 @@ gboolean record_broken_event(struct broken_event_s * broken_event, GError ** err
  *
  * @return TRUE or FALSE if an error occured (error is set)
  */
-typedef gboolean (* broken_event_filter_f) (const struct broken_event_s * broken_event, void * data, GError ** error);
+typedef gboolean(*broken_event_filter_f) (const struct broken_event_s *
+	broken_event, void *data, GError ** error);
 
 
 /**
@@ -89,8 +75,9 @@ typedef gboolean (* broken_event_filter_f) (const struct broken_event_s * broken
  *
  * @return TRUE or FALSE if an error occured (error is set)
 */
-gboolean register_event_filter(const struct broken_event_filter_s * filter, broken_event_filter_f filter_func, void * data, GError ** error);
+gboolean register_event_filter(const struct broken_event_filter_s *filter,
+	broken_event_filter_f filter_func, void *data, GError ** error);
 
 /** @} */
 
-#endif	/* EVENT_FILTER_H */
+#endif /* EVENT_FILTER_H */

@@ -1,35 +1,13 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gridcluster.events"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gridcluster.events"
 #endif
 
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
-#include <glib.h>
-
-#include <metautils.h>
-#include <metacomm.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
 
 #include "./gridcluster_events.h"
 
@@ -38,7 +16,9 @@ gridcluster_create_event(void)
 {
 	gridcluster_event_t *event;
 
-	event = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, metautils_gba_unref);
+	event =
+		g_hash_table_new_full(g_str_hash, g_str_equal, g_free,
+		metautils_gba_unref);
 	return event;
 }
 
@@ -50,7 +30,8 @@ gridcluster_destroy_event(gridcluster_event_t * event)
 }
 
 void
-gridcluster_event_add_buffer(gridcluster_event_t * event, const gchar * key, const guint8 * value, gsize value_size)
+gridcluster_event_add_buffer(gridcluster_event_t * event, const gchar * key,
+	const guint8 * value, gsize value_size)
 {
 	GByteArray *gba_value;
 
@@ -62,10 +43,12 @@ gridcluster_event_add_buffer(gridcluster_event_t * event, const gchar * key, con
 }
 
 void
-gridcluster_event_add_string(gridcluster_event_t * event, const gchar * key, const gchar * value)
+gridcluster_event_add_string(gridcluster_event_t * event, const gchar * key,
+	const gchar * value)
 {
 	if (value)
-		gridcluster_event_add_buffer(event, key, (guint8*)value, strlen(value));
+		gridcluster_event_add_buffer(event, key, (guint8 *) value,
+			strlen(value));
 }
 
 void
@@ -75,7 +58,8 @@ gridcluster_event_set_type(gridcluster_event_t * event, const gchar * str_type)
 }
 
 gsize
-gridcluster_event_get_type(gridcluster_event_t * event, gchar * dst_type, gsize dst_size)
+gridcluster_event_get_type(gridcluster_event_t * event, gchar * dst_type,
+	gsize dst_size)
 {
 	gsize len;
 	GByteArray *gba_value;
@@ -92,7 +76,8 @@ gridcluster_event_get_type(gridcluster_event_t * event, gchar * dst_type, gsize 
 }
 
 gridcluster_event_t *
-gridcluster_decode_event2(const guint8 * const encoded, gsize encoded_size, GError ** err)
+gridcluster_decode_event2(const guint8 * const encoded, gsize encoded_size,
+	GError ** err)
 {
 	gridcluster_event_t *event;
 	GSList *list_kv = NULL;
@@ -158,3 +143,13 @@ gridcluster_event_gclean(gpointer pevent, gpointer ignored)
 		gridcluster_destroy_event(pevent);
 }
 
+
+gchar *
+gridcluster_event_get_string(gridcluster_event_t * event, const gchar * key)
+{
+	GByteArray *gba;
+
+	if (!(gba = g_hash_table_lookup(event, key)))
+		return NULL;
+	return g_strndup((gchar *) gba->data, gba->len);
+}

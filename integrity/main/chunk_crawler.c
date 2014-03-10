@@ -1,29 +1,12 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "integrity.main.chunk_crawler"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "integrity.main.chunk_crawler"
 #endif
 
 #include <unistd.h>
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 #include <rawx.h>
-#include <gridcluster.h>
+#include <cluster/lib/gridcluster.h>
 
 #include "check.h"
 
@@ -35,17 +18,18 @@
 #include "../lib/volume_scanner.h"
 #include "../lib/service_cache.h"
 
-struct chunk_crawler_data_s {
+struct chunk_crawler_data_s
+{
 	gchar *volume_path;
 	long sleep_time;
 };
 
 static enum scanner_traversal_e
-save_chunk_and_sleep(const gchar *chunk_path, void *data)
+save_chunk_and_sleep(const gchar * chunk_path, void *data)
 {
 	GError *local_error = NULL;
 	struct chunk_crawler_data_s *cc_data = data;
-	
+
 	if (!save_chunk_to_db(chunk_path, cc_data->volume_path, &local_error)) {
 		ERROR("save_chunk_to_db(%s) error : %s", chunk_path,
 			gerror_get_message(local_error));
@@ -58,7 +42,7 @@ save_chunk_and_sleep(const gchar *chunk_path, void *data)
 }
 
 static enum scanner_traversal_e
-sleep_after_directory(const gchar *path, guint depth, void *data)
+sleep_after_directory(const gchar * path, guint depth, void *data)
 {
 	struct chunk_crawler_data_s *cc_data;
 
@@ -71,8 +55,9 @@ sleep_after_directory(const gchar *path, guint depth, void *data)
 }
 
 gboolean
-fill_scanning_info_for_chunk_crawler(struct volume_scanning_info_s *scanning_info, service_info_t * service_info,
-    struct integrity_loop_config_s *config, GError ** error)
+fill_scanning_info_for_chunk_crawler(struct volume_scanning_info_s *
+	scanning_info, service_info_t * service_info,
+	struct integrity_loop_config_s * config, GError ** error)
 {
 	gchar volume_path[LIMIT_LENGTH_VOLUMENAME];
 	struct chunk_crawler_data_s cc_data;
@@ -93,8 +78,10 @@ fill_scanning_info_for_chunk_crawler(struct volume_scanning_info_s *scanning_inf
 	}
 
 	/* Fill volume_path */
-	if (!service_tag_get_value_string(tag, volume_path, sizeof(volume_path), error)) {
-		GSETERROR(error, "Failed to extract string value from tag [%s]", NAME_TAGNAME_RAWX_VOL);
+	if (!service_tag_get_value_string(tag, volume_path, sizeof(volume_path),
+			error)) {
+		GSETERROR(error, "Failed to extract string value from tag [%s]",
+			NAME_TAGNAME_RAWX_VOL);
 		return FALSE;
 	}
 
@@ -126,13 +113,16 @@ save_chunk_to_db(const gchar * chunk_path, void *data, GError ** error)
 
 	/* Read content info from chunk attributes */
 	if (!get_content_info_in_attr(chunk_path, error, &content_info)) {
-		GSETERROR(error, "Failed to read rawx info from chunk [%s]", chunk_path);
+		GSETERROR(error, "Failed to read rawx info from chunk [%s]",
+			chunk_path);
 		return FALSE;
 	}
 
 	/* Save chunk_path in content ans container db */
-	if (!add_chunk_to_db(volume_root, chunk_path, content_info.path, content_info.container_id, error)) {
-		GSETERROR(error, "Failed to add chunk in integrity db [%s]", chunk_path);
+	if (!add_chunk_to_db(volume_root, chunk_path, content_info.path,
+			content_info.container_id, error)) {
+		GSETERROR(error, "Failed to add chunk in integrity db [%s]",
+			chunk_path);
 		content_textinfo_free_content(&content_info);
 		return FALSE;
 	}
@@ -141,4 +131,3 @@ save_chunk_to_db(const gchar * chunk_path, void *data, GError ** error)
 
 	return TRUE;
 }
-

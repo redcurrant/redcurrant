@@ -1,43 +1,19 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "grid.metautils"
+#define G_LOG_DOMAIN "grid.metautils"
 #endif
 
-#ifdef HAVE_CONFIG
-# include "../config.h"
-#endif
-
-#include <stdlib.h>
-#include <string.h>
-#include <glib.h>
-#include "./metautils.h"
+#include "metautils.h"
 
 #define METADATA_HT_CREATE() g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free)
 
-GHashTable*
+GHashTable *
 metadata_create_empty(void)
 {
 	return METADATA_HT_CREATE();
 }
 
-GHashTable*
-metadata_unpack_buffer(const guint8 *data, gsize size, GError **error)
+GHashTable *
+metadata_unpack_buffer(const guint8 * data, gsize size, GError ** error)
 {
 	GHashTable *ht;
 	gchar **tokens, **tok;
@@ -52,30 +28,31 @@ metadata_unpack_buffer(const guint8 *data, gsize size, GError **error)
 
 	tokens = buffer_split(data, size, ";", 0);
 	if (!tokens) {
-		GSETERROR(error,"split error");
+		GSETERROR(error, "split error");
 		return NULL;
 	}
 
 	ht = METADATA_HT_CREATE();
-	for (tok=tokens; *tok && **tok ;tok++) {
+	for (tok = tokens; *tok && **tok; tok++) {
 		gchar **pair_tokens, *stripped;
 
 		pair_tokens = g_strsplit(*tok, "=", 2);
-		if (!pair_tokens)/*skip this empty pair*/
+		if (!pair_tokens)		/*skip this empty pair */
 			continue;
 		switch (g_strv_length(pair_tokens)) {
-		case 0U:/*strange case, let's happily ignore it*/
-			break;
-		case 1U:/*single key with no value*/
-			stripped = g_strstrip(pair_tokens[0]);
-			if (stripped && *stripped)
-				g_hash_table_insert(ht, g_strdup(stripped), g_strdup(""));
-			break;
-		case 2U:
-			stripped = g_strstrip(pair_tokens[0]);
-			if (stripped && *stripped)
-				g_hash_table_insert(ht, g_strdup(stripped), g_strdup(pair_tokens[1]));
-			break;
+			case 0U:			/*strange case, let's happily ignore it */
+				break;
+			case 1U:			/*single key with no value */
+				stripped = g_strstrip(pair_tokens[0]);
+				if (stripped && *stripped)
+					g_hash_table_insert(ht, g_strdup(stripped), g_strdup(""));
+				break;
+			case 2U:
+				stripped = g_strstrip(pair_tokens[0]);
+				if (stripped && *stripped)
+					g_hash_table_insert(ht, g_strdup(stripped),
+						g_strdup(pair_tokens[1]));
+				break;
 		}
 		g_strfreev(pair_tokens);
 	}
@@ -84,61 +61,115 @@ metadata_unpack_buffer(const guint8 *data, gsize size, GError **error)
 	return ht;
 }
 
-GHashTable*
-metadata_unpack_gba(GByteArray *gba, GError **error)
+GHashTable *
+metadata_unpack_gba(GByteArray * gba, GError ** error)
 {
 	if (!gba) {
-		GSETERROR(error,"Inavalid parameter (gba==NULL)");
+		GSETERROR(error, "Inavalid parameter (gba==NULL)");
 		return NULL;
 	}
 	return metadata_unpack_buffer(gba->data, gba->len, error);
 }
 
-GHashTable*
-metadata_unpack_string(const gchar *data, GError **error)
+GHashTable *
+metadata_unpack_string(const gchar * data, GError ** error)
 {
 	if (!data) {
-		GSETERROR(error,"Inavalid parameter (str==NULL)");
+		GSETERROR(error, "Inavalid parameter (str==NULL)");
 		return NULL;
 	}
-	return metadata_unpack_buffer((guint8*)data, strlen(data), error);
+	return metadata_unpack_buffer((guint8 *) data, strlen(data), error);
 }
 
-GByteArray*
-metadata_pack(GHashTable *unpacked, GError **error)
+GByteArray *
+metadata_pack(GHashTable * unpacked, GError ** error)
 {
 	gboolean first;
 	GByteArray *gba;
 	GHashTableIter iter;
 	gpointer k, v;
-	
+
 	if (!unpacked) {
-		GSETERROR(error,"NULL unpacked form");
+		GSETERROR(error, "NULL unpacked form");
 		return NULL;
 	}
-	gba = g_byte_array_sized_new(1+(32 * g_hash_table_size(unpacked)));
+	gba = g_byte_array_sized_new(1 + (32 * g_hash_table_size(unpacked)));
 	g_hash_table_iter_init(&iter, unpacked);
-	for (first=TRUE; g_hash_table_iter_next(&iter, &k, &v) ;) {
+	for (first = TRUE; g_hash_table_iter_next(&iter, &k, &v);) {
 		if (first)
 			first = FALSE;
 		else
-			g_byte_array_append(gba, (guint8*)";", 1);
-		g_byte_array_append(gba, (guint8*)k, strlen((gchar*)k));
-		g_byte_array_append(gba, (guint8*)"=", 1);
-		g_byte_array_append(gba, (guint8*)v, strlen((gchar*)v));
+			g_byte_array_append(gba, (guint8 *) ";", 1);
+		g_byte_array_append(gba, (guint8 *) k, strlen((gchar *) k));
+		g_byte_array_append(gba, (guint8 *) "=", 1);
+		g_byte_array_append(gba, (guint8 *) v, strlen((gchar *) v));
 	}
 	return gba;
 }
 
-GHashTable*
-metadata_remove_prefixed(GHashTable *unpacked, const gchar *prefix, GError **error)
+gboolean
+metadata_equal(const gchar * md1, const gchar * md2, GSList ** diff)
+{
+	gboolean ret = TRUE;
+	GHashTable *unpacked1, *unpacked2, *tmp;
+	GHashTableIter iter1;
+	gpointer k1, v1, v2;
+
+	// if both metadata are NULL, return TRUE
+	if (!md1 && !md2)
+		return TRUE;
+
+	// special cases when we do not need diff
+	if (!diff) {
+		// if only one of the metadata is not NULL, return FALSE
+		if (!md1 || !md2)
+			return FALSE;
+		// if length of metadata is different, return FALSE
+		if (strlen(md1) != strlen(md2))
+			return FALSE;
+	}
+
+	// unpack metadata to hashtables
+	unpacked1 = md1 ? metadata_unpack_string(md1, NULL) : METADATA_HT_CREATE();
+	unpacked2 = md2 ? metadata_unpack_string(md2, NULL) : METADATA_HT_CREATE();
+
+	// if unpacked2 has more keys than unpacked1, swap them so we always
+	// iterate over the biggest one
+	if (g_hash_table_size(unpacked2) > g_hash_table_size(unpacked1)) {
+		tmp = unpacked2;
+		unpacked2 = unpacked1;
+		unpacked1 = tmp;
+	}
+
+	// look for all keys of table 1 in table 2
+	g_hash_table_iter_init(&iter1, unpacked1);
+	while (g_hash_table_iter_next(&iter1, &k1, &v1)) {
+		v2 = g_hash_table_lookup(unpacked2, k1);
+		if (!v2 || 0 != g_strcmp0(v2, v1)) {
+			ret = FALSE;
+			if (diff)
+				*diff = g_slist_prepend(*diff, g_strdup(k1));
+			else
+				break;
+		}
+	}
+
+	g_hash_table_destroy(unpacked1);
+	g_hash_table_destroy(unpacked2);
+
+	return ret;
+}
+
+GHashTable *
+metadata_remove_prefixed(GHashTable * unpacked, const gchar * prefix,
+	GError ** error)
 {
 	GHashTable *ht_result;
 	GHashTableIter iter;
 	gpointer k, v;
-	
+
 	if (!unpacked) {
-		GSETERROR(error,"NULL unpacked form");
+		GSETERROR(error, "NULL unpacked form");
 		return NULL;
 	}
 	ht_result = METADATA_HT_CREATE();
@@ -151,15 +182,16 @@ metadata_remove_prefixed(GHashTable *unpacked, const gchar *prefix, GError **err
 	return ht_result;
 }
 
-GHashTable*
-metadata_extract_prefixed(GHashTable *unpacked, const gchar *prefix, GError **error)
+GHashTable *
+metadata_extract_prefixed(GHashTable * unpacked, const gchar * prefix,
+	GError ** error)
 {
 	GHashTable *ht_result;
 	GHashTableIter iter;
 	gpointer k, v;
-	
+
 	if (!unpacked) {
-		GSETERROR(error,"NULL unpacked form");
+		GSETERROR(error, "NULL unpacked form");
 		return NULL;
 	}
 	ht_result = METADATA_HT_CREATE();
@@ -173,11 +205,11 @@ metadata_extract_prefixed(GHashTable *unpacked, const gchar *prefix, GError **er
 }
 
 void
-metadata_merge(GHashTable *base, GHashTable *complement)
+metadata_merge(GHashTable * base, GHashTable * complement)
 {
 	GHashTableIter iter;
 	gpointer k, v;
-	
+
 	if (!base || complement)
 		return;
 
@@ -187,10 +219,10 @@ metadata_merge(GHashTable *base, GHashTable *complement)
 }
 
 void
-metadata_add_time(GHashTable *md, const gchar *key, GTimeVal *t) 
+metadata_add_time(GHashTable * md, const gchar * key, GTimeVal * t)
 {
 	GTimeVal time_used;
-	
+
 	if (!md || !key)
 		return;
 
@@ -199,22 +231,23 @@ metadata_add_time(GHashTable *md, const gchar *key, GTimeVal *t)
 	else
 		memcpy(&time_used, t, sizeof(GTimeVal));
 
-	g_hash_table_insert(md, g_strdup(key), g_strdup_printf("%li", time_used.tv_sec));
+	g_hash_table_insert(md, g_strdup(key), g_strdup_printf("%li",
+			time_used.tv_sec));
 }
 
 void
-metadata_add_printf(GHashTable *md, const gchar *key, const gchar * format, ...)
+metadata_add_printf(GHashTable * md, const gchar * key, const gchar * format,
+	...)
 {
 	va_list args;
 	gchar *str_formated;
-	
+
 	if (!md || !key || !format)
 		return;
 
-	va_start(args,format);
+	va_start(args, format);
 	str_formated = g_strdup_vprintf(format, args);
 	va_end(args);
 
 	g_hash_table_insert(md, g_strdup(key), str_formated);
 }
-

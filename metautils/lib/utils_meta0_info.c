@@ -1,35 +1,10 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metautils.meta0_info"
 #endif
 
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metautils.meta0_info"
-#endif
-
-#include <stdlib.h>
 #include <errno.h>
-#include <string.h>
-#include <glib.h>
 
-#include "./metatypes.h"
-#include "./metautils.h"
+#include "metautils.h"
 
 static gboolean
 func_equal_prefix(gconstpointer a, gconstpointer b)
@@ -45,32 +20,16 @@ func_equal_prefix(gconstpointer a, gconstpointer b)
 	if (sA != sB)
 		return FALSE;
 
-	return (0 == memcmp(((meta0_info_t *) a)->prefixes, ((meta0_info_t *) b)->prefixes, sA)) ? TRUE : FALSE;
+	return (0 == memcmp(((meta0_info_t *) a)->prefixes,
+			((meta0_info_t *) b)->prefixes, sA)) ? TRUE : FALSE;
 }
 
 
 static guint
 func_hash_prefix(gconstpointer k)
 {
-	register guint8 *b;
-	register guint32 h = 5381;
-	register gsize s, i;
-
-	if (!k)
-		return 0;
-
-	b = ((meta0_info_t *) k)->prefixes;
-	i = 0;
-	h = 5381;
-	s = ((meta0_info_t *) k)->prefixes_size;
-
-	for (; i < s; i++) {
-		register guint32 tmpB = *(b++);
-
-		h = ((h << 5) + h) ^ tmpB;
-	}
-
-	return h;
+	return djb_hash_buf(((meta0_info_t *) k)->prefixes,
+		((meta0_info_t *) k)->prefixes_size);
 }
 
 
@@ -94,20 +53,23 @@ meta0_info_to_string(const meta0_info_t * m0i, gchar * dst, gsize dstSize)
 	gsize i = 0;
 	gsize offset;
 
-	offset = g_snprintf(dst, dstSize, "%"G_GSIZE_FORMAT":", m0i->prefixes_size);
+	offset =
+		g_snprintf(dst, dstSize, "%" G_GSIZE_FORMAT ":", m0i->prefixes_size);
 
 	offset += addr_info_to_string(&(m0i->addr), dst + offset, dstSize - offset);
 
 	offset += g_snprintf(dst + offset, dstSize - offset, ":");
 
 	for (i = 0; i < m0i->prefixes_size; i++)
-		offset += g_snprintf(dst + offset, dstSize - offset, "%02x", m0i->prefixes[i]);
+		offset +=
+			g_snprintf(dst + offset, dstSize - offset, "%02x",
+			m0i->prefixes[i]);
 
 	return offset;
 }
 
 void
-meta0_info_clean(meta0_info_t *m0)
+meta0_info_clean(meta0_info_t * m0)
 {
 	if (!m0) {
 		errno = EINVAL;
@@ -167,7 +129,8 @@ meta0_info_list_map_by_addr(GSList * mL, GError ** err)
 
 	(void) err;
 
-	mH = g_hash_table_new_full(addr_info_hash, addr_info_equal, NULL, func_free_meta0);
+	mH = g_hash_table_new_full(addr_info_hash, addr_info_equal, NULL,
+		func_free_meta0);
 	if (!mH) {
 		errno = ENOMEM;
 		return NULL;
@@ -181,16 +144,19 @@ meta0_info_list_map_by_addr(GSList * mL, GError ** err)
 
 		arg = (meta0_info_t *) l->data;
 		m0i = g_hash_table_lookup(mH, arg);
-		if (m0i) {	/*appends the prefix */
-			guint8 *b = g_try_realloc(m0i->prefixes, m0i->prefixes_size + arg->prefixes_size);
+		if (m0i) {				/*appends the prefix */
+			guint8 *b =
+				g_try_realloc(m0i->prefixes,
+				m0i->prefixes_size + arg->prefixes_size);
 
 			if (b) {
 				m0i->prefixes = b;
-				g_memmove(m0i->prefixes + m0i->prefixes_size, arg->prefixes, arg->prefixes_size);
+				g_memmove(m0i->prefixes + m0i->prefixes_size, arg->prefixes,
+					arg->prefixes_size);
 				m0i->prefixes_size += arg->prefixes_size;
 			}
 		}
-		else {		/*insert a copy */
+		else {					/*insert a copy */
 			m0i = meta0_info_copy(arg);
 			g_hash_table_insert(mH, m0i, m0i);
 		}
@@ -209,7 +175,8 @@ meta0_info_list_map_by_prefix(GSList * mL, GError ** err)
 
 	(void) err;
 
-	mH = g_hash_table_new_full(func_hash_prefix, func_equal_prefix, NULL, func_free_meta0);
+	mH = g_hash_table_new_full(func_hash_prefix, func_equal_prefix, NULL,
+		func_free_meta0);
 	for (l = mL; l; l = l->next) {
 		register int i, max;
 		meta0_info_t dummy, *arg, *m0i;
@@ -225,15 +192,17 @@ meta0_info_list_map_by_prefix(GSList * mL, GError ** err)
 		for (i = 1, max = arg->prefixes_size - 1; i < max; i += 2) {
 			g_memmove(dummy.prefixes, arg->prefixes + i - 1, 2);
 			m0i = g_hash_table_lookup(mH, &dummy);
-			if (m0i) {	/*prefix already present, we do nothing else a debug */
+			if (m0i) {			/*prefix already present, we do nothing else a debug */
 				if (DEBUG_ENABLED()) {
 					char str_addr[128];
 
-					addr_info_to_string(&(dummy.addr), str_addr, sizeof(str_addr));
-					DEBUG("double prefix found %02X%02X -> %s", dummy.prefixes[0], dummy.prefixes[1], str_addr);
+					addr_info_to_string(&(dummy.addr), str_addr,
+						sizeof(str_addr));
+					DEBUG("double prefix found %02X%02X -> %s",
+						dummy.prefixes[0], dummy.prefixes[1], str_addr);
 				}
 			}
-			else {	/*prefix absent */
+			else {				/*prefix absent */
 				m0i = meta0_info_copy(&dummy);
 				g_hash_table_insert(mH, m0i, m0i);
 			}

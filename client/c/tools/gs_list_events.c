@@ -1,25 +1,7 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "grid.tools.event.list"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "grid.tools.event.list"
 #endif
 
-#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -28,21 +10,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 
-#include <signal.h>
-
-#include <glib.h>
-
-#include <metatypes.h>
-#include <metautils.h>
-#include <metacomm.h>
-
-#include <meta2_services_remote.h>
-
-#include "../lib/grid_client.h"
 #include "../lib/gs_internals.h"
 #include "./gs_tools.h"
 
@@ -77,19 +49,19 @@ parse_opt(int argc, char **args)
 
 	while ((opt = getopt(argc, args, "hvq")) != -1) {
 		switch (opt) {
-		case 'h':
-			flag_help = ~0;
-			break;
-		case 'v':
-			flag_verbose++;
-			break;
-		case 'q':
-			flag_quiet = ~0;
-			break;
-		case '?':
-		default:
-			PRINT_ERROR("unexpected %c (%s)\n", optopt, strerror(opterr));
-			return 0;
+			case 'h':
+				flag_help = ~0;
+				break;
+			case 'v':
+				flag_verbose++;
+				break;
+			case 'q':
+				flag_quiet = ~0;
+				break;
+			case '?':
+			default:
+				PRINT_ERROR("unexpected %c (%s)\n", optopt, strerror(opterr));
+				return 0;
 		}
 	}
 
@@ -97,7 +69,7 @@ parse_opt(int argc, char **args)
 		PRINT_ERROR("Expected GridUrl as last argument\n");
 		return 0;
 	}
-	
+
 	grid_url = args[optind];
 	tokens = g_strsplit(grid_url, "/", 0);
 	if (!tokens)
@@ -107,8 +79,8 @@ parse_opt(int argc, char **args)
 		return 0;
 	}
 
-	g_strlcpy(ns_name, tokens[0], sizeof(ns_name)-1);
-	g_strlcpy(container_name, tokens[1], sizeof(ns_name)-1);
+	g_strlcpy(ns_name, tokens[0], sizeof(ns_name) - 1);
+	g_strlcpy(container_name, tokens[1], sizeof(ns_name) - 1);
 	g_strfreev(tokens);
 	return 1;
 }
@@ -154,34 +126,36 @@ main_set_defaults(void)
 }
 
 static gboolean
-str_is_hexid(const gchar *str)
+str_is_hexid(const gchar * str)
 {
 	const gchar *s;
+
 	if (!str || !*str)
 		return FALSE;
-	for (s=str; *s ;s++) {
+	for (s = str; *s; s++) {
 		if (!g_ascii_isxdigit(*s)) {
 			PRINT_DEBUG("non-xdigit character found : %c", *s);
 			return FALSE;
 		}
 	}
-	if ((s-str) == 64)
+	if ((s - str) == 64)
 		return TRUE;
 
-	PRINT_DEBUG("Invalid string length : %"G_GSIZE_FORMAT, (s-str));
+	PRINT_DEBUG("Invalid string length : %" G_GSIZE_FORMAT, (s - str));
 	return FALSE;
 }
 
 static gboolean
-gba_is_printable(GByteArray *gba)
+gba_is_printable(GByteArray * gba)
 {
 	gsize i;
 
 	g_assert(gba != NULL);
 	g_assert(!gba->len || gba->data != NULL);
 
-	for (i=0; i<gba->len ;i++) {
+	for (i = 0; i < gba->len; i++) {
 		gchar c = (gchar) gba->data[i];
+
 		if (c && !g_ascii_isspace(c) && !g_ascii_isprint(c))
 			return FALSE;
 	}
@@ -189,29 +163,41 @@ gba_is_printable(GByteArray *gba)
 }
 
 static void
-event_print(container_event_t *ce)
+event_print(container_event_t * ce)
 {
 	guint i;
 	GByteArray *gba;
 
-	g_print("%"G_GINT64_FORMAT" 	| %"G_GINT64_FORMAT" 	| %s 	| %s 	| ", ce->rowid, ce->timestamp, ce->type, ce->ref);
-	
+	g_print("%" G_GINT64_FORMAT " 	| %" G_GINT64_FORMAT " 	| %s 	| %s 	| ",
+		ce->rowid, ce->timestamp, ce->type, ce->ref);
+
 	gba = ce->message;
 	if (gba_is_printable(gba)) {
-		for (i=0; i < gba->len ;i++) {
+		for (i = 0; i < gba->len; i++) {
 			gchar c = (gchar) gba->data[i];
+
 			switch (c) {
-				case '\0': g_print("\\0"); break;
-				case '\t': g_print("\\t"); break;
-				case '\n': g_print("\\n"); break;
-				case '\r': g_print("\\r"); break;
-				default: g_print("%c", c); break;
+				case '\0':
+					g_print("\\0");
+					break;
+				case '\t':
+					g_print("\\t");
+					break;
+				case '\n':
+					g_print("\\n");
+					break;
+				case '\r':
+					g_print("\\r");
+					break;
+				default:
+					g_print("%c", c);
+					break;
 			}
 		}
 	}
 	else {
 		g_print("0x");
-		for (i=0; i < gba->len ;i++)
+		for (i = 0; i < gba->len; i++)
 			g_print("%02X", gba->data[i]);
 	}
 
@@ -248,19 +234,20 @@ main(int argc, char **args)
 
 	gs = gs_grid_storage_init2(ns_name, 5000, 60000, &gserr);
 	if (!gs) {
-		PRINT_ERROR("Failed to init the GridStorage client : %s\n", gs_error_get_message(gserr));
+		PRINT_ERROR("Failed to init the GridStorage client : %s\n",
+			gs_error_get_message(gserr));
 		goto label_exit;
 	}
-	gs_grid_storage_set_timeout(gs, GS_TO_RAWX_CNX,  5000, NULL);
-	gs_grid_storage_set_timeout(gs, GS_TO_RAWX_OP,  60000, NULL);
-	gs_grid_storage_set_timeout(gs, GS_TO_M0_CNX,    5000, NULL);
-	gs_grid_storage_set_timeout(gs, GS_TO_M0_OP,    60000, NULL);
-	gs_grid_storage_set_timeout(gs, GS_TO_M1_CNX,    5000, NULL);
-	gs_grid_storage_set_timeout(gs, GS_TO_M1_OP,    60000, NULL);
-	gs_grid_storage_set_timeout(gs, GS_TO_M2_CNX,    5000, NULL);
-	gs_grid_storage_set_timeout(gs, GS_TO_M2_OP,    60000, NULL);
-	gs_grid_storage_set_timeout(gs, GS_TO_MCD_CNX,   5000, NULL);
-	gs_grid_storage_set_timeout(gs, GS_TO_MCD_OP,   60000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_RAWX_CNX, 5000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_RAWX_OP, 60000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_M0_CNX, 5000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_M0_OP, 60000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_M1_CNX, 5000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_M1_OP, 60000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_M2_CNX, 5000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_M2_OP, 60000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_MCD_CNX, 5000, NULL);
+	gs_grid_storage_set_timeout(gs, GS_TO_MCD_OP, 60000, NULL);
 
 	/* Ensure the container's name is set */
 	if (!*container_name) {
@@ -270,37 +257,44 @@ main(int argc, char **args)
 
 	/* Locate the container */
 	if (str_is_hexid(container_name)) {
-		PRINT_DEBUG("Considering %s is a hexidecimal container id\n", container_name);
+		PRINT_DEBUG("Considering %s is a hexidecimal container id\n",
+			container_name);
 		location = gs_locate_container_by_hexid(gs, container_name, &gserr);
 	}
 	else {
-		PRINT_DEBUG("Considering %s is a regular container id\n", container_name);
+		PRINT_DEBUG("Considering %s is a regular container id\n",
+			container_name);
 		location = gs_locate_container_by_name(gs, container_name, &gserr);
 	}
 
 	if (!location) {
-		PRINT_ERROR("Container reference not resolvable : %s\n", gs_error_get_message(gserr));
+		PRINT_ERROR("Container reference not resolvable : %s\n",
+			gs_error_get_message(gserr));
 		goto label_exit_client;
 	}
-	if (!location->m0_url || !location->m1_url || !location->m2_url || !location->m2_url[0]) {
+	if (!location->m0_url || !location->m1_url || !location->m2_url
+		|| !location->m2_url[0]) {
 		PRINT_ERROR("Container reference partially missing (%p %p %p): %s\n",
-			location->m0_url, location->m1_url, location->m2_url, gs_error_get_message(gserr));
+			location->m0_url, location->m1_url, location->m2_url,
+			gs_error_get_message(gserr));
 		goto label_exit_location;
 	}
 
 	gchar **p;
+
 	PRINT_DEBUG("META0   : tcp://%s\n", location->m0_url);
 	g_print("META1   :");
-	for (p=location->m1_url; p && *p ;p++)
+	for (p = location->m1_url; p && *p; p++)
 		g_print(" tcp://%s", *p);
 	g_print("META2   :");
-	for (p=location->m2_url; p && *p ;p++)
+	for (p = location->m2_url; p && *p; p++)
 		g_print(" tcp://%s", *p);
 	PRINT_DEBUG("CNAME   : [%s]\n", location->container_name);
 	PRINT_DEBUG("CID     : [%s]\n", location->container_hexid);
-	
+
 	/* Now Dump the content and its chunks */
-	container_id_hex2bin(location->container_hexid, strlen(location->container_hexid), &cid, &gerr);
+	container_id_hex2bin(location->container_hexid,
+		strlen(location->container_hexid), &cid, &gerr);
 	metacnx_clear(&m2_ctx);
 	if (!metacnx_init_with_url(&m2_ctx, location->m2_url[0], &gerr)) {
 		g_print("Invalid meta2 address : %s\n", gerror_get_message(gerr));
@@ -310,14 +304,16 @@ main(int argc, char **args)
 
 		m2_ctx.timeout.cnx = 60000;
 		m2_ctx.timeout.req = 60000;
-		rc = meta2_remote_list_last_container_events(&m2_ctx, cid, 20, "ALL", "", &last_events, &gerr);
+		rc = meta2_remote_list_last_container_events(&m2_ctx, cid, 20, "ALL",
+			"", &last_events, &gerr);
 		metacnx_close(&m2_ctx);
 		metacnx_clear(&m2_ctx);
 
 		if (last_events) {
 			g_print("#Rowid 	| Timestamp 	| Type 	| Ref 	| Message\n");
-			g_print("-------------------------------------------------------\n");
-			for (l=last_events; l ;l=l->next)
+			g_print
+				("-------------------------------------------------------\n");
+			for (l = last_events; l; l = l->next)
 				event_print(l->data);
 			g_slist_foreach(last_events, container_event_gclean, NULL);
 			g_slist_free(last_events);
@@ -339,4 +335,3 @@ label_exit:
 		gs_error_free(gserr);
 	return rc;
 }
-

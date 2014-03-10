@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-#include "../config.h"
-#endif
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "snmp.gridstorage"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "grid.snmp.session"
 #endif
 
 #include <errno.h>
@@ -32,27 +12,29 @@
 #include <neon/ne_request.h>
 #include <neon/ne_session.h>
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 
-#include "./session.h"
+#include "session.h"
 
 struct rawx_session_s
 {
-        GByteArray *request_id;
-        addr_info_t addr;
-        struct {
-                gint cnx;
-                gint req;
-        } timeout;
-        ne_session *neon_session;
+	GByteArray *request_id;
+	addr_info_t addr;
+	struct
+	{
+		gint cnx;
+		gint req;
+	} timeout;
+	ne_session *neon_session;
 };
 
 static int
 body_reader(void *userdata, const char *buf, size_t len)
 {
 	GByteArray *gba = userdata;
+
 	if (buf && len)
-		g_byte_array_append(gba, (const guint8*)buf, len);
+		g_byte_array_append(gba, (const guint8 *) buf, len);
 	return 0;
 }
 
@@ -63,17 +45,18 @@ body_parser(GByteArray * buffer, GError ** err)
 	GRegex *stat_regex = NULL;
 	GMatchInfo *match_info = NULL;
 
-	g_byte_array_append(buffer, (const guint8*)"", 1);
+	g_byte_array_append(buffer, (const guint8 *) "", 1);
 
 	stat_regex = g_regex_new("^(\\S+)[ \\t]+(\\S+).*$",
-			G_REGEX_MULTILINE | G_REGEX_RAW, G_REGEX_MATCH_NOTEMPTY, err);
+		G_REGEX_MULTILINE | G_REGEX_RAW, G_REGEX_MATCH_NOTEMPTY, err);
 
 	if (!stat_regex) {
 		GSETERROR(err, "Regex compilation error");
 		return NULL;
 	}
 
-	if (!g_regex_match(stat_regex, (const gchar*)buffer->data, G_REGEX_MATCH_NOTEMPTY, &match_info)) {
+	if (!g_regex_match(stat_regex, (const gchar *) buffer->data,
+			G_REGEX_MATCH_NOTEMPTY, &match_info)) {
 		GSETERROR(err, "Invalid stat from the RAWX");
 		goto error_label;
 	}
@@ -90,7 +73,8 @@ body_parser(GByteArray * buffer, GError ** err)
 			goto error_label;
 		}
 		else if (g_match_info_get_match_count(match_info) != 3) {
-			GSETERROR(err, "Invalid matching, %d groups found", g_match_info_get_match_count(match_info));
+			GSETERROR(err, "Invalid matching, %d groups found",
+				g_match_info_get_match_count(match_info));
 			goto error_label;
 		}
 		else {
@@ -129,45 +113,47 @@ error_label:
 	return NULL;
 }
 
-rawx_session_t* rawx_client_create_session( addr_info_t *ai, GError **err )
+rawx_session_t *
+rawx_client_create_session(addr_info_t * ai, GError ** err)
 {
 	struct sockaddr_storage ss;
 	gsize ss_size = sizeof(ss);
 	gchar host[256], port[16];
 	rawx_session_t *session;
 
-	session = g_try_malloc0( sizeof(rawx_session_t) );
+	session = g_try_malloc0(sizeof(rawx_session_t));
 	if (!session) {
-		GSETERROR(err,"Memory allocation failure");
+		GSETERROR(err, "Memory allocation failure");
 		goto error_session;
 	}
 
-	memcpy( &(session->addr), ai, sizeof(addr_info_t) );
+	memcpy(&(session->addr), ai, sizeof(addr_info_t));
 
-	if (!addrinfo_to_sockaddr( ai, (struct sockaddr*)&ss, &ss_size )) {
-		GSETERROR(err,"addr_info_t conversion error");
+	if (!addrinfo_to_sockaddr(ai, (struct sockaddr *) &ss, &ss_size)) {
+		GSETERROR(err, "addr_info_t conversion error");
 		goto error_addr;
 	}
 
-	memset( host, 0x00, sizeof(host) );
-	memset( port, 0x00, sizeof(port) );
+	memset(host, 0x00, sizeof(host));
+	memset(port, 0x00, sizeof(port));
 
-	if (getnameinfo ( (struct sockaddr* )&ss, ss_size, host, sizeof(host), port, sizeof(port), NI_NUMERICHOST|NI_NUMERICSERV)) {
-		GSETERROR(err,"addr_info_t resolution error : %s", strerror(errno));
+	if (getnameinfo((struct sockaddr *) &ss, ss_size, host, sizeof(host), port,
+			sizeof(port), NI_NUMERICHOST | NI_NUMERICSERV)) {
+		GSETERROR(err, "addr_info_t resolution error : %s", strerror(errno));
 		goto error_addr;
 	}
 
-	session->neon_session = ne_session_create ("http", host, atoi(port));
+	session->neon_session = ne_session_create("http", host, atoi(port));
 	if (!session->neon_session) {
-		GSETERROR(err,"neon session creation error");
+		GSETERROR(err, "neon session creation error");
 		goto error_neon;
 	}
 
 	session->timeout.cnx = 60000;
 	session->timeout.req = 60000;
 
-	ne_set_connect_timeout (session->neon_session, session->timeout.cnx/1000);
-	ne_set_read_timeout (session->neon_session, session->timeout.req/1000);
+	ne_set_connect_timeout(session->neon_session, session->timeout.cnx / 1000);
+	ne_set_read_timeout(session->neon_session, session->timeout.req / 1000);
 
 	return session;
 
@@ -178,21 +164,25 @@ error_session:
 	return NULL;
 }
 
-void rawx_client_free_session( rawx_session_t *session )
+void
+rawx_client_free_session(rawx_session_t * session)
 {
 	if (!session)
 		return;
-	ne_session_destroy( session->neon_session );
-	memset( session, 0x00, sizeof(rawx_session_t) );
-	g_free( session );
+	ne_session_destroy(session->neon_session);
+	memset(session, 0x00, sizeof(rawx_session_t));
+	g_free(session);
 }
 
-void rawx_client_session_set_timeout( rawx_session_t *session, gint cnx, gint req )
+void
+rawx_client_session_set_timeout(rawx_session_t * session, gint cnx, gint req)
 {
 	if (!session)
 		return;
-	if (req>0) session->timeout.req = req;
-	if (cnx>0) session->timeout.cnx = cnx;
+	if (req > 0)
+		session->timeout.req = req;
+	if (cnx > 0)
+		session->timeout.cnx = cnx;
 }
 
 static void
@@ -200,7 +190,7 @@ _convert_string_to_double(gpointer key, gpointer value, gpointer data)
 {
 	gint64 value_i64;
 	gdouble value_d;
-	gchar* str_value;
+	gchar *str_value;
 	GHashTable *hash;
 
 	str_value = value;
@@ -208,11 +198,13 @@ _convert_string_to_double(gpointer key, gpointer value, gpointer data)
 
 	value_i64 = g_ascii_strtoll(str_value, NULL, 10);
 	value_d = value_i64;
-	g_hash_table_insert(hash, g_strdup(key), g_memdup(&value_d, sizeof(value_d)));
+	g_hash_table_insert(hash, g_strdup(key), g_memdup(&value_d,
+			sizeof(value_d)));
 }
 
 GHashTable *
-rawx_client_get_statistics(rawx_session_t * session, const gchar *url, GError ** err)
+rawx_client_get_statistics(rawx_session_t * session, const gchar * url,
+	GError ** err)
 {
 	int rc;
 	gchar str_addr[64];
@@ -239,27 +231,30 @@ rawx_client_get_statistics(rawx_session_t * session, const gchar *url, GError **
 	ne_add_response_body_reader(request, ne_accept_2xx, body_reader, buffer);
 
 	switch (rc = ne_request_dispatch(request)) {
-	case NE_OK:
-		if (ne_get_status(request)->klass != 2) {
-			GSETERROR(err, "RAWX returned an error");
+		case NE_OK:
+			if (ne_get_status(request)->klass != 2) {
+				GSETERROR(err, "RAWX returned an error");
+				goto exit;
+			}
+			else if (!(parsed = body_parser(buffer, err))) {
+				GSETERROR(err, "No statistics from the RAWX server");
+				goto exit;
+			}
+			break;
+		case NE_ERROR:
+		case NE_TIMEOUT:
+		case NE_CONNECT:
+		case NE_AUTH:
+			str_addr_size =
+				addr_info_to_string(&(session->addr), str_addr,
+				sizeof(str_addr));
+			GSETERROR(err, "cannot download the stats from [%.*s]' (%s)",
+				str_addr_size, str_addr, ne_get_error(session->neon_session));
 			goto exit;
-		}
-		else if (!(parsed = body_parser(buffer, err))) {
-			GSETERROR(err, "No statistics from the RAWX server");
+		default:
+			GSETERROR(err, "Unexpected return code from the neon library : %d",
+				rc);
 			goto exit;
-		}
-		break;
-	case NE_ERROR:
-	case NE_TIMEOUT:
-	case NE_CONNECT:
-	case NE_AUTH:
-		str_addr_size = addr_info_to_string(&(session->addr), str_addr, sizeof(str_addr));
-		GSETERROR(err, "cannot download the stats from [%.*s]' (%s)",
-		    str_addr_size, str_addr, ne_get_error(session->neon_session));
-		goto exit;
-	default:
-		GSETERROR(err, "Unexpected return code from the neon library : %d", rc);
-		goto exit;
 	}
 
 	result = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
@@ -275,4 +270,3 @@ exit:
 
 	return result;
 }
-

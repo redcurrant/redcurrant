@@ -1,24 +1,15 @@
 include_directories(BEFORE .
-		../../../metautils/lib
-		../../../libdbaccess/lib
-		../../../cluster/lib ../../../cluster/agent ../../../cluster/events
-		../../../meta1v2
-		../../../meta0v2
-		../../../meta2/remote
-		../../../meta2v2
-		../lib)
-
-include_directories(AFTER
-		${CMAKE_CURRENT_BINARY_DIR}/../../../meta2/remote
-		${CMAKE_CURRENT_BINARY_DIR}/../../../meta2v2)
-
-set(BINPREFIX redc_)
+		../../..
+		${CMAKE_CURRENT_BINARY_DIR}/../../..
+		../../../metautils/lib)
 
 set(REQLIBS
 		gridclient metautils metacomm
 		gridcluster gridcluster-remote gridcluster-events
 		meta2remote meta1remote meta0remote
 		${GLIB2_LIBRARIES})
+
+set(SOLRLIBS solrutils)
 
 add_executable(${BINPREFIX}add_event gs_add_event.c)
 target_link_libraries(${BINPREFIX}add_event ${REQLIBS})
@@ -68,17 +59,30 @@ target_link_libraries(${BINPREFIX}set_prop ${REQLIBS})
 add_executable(${BINPREFIX}touch gs_touch.c)
 target_link_libraries(${BINPREFIX}touch ${REQLIBS})
 
+add_executable(${BINPREFIX}unref_solr gs_unref_solr.c)
+target_link_libraries(${BINPREFIX}unref_solr ${REQLIBS} ${SOLRLIBS})
+
+add_executable(${BINPREFIX}set_solr gs_set_solr.c)
+target_link_libraries(${BINPREFIX}set_solr ${REQLIBS} ${SOLRLIBS})
+
 add_executable(${BINPREFIX}rm_event gs_rm_event.c)
 target_link_libraries(${BINPREFIX}rm_event ${REQLIBS})
 
-add_executable(redcdir hcdir.c)
-target_link_libraries(redcdir ${REQLIBS})
+add_executable(hcdir hcdir.c)
+target_link_libraries(hcdir ${REQLIBS})
 
-add_executable(redc hc.c)
-target_link_libraries(redc ${REQLIBS})
+
+add_executable(hc hc.c)
+target_link_libraries(hc ${REQLIBS})
 
 add_executable(${BINPREFIX}quota gs_quota.c)
 target_link_libraries(${BINPREFIX}quota ${REQLIBS})
+
+add_executable(hcadmin hcadmin.c)
+target_link_libraries(hcadmin ${REQLIBS})
+
+add_executable(test_upload test_upload.c)
+target_link_libraries(test_upload ${REQLIBS})
 
 #install(TARGETS
 #			${BINPREFIX}touch
@@ -97,8 +101,10 @@ target_link_libraries(${BINPREFIX}quota ${REQLIBS})
 #			${BINPREFIX}create
 #			${BINPREFIX}append
 #			${BINPREFIX}add_event
+#			${BINPREFIX}unref_solr
+#			${BINPREFIX}set_solr
 #			${BINPREFIX}quota
 #		RUNTIME DESTINATION bin)
 
-install(TARGETS redcdir redc
+install(TARGETS hcdir hc hcadmin
 		RUNTIME DESTINATION bin)

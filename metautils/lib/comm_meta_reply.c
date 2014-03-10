@@ -1,26 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metautils"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metautils"
 #endif
 
 #include <errno.h>
@@ -28,13 +7,6 @@
 #include <strings.h>
 #include <stdlib.h>
 
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
-#include <glib.h>
-
-#include "./metatypes.h"
 #include "./metautils.h"
 #include "./metacomm.h"
 #include "./gridd_client.h"
@@ -43,12 +15,13 @@ static inline gdouble
 ms_to_s(int ms)
 {
 	gdouble dms = ms;
+
 	return dms / 1000.0;
 }
 
 gint
 metaXServer_reply_simple(MESSAGE * reply, MESSAGE request, gint code,
-		const gchar * message, GError ** err)
+	const gchar * message, GError ** err)
 {
 	MESSAGE tmpReply = NULL;
 
@@ -62,7 +35,8 @@ metaXServer_reply_simple(MESSAGE * reply, MESSAGE request, gint code,
 		goto errorLabel;
 	}
 
-	if (!message_set_NAME(tmpReply, NAME_MSGNAME_METAREPLY, sizeof(NAME_MSGNAME_METAREPLY) - 1, err)) {
+	if (!message_set_NAME(tmpReply, NAME_MSGNAME_METAREPLY,
+			sizeof(NAME_MSGNAME_METAREPLY) - 1, err)) {
 		GSETERROR(err, "Cannot set the NAME of the message");
 		goto errorLabel;
 	}
@@ -74,33 +48,35 @@ metaXServer_reply_simple(MESSAGE * reply, MESSAGE request, gint code,
 
 		mID = NULL;
 		mIDSize = 0;
-		if (0>=message_get_ID(request, &mID, &mIDSize, err) || 0>=message_set_ID(tmpReply, mID, mIDSize, err)) {
+		if (0 >= message_get_ID(request, &mID, &mIDSize, err)
+			|| 0 >= message_set_ID(tmpReply, mID, mIDSize, err)) {
 			GSETERROR(err, "Cannot copy the ID of the message");
 			goto errorLabel;
 		}
 	}
 
-	do {			/*If the original request carries a timestamp, we keep it in the reply */
+	do {						/*If the original request carries a timestamp, we keep it in the reply */
 		void *stamp = NULL;
 		gsize stampLen = 0;
 
-		switch (message_get_field(request, NAME_MSGKEY_TIMESTAMP, sizeof(NAME_MSGKEY_TIMESTAMP) - 1, &stamp,
-			&stampLen, err)) {
-		case 1:
-			if (!message_add_field(tmpReply, NAME_MSGKEY_TIMESTAMP, sizeof(NAME_MSGKEY_TIMESTAMP) - 1,
-				stamp, stampLen, err)) {
+		switch (message_get_field(request, NAME_MSGKEY_TIMESTAMP,
+				sizeof(NAME_MSGKEY_TIMESTAMP) - 1, &stamp, &stampLen, err)) {
+			case 1:
+				if (!message_add_field(tmpReply, NAME_MSGKEY_TIMESTAMP,
+						sizeof(NAME_MSGKEY_TIMESTAMP) - 1, stamp, stampLen,
+						err)) {
+					GSETERROR(err, "Cannot copy the TIMESTAMP of the message");
+					goto errorLabel;
+				}
+			case 0:
+				break;
+			case -1:
 				GSETERROR(err, "Cannot copy the TIMESTAMP of the message");
 				goto errorLabel;
-			}
-		case 0:
-			break;
-		case -1:
-			GSETERROR(err, "Cannot copy the TIMESTAMP of the message");
-			goto errorLabel;
 		}
 	} while (0);
 
-	do {			/*ensures and formats the error code */
+	do {						/*ensures and formats the error code */
 		gchar bufCode[4];
 
 		if (code < 100)
@@ -109,7 +85,8 @@ metaXServer_reply_simple(MESSAGE * reply, MESSAGE request, gint code,
 			code = 699;
 		g_snprintf(bufCode, 4, "%03i", code);
 
-		if (!message_add_field(tmpReply, NAME_MSGKEY_STATUS, sizeof(NAME_MSGKEY_STATUS) - 1, bufCode, 3, err)) {
+		if (!message_add_field(tmpReply, NAME_MSGKEY_STATUS,
+				sizeof(NAME_MSGKEY_STATUS) - 1, bufCode, 3, err)) {
 			GSETERROR(err, "%s", "Cannot add the status in the reply");
 			goto errorLabel;
 		}
@@ -117,8 +94,9 @@ metaXServer_reply_simple(MESSAGE * reply, MESSAGE request, gint code,
 
 	/*writes the message */
 	if (message) {
-		if (!message_add_field(tmpReply, NAME_MSGKEY_MESSAGE, sizeof(NAME_MSGKEY_MESSAGE) - 1, message,
-			strlen(message), err)) {
+		if (!message_add_field(tmpReply, NAME_MSGKEY_MESSAGE,
+				sizeof(NAME_MSGKEY_MESSAGE) - 1, message, strlen(message),
+				err)) {
 			GSETERROR(err, "%s", "Cannot add the error-message in the reply");
 			goto errorLabel;
 		}
@@ -127,7 +105,7 @@ metaXServer_reply_simple(MESSAGE * reply, MESSAGE request, gint code,
 	*reply = tmpReply;
 
 	return 1;
-      errorLabel:
+errorLabel:
 	if (tmpReply)
 		message_destroy(tmpReply, NULL);
 
@@ -136,7 +114,8 @@ metaXServer_reply_simple(MESSAGE * reply, MESSAGE request, gint code,
 
 
 gint
-metaXClient_reply_simple(MESSAGE reply, gint * status, gchar ** msg, GError ** err)
+metaXClient_reply_simple(MESSAGE reply, gint * status, gchar ** msg,
+	GError ** err)
 {
 	/*sanity checks */
 	if (!reply || !status || !msg) {
@@ -153,64 +132,69 @@ metaXClient_reply_simple(MESSAGE reply, gint * status, gchar ** msg, GError ** e
 		gchar *name = NULL;
 
 		switch (message_has_NAME(reply, NULL)) {
-		case 0:
-			GSETERROR(err, "The message cannot be a reply (%s)", "no name is present");
-		case -1:
-			goto errorLabel;
+			case 0:
+				GSETERROR(err, "The message cannot be a reply (%s)",
+					"no name is present");
+			case -1:
+				goto errorLabel;
 		}
 
 		if (!message_get_NAME(reply, (void *) &name, &nameSize, err))
 			goto errorLabel;
 
-		if (0 != g_ascii_strncasecmp(name, NAME_MSGNAME_METAREPLY, MIN(sizeof(NAME_MSGNAME_METAREPLY) - 1, nameSize))) {
+		if (0 != g_ascii_strncasecmp(name, NAME_MSGNAME_METAREPLY,
+				MIN(sizeof(NAME_MSGNAME_METAREPLY) - 1, nameSize))) {
 			GSETERROR(err, "The message cannot be a reply (%s)",
-			    "invalid message name, '" NAME_MSGNAME_METAREPLY "' expected");
+				"invalid message name, '" NAME_MSGNAME_METAREPLY "' expected");
 			goto errorLabel;
 		}
 	}
 
-	{			/*get the message (copy) if present */
+	{							/*get the message (copy) if present */
 		gchar *tmpMsg = NULL, *newMsg = NULL;
 		gsize tmpMsgSize = 0, i;
 
-		switch (message_get_field(reply, NAME_MSGKEY_MESSAGE, sizeof(NAME_MSGKEY_MESSAGE) - 1, (void *) &tmpMsg,
-			&tmpMsgSize, err)) {
-		case 1:
-			newMsg = g_try_malloc0(sizeof(gchar) * (tmpMsgSize + 1));
-			if (!newMsg) {
-				GSETERROR(err, "%s", "Memory allocation error");
+		switch (message_get_field(reply, NAME_MSGKEY_MESSAGE,
+				sizeof(NAME_MSGKEY_MESSAGE) - 1, (void *) &tmpMsg, &tmpMsgSize,
+				err)) {
+			case 1:
+				newMsg = g_try_malloc0(sizeof(gchar) * (tmpMsgSize + 1));
+				if (!newMsg) {
+					GSETERROR(err, "%s", "Memory allocation error");
+					goto errorLabel;
+				}
+				memcpy(newMsg, tmpMsg, tmpMsgSize);
+				newMsg[tmpMsgSize] = '\0';
+
+				/*check the message is pure ASCII */
+				for (i = 0; i < tmpMsgSize; i++) {
+					if (!g_ascii_isprint(newMsg[i])
+						&& !g_ascii_isspace(newMsg[i]))
+						newMsg[i] = '?';
+				}
+
+				*msg = newMsg;
+				break;
+			case 0:
+				*msg = NULL;
+				break;
+			case -1:
+				*msg = NULL;
 				goto errorLabel;
-			}
-			memcpy(newMsg, tmpMsg, tmpMsgSize);
-			newMsg[tmpMsgSize] = '\0';
-
-			/*check the message is pure ASCII */
-			for (i = 0; i < tmpMsgSize; i++) {
-				if (!g_ascii_isprint(newMsg[i]) && !g_ascii_isspace(newMsg[i]))
-					newMsg[i] = '?';
-			}
-
-			*msg = newMsg;
-			break;
-		case 0:
-			*msg = NULL;
-			break;
-		case -1:
-			*msg = NULL;
-			goto errorLabel;
 		}
 	}
 
-	{			/*XXX MANDATORY XXX get the status */
+	{							/*XXX MANDATORY XXX get the status */
 		gchar *tmpStatus = NULL, *end = NULL, wrkStatus[4] = { 0, 0, 0, 0 };
 		gsize tmpStatusSize = 0;
 
-		switch (message_get_field(reply, NAME_MSGKEY_STATUS, sizeof(NAME_MSGKEY_STATUS) - 1,
-			(void *) &tmpStatus, &tmpStatusSize, err)) {
-		case 0:
-			GSETERROR(err, "%s", "Status not found");
-		case -1:
-			goto errorLabel;
+		switch (message_get_field(reply, NAME_MSGKEY_STATUS,
+				sizeof(NAME_MSGKEY_STATUS) - 1, (void *) &tmpStatus,
+				&tmpStatusSize, err)) {
+			case 0:
+				GSETERROR(err, "%s", "Status not found");
+			case -1:
+				goto errorLabel;
 		}
 
 		if (tmpStatusSize != 3) {
@@ -229,31 +213,11 @@ metaXClient_reply_simple(MESSAGE reply, gint * status, gchar ** msg, GError ** e
 	}
 
 	return 1;
-      errorLabel:
+errorLabel:
 	if (*msg)
 		g_free(*msg);
 
 	return 0;
-}
-
-static void
-message_randomize_id(struct message_s *req)
-{
-	static volatile guint32 seq = 0;
-	struct {
-		gint pid, ppid;
-		GTimeVal now;
-		guint32 seq;
-		gpointer req;
-	} bulk;
-
-	bulk.pid = getpid();
-	bulk.ppid = getppid();
-	g_get_current_time(&bulk.now);
-	bulk.seq = ++seq;
-	bulk.req = req;
-
-	message_set_ID(req, &bulk, sizeof(bulk), NULL);
 }
 
 struct repseq_ctx_s
@@ -262,11 +226,12 @@ struct repseq_ctx_s
 	GError *err;
 };
 
-static struct code_handler_s*
+static struct code_handler_s *
 _find_handler(struct reply_sequence_data_s *data, int code)
 {
 	struct code_handler_s *h;
-	for (h=data->codes; h->code != 0 ;h++) {
+
+	for (h = data->codes; h->code != 0; h++) {
 		if (h->code < 0 || h->code == code)
 			return h;
 	}
@@ -277,7 +242,7 @@ static gboolean
 rep_handler(gpointer u, struct message_s *reply)
 {
 	struct repseq_ctx_s *ctx = u;
-	int rc=TRUE, body;
+	int rc = TRUE, body;
 	gint64 s64 = 0;
 	struct code_handler_s *h;
 
@@ -285,8 +250,10 @@ rep_handler(gpointer u, struct message_s *reply)
 	if (ctx->err != NULL)
 		return FALSE;
 
-	if (!(h = _find_handler(ctx->data, s64))) { // Unexpected reply received
-		ctx->err = NEWERROR(500, "Unexpected reply status [%"G_GINT64_FORMAT"]", s64);
+	if (!(h = _find_handler(ctx->data, s64))) {	// Unexpected reply received
+		ctx->err =
+			NEWERROR(500, "Unexpected reply status [%" G_GINT64_FORMAT "]",
+			s64);
 		return FALSE;
 	}
 
@@ -294,18 +261,25 @@ rep_handler(gpointer u, struct message_s *reply)
 	body = message_has_BODY(reply, NULL);
 
 	if ((h->flags & REPSEQ_BODYMANDATORY) && body <= 0) {
-		ctx->err = NEWERROR(500, "Missing body (mandatory for status " "[%"G_GINT64_FORMAT"])", s64);
+		ctx->err =
+			NEWERROR(500,
+			"Missing body (mandatory for status " "[%" G_GINT64_FORMAT "])",
+			s64);
 		return FALSE;
 	}
 
-	if (body > 0 && h->content_handler) { // call the body handler
+	if (body > 0 && h->content_handler) {	// call the body handler
 		void *b = NULL;
 		gsize blen = 0;
+
 		message_get_BODY(reply, &b, &blen, NULL);
 		rc = h->content_handler(&(ctx->err), ctx->data->udata, s64, b, blen);
 		if (!rc || ctx->err != NULL) {
 			if (!ctx->err)
-				ctx->err = NEWERROR(500, "Unknown content handler error for status [%"G_GINT64_FORMAT"]", s64);
+				ctx->err =
+					NEWERROR(500,
+					"Unknown content handler error for status [%"
+					G_GINT64_FORMAT "]", s64);
 			return FALSE;
 		}
 	}
@@ -316,45 +290,55 @@ rep_handler(gpointer u, struct message_s *reply)
 		rc = h->msg_handler(&(ctx->err), ctx->data->udata, s64, reply);
 		if (!rc || ctx->err != NULL) {
 			if (!ctx->err)
-				ctx->err = NEWERROR(500, "Unknown reply handler error for status [%"G_GINT64_FORMAT"]", s64);
+				ctx->err =
+					NEWERROR(500,
+					"Unknown reply handler error for status [%" G_GINT64_FORMAT
+					"]", s64);
 			return FALSE;
 		}
 	}
 
 	if (h->flags & REPSEQ_ERROR) {
-		ctx->err = NEWERROR(500, "ReplySequence error : explicit bad code [%"G_GINT64_FORMAT"]", s64);
+		ctx->err =
+			NEWERROR(500,
+			"ReplySequence error : explicit bad code [%" G_GINT64_FORMAT "]",
+			s64);
 		return FALSE;
 	}
 
 	return TRUE;
 }
 
-static GError*
+static GError *
 _repseq_run(struct message_s *req, struct metacnx_ctx_s *cnx,
-		struct reply_sequence_data_s *data)
+	struct reply_sequence_data_s *data)
 {
 	struct repseq_ctx_s ctx;
-	struct client_s *client;
-	int keepalive;
 
-	ctx.err = NULL;
+	if (cnx == NULL || req == NULL || data == NULL)
+		return NEWERROR(1, "BUG : Invalid parameters");
+
+	memset(&ctx, 0, sizeof(ctx));
 	ctx.data = data;
-	if (0 >= message_has_ID(req, NULL))
-		message_randomize_id(req);
+
+	struct client_s *client = gridd_client_create_empty();
+
+	int keepalive = cnx->flags & METACNX_FLAGMASK_KEEPALIVE;
+
+	gridd_client_set_keepalive(client, keepalive);
 
 	int to = MAX(cnx->timeout.cnx, cnx->timeout.req);
 
-	keepalive = cnx->flags & METACNX_FLAGMASK_KEEPALIVE;
-	client = gridd_client_create_empty();
-	gridd_client_set_keepalive(client, keepalive);
 	gridd_client_set_timeout(client, ms_to_s(to), ms_to_s(to));
 
-	if (!(ctx.err = gridd_client_set_fd(client, cnx->fd))) {
+	if (NULL == (ctx.err = gridd_client_set_fd(client, cnx->fd))) {
+		cnx->fd = -1;
 		GByteArray *gba = message_marshall_gba(req, NULL);
+
 		ctx.err = gridd_client_request(client, gba, &ctx, rep_handler);
 		g_byte_array_unref(gba);
 
-		if (!ctx.err) { // Run the request
+		if (!ctx.err) {			// Run the request
 			gridd_client_start(client);
 			if (!(ctx.err = gridd_client_loop(client)))
 				ctx.err = gridd_client_error(client);
@@ -362,20 +346,24 @@ _repseq_run(struct message_s *req, struct metacnx_ctx_s *cnx,
 	}
 
 	cnx->fd = gridd_client_fd(client);
+	(void) gridd_client_set_fd(client, -1);
 
 	gridd_client_free(client);
 	return ctx.err;
 }
 
 gboolean
-metaXClient_reply_sequence_run_context(GError ** err, struct metacnx_ctx_s *cnx,
-		MESSAGE request, struct reply_sequence_data_s * h)
+metaXClient_reply_sequence_run_context(GError ** err,
+	struct metacnx_ctx_s * cnx, MESSAGE request,
+	struct reply_sequence_data_s * h)
 {
-	if (!metacnx_is_open(cnx)) {
-		if (!metacnx_open(cnx, err)) {
-			return FALSE;
-		}
+	if (cnx == NULL || request == NULL || h == NULL) {
+		GSETERROR(err, "BUG invalid parameter");
+		return FALSE;
 	}
+
+	if (!metacnx_is_open(cnx) && !metacnx_open(cnx, err))
+		return FALSE;
 
 	GError *e;
 
@@ -385,7 +373,11 @@ metaXClient_reply_sequence_run_context(GError ** err, struct metacnx_ctx_s *cnx,
 		return TRUE;
 	}
 	else {
-		g_error_transmit(err, e);
+		if (err && NULL == *err)
+			g_propagate_error(err, e);
+		else
+			g_clear_error(&e);
+
 		metacnx_close(cnx);
 		return FALSE;
 	}
@@ -393,10 +385,15 @@ metaXClient_reply_sequence_run_context(GError ** err, struct metacnx_ctx_s *cnx,
 
 gboolean
 metaXClient_reply_sequence_run_from_addrinfo(GError ** err, MESSAGE request,
-		addr_info_t * addr, gint ms, struct reply_sequence_data_s * h)
+	addr_info_t * addr, gint ms, struct reply_sequence_data_s * h)
 {
 	struct metacnx_ctx_s cnx;
 	gboolean rc;
+
+	if (addr == NULL || request == NULL || h == NULL) {
+		GSETERROR(err, "BUG invalid parameter");
+		return FALSE;
+	}
 
 	metacnx_clear(&cnx);
 	metacnx_init_with_addr(&cnx, addr, NULL);
@@ -409,17 +406,24 @@ metaXClient_reply_sequence_run_from_addrinfo(GError ** err, MESSAGE request,
 }
 
 gboolean
-metaXClient_reply_sequence_run(GError ** err, MESSAGE req, int fd, gint ms,
-		struct reply_sequence_data_s *h)
+metaXClient_reply_sequence_run(GError ** err, MESSAGE req, int *fd, gint ms,
+	struct reply_sequence_data_s * h)
 {
 	struct metacnx_ctx_s cnx;
-	gboolean rc;
+
+	if (fd == NULL || req == NULL || h == NULL) {
+		GSETERROR(err, "BUG invalid parameter");
+		return FALSE;
+	}
 
 	metacnx_clear(&cnx);
 	cnx.timeout.cnx = cnx.timeout.req = ms;
-	cnx.fd = fd;
-	rc = metaXClient_reply_sequence_run_context(err, &cnx, req, h);
-	metacnx_close(&cnx);
+	cnx.fd = *fd;
+	cnx.flags = METACNX_FLAGMASK_KEEPALIVE;
+	gboolean rc = metaXClient_reply_sequence_run_context(err, &cnx, req, h);
+
+	*fd = cnx.fd;
+	cnx.fd = -1;
 	metacnx_clear(&cnx);
 
 	return rc;
@@ -430,10 +434,8 @@ metaXClient_reply_sequence_run(GError ** err, MESSAGE req, int fd, gint ms,
 void
 metacnx_clear(struct metacnx_ctx_s *ctx)
 {
-	if (!ctx) {
-		WARN("invalid parameter");
+	if (!ctx)
 		return;
-	}
 	memset(ctx, 0x00, sizeof(struct metacnx_ctx_s));
 	ctx->fd = -1;
 }
@@ -450,7 +452,7 @@ metacnx_open(struct metacnx_ctx_s *ctx, GError ** err)
 		metacnx_close(ctx);
 
 	ctx->fd = addrinfo_connect(&(ctx->addr), ctx->timeout.cnx, err);
-	return metacnx_is_open(ctx);
+	return ctx->fd >= 0;
 }
 
 gboolean
@@ -469,9 +471,7 @@ metacnx_close(struct metacnx_ctx_s *ctx)
 {
 	if (!ctx)
 		return;
-	if (ctx->fd != -1)
-		close(ctx->fd);
-	ctx->fd = -1;
+	metautils_pclose(&(ctx->fd));
 }
 
 struct metacnx_ctx_s *
@@ -492,6 +492,7 @@ metacnx_create(GError ** err)
 
 	for (i = sizeof(int); i < IDSIZE; i += sizeof(int)) {
 		int r = random();
+
 		g_byte_array_append(ctx->id, (guint8 *) (&r), sizeof(int));
 	}
 
@@ -509,7 +510,8 @@ metacnx_destroy(struct metacnx_ctx_s *ctx)
 }
 
 gboolean
-metacnx_init_with_url(struct metacnx_ctx_s *ctx, const gchar *url, GError ** err)
+metacnx_init_with_url(struct metacnx_ctx_s *ctx, const gchar * url,
+	GError ** err)
 {
 	if (!ctx || !url) {
 		GSETERROR(err, "Invalid parameter ctx=%p url=%p", ctx, url);
@@ -524,7 +526,8 @@ metacnx_init_with_url(struct metacnx_ctx_s *ctx, const gchar *url, GError ** err
 }
 
 gboolean
-metacnx_init_with_addr(struct metacnx_ctx_s *ctx, const addr_info_t* addr, GError** err)
+metacnx_init_with_addr(struct metacnx_ctx_s * ctx, const addr_info_t * addr,
+	GError ** err)
 {
 	if (!ctx) {
 		GSETERROR(err, "Invalid parameter ctx=%p", ctx);
@@ -537,7 +540,8 @@ metacnx_init_with_addr(struct metacnx_ctx_s *ctx, const addr_info_t* addr, GErro
 }
 
 gboolean
-metacnx_init(struct metacnx_ctx_s *ctx, const gchar * host, int port, GError ** err)
+metacnx_init(struct metacnx_ctx_s * ctx, const gchar * host, int port,
+	GError ** err)
 {
 	addr_info_t *ai;
 	gboolean rc;

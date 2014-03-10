@@ -1,32 +1,12 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "conscience.api"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "conscience.api"
 #endif
 #include <stdlib.h>
 #include <string.h>
-#include <glib.h>
-#include <metautils.h>
-#include <metacomm.h>
-#include <expr.h>
+
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
+
 #include "./conscience_srvtype.h"
 #include "./conscience_srv.h"
 #include "./conscience.h"
@@ -34,19 +14,7 @@
 static guint
 hash_service_id(gconstpointer p)
 {
-	guint i;
-	register guint32 i32;
-	register guint32 h = 5381;
-
-	if (!p)
-		return 0;
-	for (i32 = 0; i32 < sizeof(struct conscience_srvid_s); i32++) {
-		register guint32 _h = ((const guint8 *) p)[i32];
-
-		h = ((h << 5) + h) ^ _h;
-	}
-	i = i32;
-	return i;
+	return djb_hash_buf(p, sizeof(struct conscience_srvid_s));
 }
 
 static gboolean
@@ -76,8 +44,8 @@ conscience_srvtype_create(struct conscience_s *conscience, const char *type)
 		return NULL;
 	}
 
-	 /*sets a default expression that always fits*/
-    	if (!conscience_srvtype_set_type_expression(srvtype, NULL, "100")) {
+	/*sets a default expression that always fits */
+	if (!conscience_srvtype_set_type_expression(srvtype, NULL, "100")) {
 		ERROR("Failed to force the score to 100");
 		conscience_srvtype_destroy(srvtype);
 		return NULL;
@@ -85,9 +53,9 @@ conscience_srvtype_create(struct conscience_s *conscience, const char *type)
 
 	/*allocate the hashtables */
 	srvtype->services_ht = g_hash_table_new_full(hash_service_id,
-			equal_service_id, NULL, NULL);
+		equal_service_id, NULL, NULL);
 	srvtype->config_ht = g_hash_table_new_full(g_str_hash,
-			g_str_equal, g_free, destroy_gba);
+		g_str_equal, g_free, destroy_gba);
 	if (!srvtype->config_ht || !srvtype->services_ht) {
 		ERROR("HT allocation failure");
 		conscience_srvtype_destroy(srvtype);
@@ -100,7 +68,8 @@ conscience_srvtype_create(struct conscience_s *conscience, const char *type)
 	srvtype->alert_frequency_limit = 0;
 	srvtype->score_variation_bound = 0;
 	srvtype->conscience = conscience;
-	srvtype->services_ring.next = srvtype->services_ring.prev = &(srvtype->services_ring);
+	srvtype->services_ring.next = srvtype->services_ring.prev =
+		&(srvtype->services_ring);
 	return srvtype;
 }
 
@@ -131,7 +100,7 @@ conscience_srvtype_destroy(struct conscience_srvtype_s *srvtype)
 
 struct conscience_srv_s *
 conscience_srvtype_get_srv(struct conscience_srvtype_s *srvtype,
-    const struct conscience_srvid_s *srvid)
+	const struct conscience_srvid_s *srvid)
 {
 	if (!srvtype || !srvid)
 		return NULL;
@@ -140,7 +109,7 @@ conscience_srvtype_get_srv(struct conscience_srvtype_s *srvtype,
 
 void
 conscience_srvtype_remove_srv(struct conscience_srvtype_s *srvtype,
-    struct conscience_srvid_s *srvid)
+	struct conscience_srvid_s *srvid)
 {
 	struct conscience_srv_s *srv;
 
@@ -161,7 +130,7 @@ conscience_srvtype_remove_srv(struct conscience_srvtype_s *srvtype,
 
 static GByteArray *
 conscience_srvtype_serialize_config(struct conscience_srvtype_s *srvtype,
-    GError ** err)
+	GError ** err)
 {
 	GByteArray *v, *encoded_kv;
 	GSList *kv_list = NULL;
@@ -175,7 +144,7 @@ conscience_srvtype_serialize_config(struct conscience_srvtype_s *srvtype,
 	/*Add the current timestamp */
 	g_snprintf(wrkBuf, sizeof(wrkBuf), "%ld", time(0));
 	v = g_byte_array_append(g_byte_array_new(),
-	    (guint8 *) wrkBuf, strlen(wrkBuf) + 1);
+		(guint8 *) wrkBuf, strlen(wrkBuf) + 1);
 	g_hash_table_insert(ht, "timestamp", v);
 
 	/*convert the GHashTable to a list of KV */
@@ -199,7 +168,7 @@ conscience_srvtype_serialize_config(struct conscience_srvtype_s *srvtype,
 
 GByteArray *
 conscience_srvtype_get_config(struct conscience_srvtype_s * srvtype,
-    GError ** err)
+	GError ** err)
 {
 	if (!srvtype) {
 		GSETERROR(err, "Invalid parameter");
@@ -207,21 +176,22 @@ conscience_srvtype_get_config(struct conscience_srvtype_s * srvtype,
 	}
 
 	if (!srvtype->config_serialized)
-		srvtype->config_serialized = conscience_srvtype_serialize_config(srvtype, err);
+		srvtype->config_serialized =
+			conscience_srvtype_serialize_config(srvtype, err);
 
 	if (!srvtype->config_serialized) {
-		GSETERROR(err,"Serialization failure");
+		GSETERROR(err, "Serialization failure");
 		return NULL;
 	}
-	
-	return g_byte_array_append(g_byte_array_new(), srvtype->config_serialized->data,
-		srvtype->config_serialized->len);
+
+	return g_byte_array_append(g_byte_array_new(),
+		srvtype->config_serialized->data, srvtype->config_serialized->len);
 }
 
 
 struct conscience_srv_s *
 conscience_srvtype_register_srv(struct conscience_srvtype_s *srvtype,
-    GError ** err, const struct conscience_srvid_s *srvid)
+	GError ** err, const struct conscience_srvid_s *srvid)
 {
 	gsize desc_size;
 	struct conscience_srv_s *service;
@@ -244,13 +214,14 @@ conscience_srvtype_register_srv(struct conscience_srvtype_s *srvtype,
 	service->score.value = -1;
 	service->srvtype = srvtype;
 
-	/*build the service description once for all*/
-	desc_size = g_snprintf(service->description,sizeof(service->description),"%s/%s/",
+	/*build the service description once for all */
+	desc_size =
+		g_snprintf(service->description, sizeof(service->description), "%s/%s/",
 		srvtype->conscience->ns_info.name, srvtype->type_name);
-	addr_info_to_string(&(service->id.addr),
-		service->description+desc_size,sizeof(service->description)-desc_size);
+	addr_info_to_string(&(service->id.addr), service->description + desc_size,
+		sizeof(service->description) - desc_size);
 
-	/*register the service with its ID*/
+	/*register the service with its ID */
 	g_hash_table_insert(srvtype->services_ht, &(service->id), service);
 
 	/*ring insertion */
@@ -266,7 +237,7 @@ conscience_srvtype_register_srv(struct conscience_srvtype_s *srvtype,
 
 gint
 conscience_srvtype_remove_expired(struct conscience_srvtype_s * srvtype,
-    GError ** err, service_callback_f * callback, gpointer u)
+	GError ** err, service_callback_f * callback, gpointer u)
 {
 	GHashTableIter iter;
 	gpointer key, value;
@@ -300,7 +271,8 @@ conscience_srvtype_remove_expired(struct conscience_srvtype_s * srvtype,
 
 gboolean
 conscience_srvtype_run_all(struct conscience_srvtype_s * srvtype,
-    GError ** error, guint32 flags, service_callback_f * callback, gpointer udata)
+	GError ** error, guint32 flags, service_callback_f * callback,
+	gpointer udata)
 {
 	gboolean rc;
 	time_t oldest;
@@ -334,7 +306,7 @@ conscience_srvtype_run_all(struct conscience_srvtype_s * srvtype,
 
 guint
 conscience_srvtype_count_srv(struct conscience_srvtype_s * srvtype,
-    gboolean include_expired)
+	gboolean include_expired)
 {
 	guint count = 0U;
 
@@ -351,8 +323,7 @@ conscience_srvtype_count_srv(struct conscience_srvtype_s * srvtype,
 		oldest = time(0) - srvtype->score_expiration;
 		beacon = &(srvtype->services_ring);
 
-		for (srv = beacon->next; srv && srv != beacon;
-		    srv = srv->next) {
+		for (srv = beacon->next; srv && srv != beacon; srv = srv->next) {
 			if (srv->score.timestamp < oldest)
 				break;
 			count++;
@@ -398,7 +369,7 @@ conscience_srvtype_set_type_expression(struct conscience_srvtype_s * srvtype,
 		g_free(srvtype->score_expr_str);
 	if (srvtype->score_expr)
 		expr_clean(srvtype->score_expr);
-	
+
 	srvtype->score_expr_str = g_strdup(expr_str);
 	srvtype->score_expr = pE;
 	return TRUE;
@@ -424,12 +395,12 @@ conscience_srvtype_flush(struct conscience_srvtype_s *srvtype)
 	}
 
 	DEBUG("Service type [%s] flushed, [%u] services removed",
-	    srvtype->type_name, counter);
+		srvtype->type_name, counter);
 }
 
 gboolean
 conscience_srvtype_refresh(struct conscience_srvtype_s *srvtype,
-    GError ** error, struct service_info_s *si, gboolean overwrite_score)
+	GError ** error, struct service_info_s *si, gboolean overwrite_score)
 {
 	struct conscience_srvid_s srvid;
 	struct conscience_srv_s *p_srv;
@@ -437,7 +408,7 @@ conscience_srvtype_refresh(struct conscience_srvtype_s *srvtype,
 
 	if (!srvtype || !si) {
 		GSETERROR(error, "Invalid argument srvtype=%p srvinfo=%p",
-		    (void *) srvtype, (void *) si);
+			(void *) srvtype, (void *) si);
 		return FALSE;
 	}
 	memcpy(&(srvid.addr), &(si->addr), sizeof(addr_info_t));
@@ -455,8 +426,11 @@ conscience_srvtype_refresh(struct conscience_srvtype_s *srvtype,
 			return FALSE;
 		}
 
-		if (tag_first != NULL && tag_first->type == STVT_BOOL && tag_first->value.b) {
-			DEBUG("Service [%s] lauched for the first time => locking score to 0", si->type);
+		if (tag_first != NULL && tag_first->type == STVT_BOOL
+			&& tag_first->value.b) {
+			DEBUG
+				("Service [%s] lauched for the first time => locking score to 0",
+				si->type);
 			p_srv->score.value = 0;
 			p_srv->locked = TRUE;
 		}
@@ -470,7 +444,8 @@ conscience_srvtype_refresh(struct conscience_srvtype_s *srvtype,
 		int i, max;
 		struct service_tag_s *tag, *orig;
 
-		TRACE("Refreshing tags for srv [%.*s]", (int)(LIMIT_LENGTH_SRVDESCR), p_srv->description);
+		TRACE("Refreshing tags for srv [%.*s]", (int) (LIMIT_LENGTH_SRVDESCR),
+			p_srv->description);
 		for (i = 0, max = si->tags->len; i < max; i++) {
 			tag = g_ptr_array_index(si->tags, i);
 			orig = conscience_srv_ensure_tag(p_srv, tag->name);
@@ -482,7 +457,8 @@ conscience_srvtype_refresh(struct conscience_srvtype_s *srvtype,
 	if (overwrite_score)
 		memcpy(&(p_srv->score), &(si->score), sizeof(score_t));
 	else if (!conscience_srv_compute_score(p_srv, error)) {
-		GSETERROR(error, "Service data refreshed, but score computation failed!");
+		GSETERROR(error,
+			"Service data refreshed, but score computation failed!");
 		return FALSE;
 	}
 

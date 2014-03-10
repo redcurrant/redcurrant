@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gs_chunk_crawler"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gs_chunk_crawler"
 #endif
 
 #include <stdlib.h>
@@ -30,29 +10,36 @@
 #include <signal.h>
 #include <attr/xattr.h>
 
-#include <glib.h>
-#include <glib/gstdio.h>
-
-#include <metautils.h>
-#include <common_main.h>
-#include <rawx.h>
-#include <motor.h>
+#include <metautils/lib/metautils.h>
+#include <rawx-lib/src/rawx.h>
+#include <rules-motor/lib/motor.h>
 
 #include "./lock.h"
-#include "../lib/volume_scanner.h"
+#include "./volume_scanner.h"
 #include "../lib/chunk_db.h"
+#include "../lib/chunk_check.h"
+#include "../lib/content_check.h"
 
 #ifndef  CHUNK_CRAWLER_XATTRLOCK
-# define CHUNK_CRAWLER_XATTRLOCK "user.grid.chunk-crawler.pid"
+#define CHUNK_CRAWLER_XATTRLOCK "user.grid.chunk-crawler.pid"
 #endif
 
 #ifndef CHUNK_CRAWLER_XATTR_STAMP
-# define CHUNK_CRAWLER_XATTR_STAMP "user.grid.chunk-crawler.last-run"
+#define CHUNK_CRAWLER_XATTR_STAMP "user.grid.chunk-crawler.last-run"
 #endif
 
 int volume_busy = 0;
 
-struct crawler_stats_s {
+// motor_env and rules_reload_time_interval declared in motor.h
+struct rules_motor_env_s *motor_env = NULL;
+gint rules_reload_time_interval = 1L;
+
+// m2v1_list declared in libintegrity
+GSList *m2v1_list = NULL;
+
+struct crawler_stats_s
+{
+	gint chunk_total;
 	guint64 chunk_skipped;
 	guint64 chunk_success;
 	guint64 chunk_failures;
@@ -72,22 +59,13 @@ static time_t interval_sleep = 200L;
 static gboolean flag_loop = FALSE;
 static gboolean flag_timestamp = FALSE;
 static gboolean flag_exit_on_error = FALSE;
+static gint nbChunkMax = 0;
 
 /* ------------------------------------------------------------------------- */
 
-static gboolean
-is_hexa(const gchar *s)
-{
-	register char c;
-	for (; '\0'!=(c = *s) ;s++) {
-		if (!g_ascii_isxdigit(g_ascii_toupper(c)))
-			return FALSE;
-	}
-	return TRUE;
-}
 
 static gboolean
-chunk_path_is_valid(const gchar *fullpath)
+chunk_path_is_valid(const gchar * fullpath)
 {
 	size_t len, i;
 	const gchar *ptr;
@@ -96,8 +74,9 @@ chunk_path_is_valid(const gchar *fullpath)
 	len = strlen(fullpath);
 	ptr = fullpath + len - 1;
 
-	for (; ptr >= fullpath ; ptr--, i++) {
+	for (; ptr >= fullpath; ptr--, i++) {
 		register gchar c = *ptr;
+
 		if (c == '/')
 			break;
 		if (!g_ascii_isxdigit(c))
@@ -108,36 +87,15 @@ chunk_path_is_valid(const gchar *fullpath)
 	return (i == 64);
 }
 
-static const char *
-chunk_check_attributes(struct chunk_textinfo_s *chunk, struct content_textinfo_s *content)
+static GError *
+chunk_check_attributes(struct chunk_textinfo_s *chunk,
+	struct content_textinfo_s *content)
 {
-	if (!chunk->path)
-		return "Missing mandatory content path";
+	GError *err = NULL;
 
-	if (!chunk->id)
-		return "Missing mandatory chunk ID";
-
-	if (!chunk->size)
-		return "Missing mandatory chunk size";
-
-	if (!chunk->hash)
-		return "Missing mandatory chunk hash";
-
-	if (!chunk->position)
-		return "Missing mandatory chunk position";
-
-	if (!content->path)
-		return "Missing mandatory content path";
-
-	if (!content->size)
-		return "Missing mandatory content size";
-
-	if (!content->chunk_nb)
-		return "Missing mandatory chunk number";
-
-	if (!content->container_id)
-		return "Missing mandatory container identifier";
-		
+	if (!check_chunk_info(chunk, &err) || !check_content_info(content, &err)) {
+		return err;
+	}
 	return NULL;
 }
 
@@ -150,7 +108,7 @@ sleep_inter_chunk(void)
 }
 
 static enum scanner_traversal_e
-manage_dir_enter(const gchar *path_dir, guint depth, gpointer data)
+manage_dir_enter(const gchar * path_dir, guint depth, gpointer data)
 {
 	if (!grid_main_is_running())
 		return SCAN_STOP_ALL;
@@ -158,11 +116,11 @@ manage_dir_enter(const gchar *path_dir, guint depth, gpointer data)
 	(void) depth;
 	(void) data;
 	GRID_DEBUG("Entering dir [%s]", path_dir);
-	return grid_main_is_running() ? SCAN_CONTINUE : SCAN_ABORT;
+	return grid_main_is_running()? SCAN_CONTINUE : SCAN_ABORT;
 }
 
 static enum scanner_traversal_e
-manage_dir_exit(const gchar *path_dir, guint depth, gpointer data)
+manage_dir_exit(const gchar * path_dir, guint depth, gpointer data)
 {
 	if (!grid_main_is_running())
 		return SCAN_STOP_ALL;
@@ -171,7 +129,8 @@ manage_dir_exit(const gchar *path_dir, guint depth, gpointer data)
 	(void) data;
 
 	if (!grid_main_is_running()) {
-		GRID_DEBUG("Exiting dir [%s], no timestamp because of an abort", path_dir);
+		GRID_DEBUG("Exiting dir [%s], no timestamp because of an abort",
+			path_dir);
 		return SCAN_ABORT;
 	}
 
@@ -180,10 +139,12 @@ manage_dir_exit(const gchar *path_dir, guint depth, gpointer data)
 		GTimeVal gnow;
 
 		g_get_current_time(&gnow);
-		g_snprintf(str_stamp, sizeof(str_stamp), "%ld.%06ld", gnow.tv_sec, gnow.tv_usec);
-		setxattr(path_dir, stamp_xattr_name->str, str_stamp, strlen(str_stamp), 0);
-		GRID_DEBUG("Exiting dir [%s], timestamp(%s) = %d (%s)", path_dir, str_stamp,
-			errno, strerror(errno));
+		g_snprintf(str_stamp, sizeof(str_stamp), "%ld.%06ld", gnow.tv_sec,
+			gnow.tv_usec);
+		setxattr(path_dir, stamp_xattr_name->str, str_stamp, strlen(str_stamp),
+			0);
+		GRID_DEBUG("Exiting dir [%s], timestamp(%s) = %d (%s)", path_dir,
+			str_stamp, errno, strerror(errno));
 	}
 	else {
 		GRID_DEBUG("Exiting dir [%s]", path_dir);
@@ -194,29 +155,30 @@ manage_dir_exit(const gchar *path_dir, guint depth, gpointer data)
 }
 
 static gboolean
-accept_chunk(const gchar *dirname, const gchar *basename, void *data)
+accept_chunk(const gchar * dirname, const gchar * bn, void *data)
 {
 	size_t len;
 
 	(void) dirname;
 	(void) data;
 
-	if (!basename || !*basename)
+	if (!bn || !*bn)
 		return FALSE;
 	if (!grid_main_is_running())
 		return FALSE;
 
-	len = strlen(basename);
+	len = strlen(bn);
 
-	if (basename[0]=='.' && (len==1 || (len==2 && basename[1] == '.')))
+	if (bn[0] == '.' && (len == 1 || (len == 2 && bn[1] == '.')))
 		return FALSE;
 
-	return is_hexa(basename);
+	return metautils_str_ishexa(bn, len);
 }
 
 
 static enum scanner_traversal_e
-manage_chunk(const gchar * chunk_path, void *data, struct rules_motor_env_s** motor)
+manage_chunk(const gchar * chunk_path, void *data,
+	struct rules_motor_env_s **motor)
 {
 	struct crawler_stats_s *stats;
 	GError *local_error = NULL;
@@ -227,7 +189,7 @@ manage_chunk(const gchar * chunk_path, void *data, struct rules_motor_env_s** mo
 	struct stat chunk_stat;
 
 
-	data_block = malloc(sizeof(struct crawler_chunk_data_pack_s));	
+	data_block = malloc(sizeof(struct crawler_chunk_data_pack_s));
 	bzero(&chunk_info, sizeof(chunk_info));
 	bzero(&content_info, sizeof(content_info));
 	bzero(&chunk_stat, sizeof(chunk_stat));
@@ -235,48 +197,69 @@ manage_chunk(const gchar * chunk_path, void *data, struct rules_motor_env_s** mo
 
 	if (!chunk_path_is_valid(chunk_path)) {
 		GRID_DEBUG("Skipping non-chunk file [%s]", chunk_path);
-		stats->chunk_skipped ++;
+		stats->chunk_skipped++;
 		goto label_exit;
 	}
+
+	/* Execute action if nb max container wasn't already managed */
+	if (nbChunkMax > 0) {
+		stats->chunk_total++;
+		if (nbChunkMax < stats->chunk_total) {
+			GRID_WARN("stop because %d max container manage !", nbChunkMax);
+			return SCAN_STOP_ALL;
+		}
+	}
+
+
 
 	/* Read content info from chunk attributes */
-	if (!get_rawx_info_in_attr(chunk_path, &local_error, &content_info, &chunk_info) ||\
-		!get_extra_chunk_info(chunk_path, &local_error, &chunk_info_extra)) {
-		GRID_ERROR("Failed to read rawx info from chunk [%s] : %s", chunk_path, local_error->message);
+	if (!get_rawx_info_in_attr(chunk_path, &local_error, &content_info,
+			&chunk_info)
+		|| !get_extra_chunk_info(chunk_path, &local_error, &chunk_info_extra)) {
+		GRID_ERROR("Failed to read rawx info from chunk [%s] : %s", chunk_path,
+			local_error->message);
 		g_clear_error(&local_error);
-		stats->chunk_failures ++;
+		stats->chunk_failures++;
 		goto label_exit;
 	}
-	
+
 
 	do {
-		const char *str_err = chunk_check_attributes(&chunk_info, &content_info);
-		if (NULL != str_err) {
-			GRID_ERROR("chunk with invalid attributes [%s] : %s", chunk_path, str_err);
-			stats->chunk_failures ++;
+		GError *err = chunk_check_attributes(&chunk_info, &content_info);
+
+		if (NULL != err) {
+			GRID_ERROR("chunk with invalid attributes [%s] : %s", chunk_path,
+				err->message);
+			g_clear_error(&err);
+			stats->chunk_failures++;
 			goto label_exit;
 		}
 	} while (0);
-	
+
 
 	/* Save chunk_path in content and container db */
-	if (add_chunk_to_db(path_root, chunk_path, content_info.path, content_info.container_id, &local_error)) {
+	if (add_chunk_to_db(path_root, chunk_path, content_info.path,
+			content_info.container_id, &local_error)) {
 		GRID_DEBUG("Saved chunk in RAWX databases [%s]", chunk_path);
-		stats->chunk_success ++;
+		stats->chunk_success++;
 	}
 	else {
-		GRID_ERROR("Failed to add chunk in integrity db [%s] : %s", chunk_path, local_error->message);
+		GRID_ERROR("Failed to add chunk in integrity db [%s] : %s", chunk_path,
+			local_error->message);
 		g_clear_error(&local_error);
-		stats->chunk_failures ++;
+		stats->chunk_failures++;
 	}
-	
+
 	/* pass data_block to python */
 	struct motor_args args;
+
 	stat(chunk_path, &chunk_stat);
-	chunk_crawler_data_block_init(data_block, &content_info, &chunk_info, &chunk_info_extra, &chunk_stat, chunk_path);
-	motor_args_init(&args, (gpointer)data_block, (gint8)CHUNK_TYPE_ID, motor, ns_name);
-	pass_to_motor((gpointer)(&args));
-	/* stamp_a_chunk(chunk_path);*/
+	chunk_crawler_data_block_init(data_block, &content_info, &chunk_info,
+		&chunk_info_extra, &chunk_stat, chunk_path);
+	motor_args_init(&args, (gpointer) data_block, (gint8) CHUNK_TYPE_ID, motor,
+		ns_name);
+	pass_to_motor((gpointer) (&args));
+	/* stamp_a_chunk(chunk_path, ATTR_NAME_CHUNK_LAST_SCANNED_TIME); */
 label_exit:
 	chunk_textinfo_free_content(&chunk_info);
 	chunk_textinfo_extra_free_content(&chunk_info_extra);
@@ -287,10 +270,11 @@ label_exit:
 
 
 static enum scanner_traversal_e
-manage_chunk_and_sleep(const gchar * chunk_path, void *data, struct rules_motor_env_s** motor)
+manage_chunk_and_sleep(const gchar * chunk_path, void *data,
+	struct rules_motor_env_s **motor)
 {
 	enum scanner_traversal_e rc;
-	
+
 	if (!grid_main_is_running())
 		return SCAN_STOP_ALL;
 
@@ -306,12 +290,12 @@ main_save_canonical_volume(const char *vol)
 	char *path;
 	size_t path_len;
 
-	path_len = strlen(vol)+1;
+	path_len = strlen(vol) + 1;
 	path = g_alloca(path_len);
 	bzero(path, path_len);
 
 	/* skip intermediate sequences of path separators */
-	for (i=0,slash=0; *vol ; vol++) {
+	for (i = 0, slash = 0; *vol; vol++) {
 		if (*vol != '/') {
 			path[i++] = *vol;
 			slash = 0;
@@ -322,12 +306,12 @@ main_save_canonical_volume(const char *vol)
 			slash = 1;
 		}
 	}
-	
+
 	/* erase trailing slashes */
-	while (i>=0 && path[--i] == '/')
+	while (i >= 0 && path[--i] == '/')
 		path[i] = '\0';
 
-	if (sizeof(path_root) <= g_strlcpy(path_root, path, sizeof(path_root)-1))
+	if (sizeof(path_root) <= g_strlcpy(path_root, path, sizeof(path_root) - 1))
 		return FALSE;
 
 	return TRUE;
@@ -346,27 +330,28 @@ main_set_defaults(void)
 	stamp_xattr_name = g_string_new(CHUNK_CRAWLER_XATTR_STAMP);
 }
 
-static struct grid_main_option_s*
+static struct grid_main_option_s *
 main_get_options(void)
 {
 	static struct grid_main_option_s options[] = {
-		{"RunLoop", OT_BOOL, {.b=&flag_loop},
+		{"RunLoop", OT_BOOL, {.b = &flag_loop},
 			"Loop until the FS usage fulfills"},
-		{"RunStampDirs", OT_BOOL, {.b=&flag_timestamp},
+		{"RunStampDirs", OT_BOOL, {.b = &flag_timestamp},
 			"Timestamp each directory after each successful run"},
-		{"ExitOnError", OT_BOOL, {.b=&flag_exit_on_error},
+		{"ExitOnError", OT_BOOL, {.b = &flag_exit_on_error},
 			"Stop the execution upon the first error"},
-
-		{"InterChunksSleepMilli", OT_TIME, {.t=&interval_sleep},
-			"Service refresh period"},
-		{"LockXattrName", OT_STRING, {.str=&lock_xattr_name},
+		{"nbChunkMax", OT_INT, {.i = &nbChunkMax},
+			"Stop after N chunks"},
+		{"InterChunksSleepMilli", OT_TIME, {.t = &interval_sleep},
+			"Sleep between each chunk"},
+		{"LockXattrName", OT_STRING, {.str = &lock_xattr_name},
 			"Xattr name used for locks"},
-		{"StampXattrName", OT_STRING, {.str=&stamp_xattr_name},
+		{"StampXattrName", OT_STRING, {.str = &stamp_xattr_name},
 			"Xattr name used for timestamps"},
-		{"RulesReloadTimeInterval", OT_INT, {.i=&rules_reload_time_interval},
+		{"RulesReloadTimeInterval", OT_INT, {.i = &rules_reload_time_interval},
 			"Update rules every n seconds"},
 
-		{NULL, 0, {.b=0}, NULL}
+		{NULL, 0, {.b = 0}, NULL}
 	};
 
 	return options;
@@ -380,7 +365,7 @@ main_specific_stop(void)
 static void
 main_specific_fini(void)
 {
-	if(volume_busy)
+	if (volume_busy)
 		return;
 	if (*path_root && lock_xattr_name->str[0]) {
 		if (volume_lock_get(path_root, lock_xattr_name->str) == getpid())
@@ -405,14 +390,17 @@ main_configure(int argc, char **args)
 		return FALSE;
 	}
 
-	if (!rawx_get_lock_info(path_root, rawx_str_addr, sizeof(rawx_str_addr), ns_name, sizeof(ns_name), &local_error)) {
+	if (!rawx_get_lock_info(path_root, rawx_str_addr, sizeof(rawx_str_addr),
+			ns_name, sizeof(ns_name), &local_error)) {
 		GRID_ERROR("The volume doesn't seem to be a RAWX volume : %s",
 			gerror_get_message(local_error));
 		g_clear_error(&local_error);
 		return FALSE;
 	}
 	if (!*ns_name || !*rawx_str_addr) {
-		GRID_ERROR("The volume doesn't seem to be a RAWX volume. Check that attributes are set on volume [%s]", path_root);
+		GRID_ERROR
+			("The volume doesn't seem to be a RAWX volume. Check that attributes are set on volume [%s]",
+			path_root);
 		return FALSE;
 	}
 
@@ -459,17 +447,15 @@ main_action(void)
 	}
 }
 
-static const gchar*
+static const gchar *
 main_get_usage(void)
 {
 	static gchar xtra_usage[] =
-		"\tExpected argument: an absolute path a a valid RAWX volume\n"
-		;
+		"\tExpected argument: an absolute path a a valid RAWX volume\n";
 	return xtra_usage;
 }
 
-static struct grid_main_callbacks cb =
-{
+static struct grid_main_callbacks cb = {
 	.options = main_get_options,
 	.action = main_action,
 	.set_defaults = main_set_defaults,
@@ -484,4 +470,3 @@ main(int argc, char **argv)
 {
 	return grid_main_cli(argc, argv, &cb);
 }
-

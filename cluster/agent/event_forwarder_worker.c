@@ -1,44 +1,22 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gridcluster.agent.event.forward"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gridcluster.agent.event.forward"
 #endif
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <attr/xattr.h>
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 
-#include <glib.h>
-#include <glib/gstdio.h>
-
-#include "../lib/gridcluster.h"
-#include "../events/gridcluster_events.h"
-#include "../events/gridcluster_eventsremote.h"
-#include "../events/gridcluster_eventhandler.h"
-#include "../conscience/conscience.h"
+#include <cluster/lib/gridcluster.h>
+#include <cluster/events/gridcluster_events.h>
+#include <cluster/events/gridcluster_eventsremote.h>
+#include <cluster/events/gridcluster_eventhandler.h>
+#include <cluster/conscience/conscience.h>
 
 
 #include "./agent.h"
@@ -54,12 +32,13 @@
 #define TASK_ID "event_forward_task"
 
 #ifdef HAVE_EXTRA_DEBUG
-# define XDEBUG(FMT,...) DEBUG(FMT,##__VA_ARGS__)
+#define XDEBUG(FMT,...) DEBUG(FMT,##__VA_ARGS__)
 #else
-# define XDEBUG(...) 
+#define XDEBUG(...)
 #endif
 
-struct event_handle_s {
+struct event_handle_s
+{
 	namespace_data_t *ns_data;
 	gint ref_count;
 
@@ -74,14 +53,16 @@ struct event_handle_s {
 	gchar *path;
 };
 
-enum action_status_e {
+enum action_status_e
+{
 	ES_NONE,
 	ES_PUSH_PENDING,
 	ES_PUSHED,
 	ES_STATUS_PENDING
 };
 
-struct event_action_s {
+struct event_action_s
+{
 	gchar id[512];
 	gchar path[1024];
 
@@ -93,7 +74,8 @@ struct event_action_s {
 	enum action_status_e action_status;
 	int event_status;
 	time_t last_request;
-	struct {
+	struct
+	{
 		guint push;
 		guint status;
 	} attempts;
@@ -108,14 +90,15 @@ static GHashTable *ht_pending_actions = NULL;
 /**
  * The type of the parameter associated to the task in the main scheduler
  */
-struct event_task_data_s {
+struct event_task_data_s
+{
 	gchar ns_name[LIMIT_LENGTH_NSNAME];
 	gchar task_id[sizeof(TASK_ID) + 1 + LIMIT_LENGTH_NSNAME];
 };
 
 /* ------------------------------------------------------------------------- */
 
-static const gchar*
+static const gchar *
 event_status_to_string(int status)
 {
 	switch (status) {
@@ -134,7 +117,7 @@ event_status_to_string(int status)
 	}
 }
 
-static const gchar*
+static const gchar *
 action_status_to_string(enum action_status_e status)
 {
 	switch (status) {
@@ -155,25 +138,31 @@ static void
 _static_init(void)
 {
 	if (!ht_event_by_ueid)
-		ht_event_by_ueid = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
-	
+		ht_event_by_ueid =
+			g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
+
 	if (!ht_idle_actions)
-		ht_idle_actions = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
+		ht_idle_actions =
+			g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
 	if (!ht_pending_actions)
-		ht_pending_actions = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
+		ht_pending_actions =
+			g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
 }
 
-static GHashTable*
+static GHashTable *
 __extract_cid_ht(void)
 {
 	GHashTable *ht_result;
 	GHashTableIter iter;
 	gpointer k, v, new_key;
 
-	ht_result = g_hash_table_new_full(container_id_hash, container_id_equal, NULL, g_free);
+	ht_result =
+		g_hash_table_new_full(container_id_hash, container_id_equal, NULL,
+		g_free);
 	g_hash_table_iter_init(&iter, ht_event_by_ueid);
 	while (g_hash_table_iter_next(&iter, &k, &v)) {
 		struct event_handle_s *h;
+
 		if (NULL != (h = v)) {
 			new_key = g_memdup(h->cid, sizeof(container_id_t));
 			g_hash_table_insert(ht_result, new_key, new_key);
@@ -197,7 +186,8 @@ agent_count_pending_events(void)
 
 /* ------------------------------------------------------------------------- */
 
-struct service_pool_s {
+struct service_pool_s
+{
 	time_t last_update;
 	GArray *pool;
 };
@@ -208,6 +198,7 @@ static void
 _free_array(gpointer p)
 {
 	struct service_pool_s *spool = p;
+
 	if (p)
 		return;
 	if (spool->pool) {
@@ -219,12 +210,13 @@ _free_array(gpointer p)
 }
 
 static void
-__zero_service(namespace_data_t *ns_data, const gchar *type_name, addr_info_t *ai)
+__zero_service(namespace_data_t * ns_data, const gchar * type_name,
+	addr_info_t * ai)
 {
 	guint i;
 	addr_info_t *addr;
 	struct service_pool_s *spool;
-	gchar key[LIMIT_LENGTH_NSNAME+1+LIMIT_LENGTH_SRVTYPE+1];
+	gchar key[LIMIT_LENGTH_NSNAME + 1 + LIMIT_LENGTH_SRVTYPE + 1];
 
 	bzero(key, sizeof(key));
 	g_snprintf(key, sizeof(key), "%s:%s", ns_data->name, type_name);
@@ -238,21 +230,22 @@ __zero_service(namespace_data_t *ns_data, const gchar *type_name, addr_info_t *a
 	if (!spool->pool || !spool->pool->len)
 		return;
 
-	for (i=spool->pool->len; i>0 ;i--) {
-		addr = & g_array_index(spool->pool, addr_info_t, i-1);
+	for (i = spool->pool->len; i > 0; i--) {
+		addr = &g_array_index(spool->pool, addr_info_t, i - 1);
 		if (addr_info_equal(addr, ai)) {
-			g_array_remove_index_fast(spool->pool, i-1);
+			g_array_remove_index_fast(spool->pool, i - 1);
 			return;
 		}
 	}
 }
 
 static gboolean
-__choose_service(namespace_data_t *ns_data, const gchar *type_name, struct service_info_s *si, GError **err)
+__choose_service(namespace_data_t * ns_data, const gchar * type_name,
+	struct service_info_s *si, GError ** err)
 {
 	struct service_pool_s *spool;
 	time_t now;
-	gchar key[LIMIT_LENGTH_NSNAME+1+LIMIT_LENGTH_SRVTYPE+1];
+	gchar key[LIMIT_LENGTH_NSNAME + 1 + LIMIT_LENGTH_SRVTYPE + 1];
 
 	if (!(IS_FORKED_AGENT)) {
 		GSETERROR(err, "Invalid state : illegal call in a non-forked agent");
@@ -260,7 +253,8 @@ __choose_service(namespace_data_t *ns_data, const gchar *type_name, struct servi
 	}
 
 	if (!local_services) {
-		local_services = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, _free_array);
+		local_services =
+			g_hash_table_new_full(g_str_hash, g_str_equal, g_free, _free_array);
 		if (!local_services) {
 			GSETCODE(err, EINVAL, "Failed to init the local service table");
 			return FALSE;
@@ -279,23 +273,26 @@ __choose_service(namespace_data_t *ns_data, const gchar *type_name, struct servi
 
 	now = time(0);
 	if (now < spool->last_update ||
-			(now > (spool->last_update+(spool->pool->len ? 10 : 1)))) {
+		(now > (spool->last_update + (spool->pool->len ? 10 : 1)))) {
 
 		GError *local_error = NULL;
 
 		/* Fill it with up services */
-		GSList *ns_services = list_namespace_services(ns_data->name, type_name, &local_error);
+		GSList *ns_services =
+			list_namespace_services(ns_data->name, type_name, &local_error);
 		if (!ns_services) {
 			if (local_error)
 				WARN("Error when getting fresh services for [%s] : %s",
-						key, gerror_get_message(local_error));
+					key, gerror_get_message(local_error));
 			else {
 				if (now > spool->last_update + 20) {
 					g_array_set_size(spool->pool, 0);
 					spool->last_update = now;
 				}
 				else {
-					DEBUG("No service available for [%s], we keep the old services", key);
+					DEBUG
+						("No service available for [%s], we keep the old services",
+						key);
 				}
 			}
 		}
@@ -303,9 +300,10 @@ __choose_service(namespace_data_t *ns_data, const gchar *type_name, struct servi
 			GSList *l;
 
 			g_array_set_size(spool->pool, 0);
-			for (l=ns_services; l ;l=l->next) {
+			for (l = ns_services; l; l = l->next) {
 				if (NULL != l->data)
-					g_array_append_vals(spool->pool, &(((struct service_info_s*)(l->data))->addr), 1);
+					g_array_append_vals(spool->pool,
+						&(((struct service_info_s *) (l->data))->addr), 1);
 			}
 			spool->last_update = time(0);
 
@@ -318,7 +316,8 @@ __choose_service(namespace_data_t *ns_data, const gchar *type_name, struct servi
 	}
 
 	if (!spool->pool->len) {
-		GSETERROR(err, "No service of type [%s] in ns [%s]", type_name, ns_data->name);
+		GSETERROR(err, "No service of type [%s] in ns [%s]", type_name,
+			ns_data->name);
 		return FALSE;
 	}
 
@@ -327,30 +326,31 @@ __choose_service(namespace_data_t *ns_data, const gchar *type_name, struct servi
 
 	i = rand();
 	i = i % spool->pool->len;
-	addr = & g_array_index(spool->pool, addr_info_t, i);
+	addr = &g_array_index(spool->pool, addr_info_t, i);
 
 	bzero(si, sizeof(service_info_t));
-	g_strlcpy(si->type, type_name, sizeof(si->type)-1);
-	g_strlcpy(si->ns_name, ns_data->name, sizeof(si->ns_name)-1);
+	g_strlcpy(si->type, type_name, sizeof(si->type) - 1);
+	g_strlcpy(si->ns_name, ns_data->name, sizeof(si->ns_name) - 1);
 	g_memmove(&(si->addr), addr, sizeof(addr_info_t));
 
 	return TRUE;
 }
 
 static gboolean
-check_spool_dirs(namespace_data_t *ns_data, GError **error)
+check_spool_dirs(namespace_data_t * ns_data, GError ** error)
 {
-	gboolean check_directory(const gchar *path) {
-		if (g_file_test(path, G_FILE_TEST_IS_DIR|G_FILE_TEST_IS_EXECUTABLE))
+	gboolean check_directory(const gchar * path)
+	{
+		if (g_file_test(path, G_FILE_TEST_IS_DIR | G_FILE_TEST_IS_EXECUTABLE))
 			return TRUE;
 		if (!g_mkdir_with_parents(path, event_directory_mode))
 			return TRUE;
 		GSETERROR(error, "Failed to create a directory with path [%s] : %s",
-				path, strerror(errno));
+			path, strerror(errno));
 		return FALSE;
 	}
 
-	return	check_directory(ns_data->queues.dir_trash)
+	return check_directory(ns_data->queues.dir_trash)
 		&& check_directory(ns_data->queues.dir_incoming)
 		&& check_directory(ns_data->queues.dir_pending);
 }
@@ -361,8 +361,7 @@ static void
 event_handle_destroy(struct event_handle_s *handle)
 {
 	XDEBUG("UEID[%s] CID[%s] ref_count=%d being destroyed",
-			handle->ueid, handle->str_cid,
-			handle->ref_count);
+		handle->ueid, handle->str_cid, handle->ref_count);
 
 	if (handle->event)
 		g_hash_table_destroy(handle->event);
@@ -377,8 +376,8 @@ static void
 event_handle_unref(struct event_handle_s *handle)
 {
 	XDEBUG("UEID[%s] CID[%s] ref_count= %d -> %d",
-			handle->ueid, handle->str_cid,
-			handle->ref_count, handle->ref_count - 1);
+		handle->ueid, handle->str_cid,
+		handle->ref_count, handle->ref_count - 1);
 
 	handle->ref_count = handle->ref_count - 1;
 	g_assert(handle->ref_count >= 0);
@@ -393,15 +392,15 @@ static void
 event_handle_ref(struct event_handle_s *handle)
 {
 	XDEBUG("UEID[%s] CID[%s] ref_count= %d -> %d ",
-			handle->ueid, handle->str_cid,
-			handle->ref_count, handle->ref_count + 1);
+		handle->ueid, handle->str_cid,
+		handle->ref_count, handle->ref_count + 1);
 
 	handle->ref_count = handle->ref_count + 1;
 }
 
-static struct event_handle_s*
-event_handle_load(namespace_data_t *ns_data, const gchar *basedir,
-		const struct path_data_s *pd, GError **error)
+static struct event_handle_s *
+event_handle_load(namespace_data_t * ns_data, const gchar * basedir,
+	const struct path_data_s *pd, GError ** error)
 {
 	struct event_handle_s *handle;
 
@@ -415,7 +414,7 @@ event_handle_load(namespace_data_t *ns_data, const gchar *basedir,
 	handle->ref_count = 0;
 
 	g_memmove(handle->cid, pd->id, sizeof(container_id_t));
-	g_strlcpy(handle->str_cid, pd->str_cid, sizeof(handle->str_cid)-1);
+	g_strlcpy(handle->str_cid, pd->str_cid, sizeof(handle->str_cid) - 1);
 
 	handle->xattr_time = pd->xattr_time;
 	handle->xattr_seq = pd->xattr_seq;
@@ -425,12 +424,14 @@ event_handle_load(namespace_data_t *ns_data, const gchar *basedir,
 	do {
 		gchar *encoded = NULL;
 		gsize encoded_size = 0;
+
 		if (!g_file_get_contents(handle->path, &encoded, &encoded_size, error)) {
 			GSETERROR(error, "read error");
 			g_free(handle);
 			return NULL;
 		}
-		handle->event = gridcluster_decode_event2((guint8*)encoded, encoded_size, error);
+		handle->event =
+			gridcluster_decode_event2((guint8 *) encoded, encoded_size, error);
 		g_free(encoded);
 	} while (0);
 	if (!handle->event) {
@@ -442,6 +443,7 @@ event_handle_load(namespace_data_t *ns_data, const gchar *basedir,
 	/* get its UEID */
 	do {
 		GByteArray *gba;
+
 		gba = g_hash_table_lookup(handle->event, "UEID");
 		if (!gba) {
 			GSETERROR(error, "missing UEID");
@@ -449,12 +451,14 @@ event_handle_load(namespace_data_t *ns_data, const gchar *basedir,
 			g_free(handle);
 			return NULL;
 		}
-		g_memmove(handle->ueid, gba->data, MIN(gba->len, sizeof(handle->ueid)-1));
+		g_memmove(handle->ueid, gba->data, MIN(gba->len,
+				sizeof(handle->ueid) - 1));
 	} while (0);
 
 	/* get its type */
 	do {
 		GByteArray *gba;
+
 		gba = g_hash_table_lookup(handle->event, "TYPE");
 		if (!gba) {
 			GSETERROR(error, "missing TYPE");
@@ -462,35 +466,38 @@ event_handle_load(namespace_data_t *ns_data, const gchar *basedir,
 			g_free(handle);
 			return NULL;
 		}
-		g_memmove(handle->type, gba->data, MIN(gba->len, sizeof(handle->type)-1));
+		g_memmove(handle->type, gba->data, MIN(gba->len,
+				sizeof(handle->type) - 1));
 	} while (0);
 
 	g_hash_table_insert(ht_event_by_ueid, handle->ueid, handle);
 	return handle;
 }
 
-static struct event_handle_s*
-event_handle_load_from_path(namespace_data_t *ns_data, const gchar *path, GError **error)
+static struct event_handle_s *
+event_handle_load_from_path(namespace_data_t * ns_data, const gchar * path,
+	GError ** error)
 {
 	struct event_handle_s *handle;
-	gchar *dirname, *basename;
+	gchar *dirname, *bn;
 	struct path_data_s pd;
 
-	basename = g_path_get_basename(path);
+	bn = g_path_get_basename(path);
 	dirname = g_path_get_dirname(path);
 
 	bzero(&pd, sizeof(pd));
-	path_get_sequence(path, &(pd.xattr_seq));
-	path_get_incoming_time(path, &(pd.xattr_time));
-	path_get_container_id(path, &(pd.id), pd.str_cid, sizeof(pd.str_cid));
+	gridcluster_eventxattr_get_seq(path, &(pd.xattr_seq));
+	gridcluster_eventxattr_get_incoming_time(path, &(pd.xattr_time));
+	gridcluster_eventxattr_get_container_id(path, &(pd.id), pd.str_cid,
+		sizeof(pd.str_cid));
 	stat(path, &(pd.stat));
-	g_strlcpy(pd.relpath, basename, sizeof(pd.relpath) - 1);
+	g_strlcpy(pd.relpath, bn, sizeof(pd.relpath) - 1);
 	pd.relpath_size = strlen(pd.relpath);
 
 	handle = event_handle_load(ns_data, dirname, &pd, error);
 
 	g_free(dirname);
-	g_free(basename);
+	g_free(bn);
 	return handle;
 }
 
@@ -500,36 +507,40 @@ static gchar *
 action_compute_path(struct event_action_s *action)
 {
 	return g_strconcat(action->handle->ns_data->queues.dir_pending,
-			G_DIR_SEPARATOR_S, action->handle->ueid,
-			",", action->srvtype, ",", action->str_target, NULL);
+		G_DIR_SEPARATOR_S, action->handle->ueid,
+		",", action->srvtype, ",", action->str_target, NULL);
 }
 
 static void
 action_compute_id(struct event_action_s *action)
 {
 	if (action->srvtype[0])
-		g_snprintf(action->id, sizeof(action->id), "%s,%s,", action->handle->ueid, action->srvtype);
+		g_snprintf(action->id, sizeof(action->id), "%s,%s,",
+			action->handle->ueid, action->srvtype);
 	else
-		g_snprintf(action->id, sizeof(action->id), "%s,,%s", action->handle->ueid, action->str_target);
+		g_snprintf(action->id, sizeof(action->id), "%s,,%s",
+			action->handle->ueid, action->str_target);
 
-	XDEBUG("ACTION[%s] ID known srv=%s addr=%s", action->id, action->srvtype, action->str_target);
+	XDEBUG("ACTION[%s] ID known srv=%s addr=%s", action->id, action->srvtype,
+		action->str_target);
 }
 
 static void
 action_destroy(struct event_action_s *action)
 {
-	XDEBUG("ACTION[%s] workers=%u being destroyed", action->id, action->workers);
-	
+	XDEBUG("ACTION[%s] workers=%u being destroyed", action->id,
+		action->workers);
+
 	if (-1 == unlink(action->path))
 		WARN("ACTION[%s] unlink failed (%s) for path=%s", action->id,
-				strerror(errno), action->path);
+			strerror(errno), action->path);
 	else
 		DEBUG("ACTION[%s] unlinked path=%s", action->id, action->path);
 
 	if (action->handle) {
 		event_handle_unref(action->handle);
 		action->handle = NULL;
-	}		
+	}
 
 	g_hash_table_remove(ht_pending_actions, action->id);
 	g_hash_table_remove(ht_idle_actions, action->id);
@@ -538,21 +549,50 @@ action_destroy(struct event_action_s *action)
 	g_free(action);
 }
 
+static void
+action_trash(struct event_action_s *action)
+{
+	gchar *trash_path = NULL;
+
+	XDEBUG("ACTION[%s] workers=%u being trashed", action->id, action->workers);
+
+	trash_path = g_strconcat(action->handle->ns_data->queues.dir_trash,
+		G_DIR_SEPARATOR_S, action->handle->ueid, NULL);
+
+	if (-1 == g_rename(action->path, trash_path))
+		WARN("ACTION[%s] trash failed (%s) for path=%s", action->id,
+			strerror(errno), action->path);
+	else
+		DEBUG("ACTION[%s] trashed path=%s", action->id, action->path);
+
+	if (action->handle) {
+		event_handle_unref(action->handle);
+		action->handle = NULL;
+	}
+
+	g_hash_table_remove(ht_pending_actions, action->id);
+	g_hash_table_remove(ht_idle_actions, action->id);
+
+	bzero(action, sizeof(*action));
+	g_free(action);
+	g_free(trash_path);
+}
+
 static gboolean
-action_save(struct event_action_s *action, GError **error)
+action_save(struct event_action_s *action, GError ** error)
 {
 	gchar *new_path;
-	
+
 	new_path = action_compute_path(action);
 	if (-1 == rename(action->path, new_path)) {
 		GSETERROR(error, "rename error (%s) %s -> %s", strerror(errno),
-				action->path, new_path);
+			action->path, new_path);
 		g_free(new_path);
 		return FALSE;
 	}
 
 	bzero(action->path, sizeof(action->path));
-	g_strlcpy(action->path, new_path, sizeof(action->path)-1);
+	g_strlcpy(action->path, new_path, sizeof(action->path) - 1);
 	g_free(new_path);
 
 	DEBUG("ACTION[%s] saved path=%s", action->id, action->path);
@@ -579,6 +619,7 @@ static void
 action_restart_push_or_destroy(struct event_action_s *action)
 {
 	GError *err;
+
 	action->action_status = ES_NONE;
 
 	if ('\0' != action->srvtype[0]) {
@@ -588,7 +629,8 @@ action_restart_push_or_destroy(struct event_action_s *action)
 			bzero(&(action->target), sizeof(action->target));
 			err = NULL;
 			if (!action_save(action, &err)) {
-				ERROR("ACTION[%s] save error : %s", action->id, gerror_get_message(err));
+				ERROR("ACTION[%s] save error : %s", action->id,
+					gerror_get_message(err));
 				g_clear_error(&err);
 				action_destroy(action);
 				return;
@@ -609,7 +651,7 @@ action_restart_status(struct event_action_s *action)
 }
 
 static gboolean
-action_register(struct event_action_s *action, GError **error)
+action_register(struct event_action_s *action, GError ** error)
 {
 	XDEBUG("ACTION[%s] being registered", action->id);
 
@@ -627,7 +669,7 @@ action_register(struct event_action_s *action, GError **error)
 }
 
 static gboolean
-action_link_to_event(struct event_action_s *action, GError **error)
+action_link_to_event(struct event_action_s *action, GError ** error)
 {
 	gboolean rc = FALSE;
 	gchar *new_path;
@@ -639,7 +681,7 @@ action_link_to_event(struct event_action_s *action, GError **error)
 			action->handle->path, new_path);
 	else {
 		bzero(action->path, sizeof(action->path));
-		g_strlcpy(action->path, new_path, sizeof(action->path)-1);
+		g_strlcpy(action->path, new_path, sizeof(action->path) - 1);
 		rc = TRUE;
 	}
 
@@ -648,20 +690,20 @@ action_link_to_event(struct event_action_s *action, GError **error)
 }
 
 static gboolean
-action_unpack_path(struct event_action_s *action, const gchar *path,
-		gchar *ueid, gsize ueid_size, GError **error)
+action_unpack_path(struct event_action_s *action, const gchar * path,
+	gchar * ueid, gsize ueid_size, GError ** error)
 {
-	gchar *basename, **tokens;
+	gchar *bn, **tokens;
 
-	g_strlcpy(action->path, path, sizeof(action->path)-1);
+	g_strlcpy(action->path, path, sizeof(action->path) - 1);
 
-	if (!(basename = g_path_get_basename(path))) {
+	if (!(bn = g_path_get_basename(path))) {
 		GSETERROR(error, "no basename in path");
 		return FALSE;
 	}
 	bzero(action->id, sizeof(action->id));
-	g_strlcpy(action->id, basename, sizeof(action->id)-1);
-	g_free(basename);
+	g_strlcpy(action->id, bn, sizeof(action->id) - 1);
+	g_free(bn);
 
 	tokens = g_strsplit(action->id, ",", 3);
 	if (!tokens) {
@@ -675,8 +717,8 @@ action_unpack_path(struct event_action_s *action, const gchar *path,
 		return FALSE;
 	}
 
-	g_strlcpy(ueid, tokens[0], ueid_size-1);
-	g_strlcpy(action->srvtype, tokens[1], sizeof(action->srvtype)-1);
+	g_strlcpy(ueid, tokens[0], ueid_size - 1);
+	g_strlcpy(action->srvtype, tokens[1], sizeof(action->srvtype) - 1);
 
 	if (*(tokens[2])) {
 		if (!l4_address_init_with_url(&(action->target), tokens[2], error)) {
@@ -686,14 +728,15 @@ action_unpack_path(struct event_action_s *action, const gchar *path,
 		}
 	}
 
-	XDEBUG("ACTION[%s] unpacked srv=%s addr=%s", action->id, action->srvtype, action->str_target);
+	XDEBUG("ACTION[%s] unpacked srv=%s addr=%s", action->id, action->srvtype,
+		action->str_target);
 
 	g_strfreev(tokens);
 	return TRUE;
 }
 
-static struct event_action_s*
-action_load(namespace_data_t *ns_data, const gchar *path, GError **error)
+static struct event_action_s *
+action_load(namespace_data_t * ns_data, const gchar * path, GError ** error)
 {
 	struct event_action_s *action;
 	gchar ueid[256];
@@ -712,7 +755,7 @@ action_load(namespace_data_t *ns_data, const gchar *path, GError **error)
 	}
 
 	action->action_status = (action->target.port == 0) ? ES_NONE : ES_PUSHED;
-	
+
 	/* Try to reuse an event handle, or load one new by default */
 	action->handle = g_hash_table_lookup(ht_event_by_ueid, ueid);
 	if (action->handle)
@@ -720,7 +763,8 @@ action_load(namespace_data_t *ns_data, const gchar *path, GError **error)
 	else {
 		action->handle = event_handle_load_from_path(ns_data, path, error);
 		if (!action->handle) {
-			GSETERROR(error, "event cannot be loaded for ACTION[%s]", action->id);
+			GSETERROR(error, "event cannot be loaded for ACTION[%s]",
+				action->id);
 			g_free(action);
 			return NULL;
 		}
@@ -739,9 +783,9 @@ action_load(namespace_data_t *ns_data, const gchar *path, GError **error)
 	return NULL;
 }
 
-static struct event_action_s*
+static struct event_action_s *
 action_create_targeted(struct event_handle_s *handle,
-		const gchar *s, const addr_info_t *ai, GError **error)
+	const gchar * s, const addr_info_t * ai, GError ** error)
 {
 	struct event_action_s *action;
 
@@ -756,10 +800,11 @@ action_create_targeted(struct event_handle_s *handle,
 	action->event_status = ~0;
 
 	if (s)
-		g_strlcpy(action->srvtype, s, sizeof(action->srvtype)-1);
+		g_strlcpy(action->srvtype, s, sizeof(action->srvtype) - 1);
 	else if (ai) {
 		g_memmove(&(action->target), ai, sizeof(addr_info_t));
-		addr_info_to_string(&(action->target), action->str_target, sizeof(action->str_target));
+		addr_info_to_string(&(action->target), action->str_target,
+			sizeof(action->str_target));
 	}
 
 	action_compute_id(action);
@@ -788,37 +833,40 @@ static void
 asn1_action_cleaner(gpointer p)
 {
 	struct event_action_s *action;
-	
+
 	action = p;
 
 	action->last_request = time(0);
-	-- action->workers ;
+	--action->workers;
 
 	XDEBUG("ACTION[%s] workers=%u action=%s event=%s cleaning worker",
-			action->id, action->workers,
-			action_status_to_string(action->action_status),
-			event_status_to_string(action->event_status));
+		action->id, action->workers,
+		action_status_to_string(action->action_status),
+		event_status_to_string(action->event_status));
 
 #ifdef HAVE_EXTRA_DEBUG
 	if (action->workers > 0) {
-		FATAL("ACTION[%s] abnormal condition, action done but %u workers still up",
+		FATAL
+			("ACTION[%s] abnormal condition, action done but %u workers still up",
 			action->id, action->workers);
-		g_error("ACTION[%s] abnormal condition, action done but %u workers still up",
+		g_error
+			("ACTION[%s] abnormal condition, action done but %u workers still up",
 			action->id, action->workers);
 	}
 #endif
 
 	switch (action->action_status) {
 
-		case ES_NONE: /* PUSH failed */
+		case ES_NONE:			/* PUSH failed */
 			action_restart_push_or_destroy(action);
 			return;
 
-		case ES_PUSHED: /* STATUS failed or PUSH succeeded */
+		case ES_PUSHED:		/* STATUS failed or PUSH succeeded */
 			switch (action->event_status) {
 				case CODE_EVT_ERROR_DEF:
-					INFO("ACTION[%s] ERROR addr=%s", action->id, action->str_target);
-					action_destroy(action);
+					INFO("ACTION[%s] ERROR addr=%s", action->id,
+						action->str_target);
+					action_trash(action);
 					return;
 				case CODE_EVT_ERROR_TMP:
 					action_restart_push_or_destroy(action);
@@ -830,13 +878,14 @@ asn1_action_cleaner(gpointer p)
 					action_restart_status(action);
 					return;
 				case CODE_EVT_WORKDONE:
-					INFO("ACTION[%s] DONE addr=%s", action->id, action->str_target);
+					INFO("ACTION[%s] DONE addr=%s", action->id,
+						action->str_target);
 					action_destroy(action);
 					return;
 				default:
 #ifdef HAVE_EXTRA_DEBUG
 					g_error("ACTION[%s] unexpected status (%x) from addr=%s ",
-							action->id, action->event_status, action->str_target);
+						action->id, action->event_status, action->str_target);
 #endif
 					action_destroy(action);
 					return;
@@ -848,7 +897,8 @@ asn1_action_cleaner(gpointer p)
 			if (action->srvtype[0]) {
 				/* reset the chosen address and ensure following actions
 				 * won't target the same service */
-				__zero_service(action->handle->ns_data, action->srvtype, &(action->target));
+				__zero_service(action->handle->ns_data, action->srvtype,
+					&(action->target));
 				bzero(&(action->target), sizeof(addr_info_t));
 				bzero(&(action->str_target), sizeof(action->str_target));
 			}
@@ -856,7 +906,7 @@ asn1_action_cleaner(gpointer p)
 			action->action_status = ES_NONE;
 			action_make_idle(action);
 			return;
-		case ES_STATUS_PENDING: /* Timeout */
+		case ES_STATUS_PENDING:	/* Timeout */
 			DEBUG("ACTION[%s] STATUS timeout", action->id);
 			action->action_status = ES_PUSHED;
 			action_make_idle(action);
@@ -864,12 +914,15 @@ asn1_action_cleaner(gpointer p)
 		default:
 			/* abnormal, pending status should have been
 			 * changed in a final handler */
-			FATAL("ACTION[%s] abnormal pending status : action=%x/%s event=%x/%s",
-				action->id,
-				action->action_status, action_status_to_string(action->action_status),
-				action->event_status, event_status_to_string(action->event_status));
+			FATAL
+				("ACTION[%s] abnormal pending status : action=%x/%s event=%x/%s",
+				action->id, action->action_status,
+				action_status_to_string(action->action_status),
+				action->event_status,
+				event_status_to_string(action->event_status));
 #ifdef HAVE_EXTRA_DEBUG
-			g_error("ACTION[%s] abnormal action's status, check the logs", action->id);
+			g_error("ACTION[%s] abnormal action's status, check the logs",
+				action->id);
 #endif
 			action_destroy(action);
 			return;
@@ -877,33 +930,35 @@ asn1_action_cleaner(gpointer p)
 }
 
 static int
-asn1_response_handler(worker_t *worker, GError **error)
+asn1_response_handler(worker_t * worker, GError ** error)
 {
 	GByteArray *gba_code;
 	struct asn1_session_s *asn1_session;
 	struct event_action_s *action;
-	
+
 	asn1_session = asn1_worker_get_session(worker);
 	action = asn1_worker_get_session_data(worker);
-	gba_code = g_hash_table_lookup(asn1_session->resp_headers,"EVENT_STATUS");
+	gba_code = g_hash_table_lookup(asn1_session->resp_headers, "EVENT_STATUS");
 	if (!gba_code) {
-		GSETERROR(error,"Distant service reply a message without EVENT_STATUS");
+		GSETERROR(error,
+			"Distant service reply a message without EVENT_STATUS");
 		return 0;
 	}
 
-	g_byte_array_append(gba_code, (guint8*)"", 1);
+	g_byte_array_append(gba_code, (guint8 *) "", 1);
 	g_byte_array_set_size(gba_code, gba_code->len - 1);
-	action->event_status = g_ascii_strtoll((gchar*)gba_code->data, NULL, 10);
+	action->event_status = g_ascii_strtoll((gchar *) gba_code->data, NULL, 10);
 
 	DEBUG("ACTION[%s] status received %s", action->id,
-			action_status_to_string(action->action_status));
+		action_status_to_string(action->action_status));
 	return 1;
 }
 
 static gint
-asn1_push_error_handler(worker_t *worker, GError **error)
+asn1_push_error_handler(worker_t * worker, GError ** error)
 {
 	struct event_action_s *action;
+
 	(void) error;
 	action = asn1_worker_get_session_data(worker);
 	action->action_status = ES_NONE;
@@ -912,9 +967,10 @@ asn1_push_error_handler(worker_t *worker, GError **error)
 }
 
 static gint
-asn1_push_final_handler(worker_t *worker, GError **error)
+asn1_push_final_handler(worker_t * worker, GError ** error)
 {
 	struct event_action_s *action;
+
 	(void) error;
 	action = asn1_worker_get_session_data(worker);
 	action->action_status = ES_PUSHED;
@@ -923,9 +979,10 @@ asn1_push_final_handler(worker_t *worker, GError **error)
 }
 
 static gint
-asn1_status_error_handler(worker_t *worker, GError **error)
+asn1_status_error_handler(worker_t * worker, GError ** error)
 {
 	struct event_action_s *action;
+
 	(void) error;
 	action = asn1_worker_get_session_data(worker);
 	action->action_status = ES_PUSHED;
@@ -934,9 +991,10 @@ asn1_status_error_handler(worker_t *worker, GError **error)
 }
 
 static gint
-asn1_status_final_handler(worker_t *worker, GError **error)
+asn1_status_final_handler(worker_t * worker, GError ** error)
 {
 	struct event_action_s *action;
+
 	(void) error;
 	action = asn1_worker_get_session_data(worker);
 	action->action_status = ES_PUSHED;
@@ -947,7 +1005,7 @@ asn1_status_final_handler(worker_t *worker, GError **error)
 /* ------------------------------------------------------------------------- */
 
 static gboolean
-action_start_worker_push(struct event_action_s *action, GError **error)
+action_start_worker_push(struct event_action_s *action, GError ** error)
 {
 	const gchar *ueid;
 	worker_t *asn1_worker;
@@ -969,14 +1027,16 @@ action_start_worker_push(struct event_action_s *action, GError **error)
 		}
 
 		bzero(&si, sizeof(struct service_info_s));
-		if (!__choose_service(action->handle->ns_data, action->srvtype, &si, error)) {
+		if (!__choose_service(action->handle->ns_data, action->srvtype, &si,
+				error)) {
 			GSETERROR(error, "No service available TYPE[%s]", action->srvtype);
 			return FALSE;
 		}
 
 		g_memmove(&(action->target), &(si.addr), sizeof(addr_info_t));
 		bzero(action->str_target, sizeof(action->str_target));
-		addr_info_to_string(&(action->target), action->str_target, sizeof(action->str_target));
+		addr_info_to_string(&(action->target), action->str_target,
+			sizeof(action->str_target));
 
 		if (!action_save(action, error)) {
 			GSETERROR(error, "persistency error");
@@ -992,15 +1052,16 @@ action_start_worker_push(struct event_action_s *action, GError **error)
 
 	asn1_worker = create_asn1_worker(&(action->target), REQ_EVT_PUSH);
 	asn1_worker_set_handlers(asn1_worker, asn1_response_handler,
-			asn1_push_error_handler, asn1_push_final_handler);
+		asn1_push_error_handler, asn1_push_final_handler);
 	asn1_worker_set_request_body(asn1_worker, encoded);
-	g_hash_table_insert(asn1_worker_get_session(asn1_worker)->req_headers, g_strdup(MSG_HEADER_UEID),
-			g_byte_array_append(g_byte_array_new(), (guint8*)ueid, strlen(ueid)));
+	g_hash_table_insert(asn1_worker_get_session(asn1_worker)->req_headers,
+		g_strdup(MSG_HEADER_UEID), g_byte_array_append(g_byte_array_new(),
+			(guint8 *) ueid, strlen(ueid)));
 
 	g_byte_array_free(encoded, FALSE);
 
 	if (asn1_request_worker(asn1_worker, error)) {
-		++ action->workers;
+		++action->workers;
 		asn1_worker_set_session_data(asn1_worker, action, asn1_action_cleaner);
 		return TRUE;
 	}
@@ -1011,7 +1072,7 @@ action_start_worker_push(struct event_action_s *action, GError **error)
 }
 
 static gboolean
-action_start_worker_status(struct event_action_s *action, GError **error)
+action_start_worker_status(struct event_action_s *action, GError ** error)
 {
 	const gchar *ueid;
 	worker_t *asn1_worker;
@@ -1020,25 +1081,27 @@ action_start_worker_status(struct event_action_s *action, GError **error)
 
 	asn1_worker = create_asn1_worker(&(action->target), REQ_EVT_STATUS);
 	asn1_worker_set_handlers(asn1_worker, asn1_response_handler,
-			asn1_status_error_handler, asn1_status_final_handler);
-	g_hash_table_insert(asn1_worker_get_session(asn1_worker)->req_headers, g_strdup(MSG_HEADER_UEID),
-			g_byte_array_append(g_byte_array_new(), (guint8*)ueid, strlen(ueid)));
+		asn1_status_error_handler, asn1_status_final_handler);
+	g_hash_table_insert(asn1_worker_get_session(asn1_worker)->req_headers,
+		g_strdup(MSG_HEADER_UEID), g_byte_array_append(g_byte_array_new(),
+			(guint8 *) ueid, strlen(ueid)));
 
 	if (asn1_request_worker(asn1_worker, error)) {
-		++ action->workers;
+		++action->workers;
 		asn1_worker_set_session_data(asn1_worker, action, asn1_action_cleaner);
 		return TRUE;
 	}
 
 	GSETERROR(error, "ASN.1 worker startup error");
-	free_asn1_worker(asn1_worker,TRUE);
+	free_asn1_worker(asn1_worker, TRUE);
 	return FALSE;
 }
 
 /* ------------------------------------------------------------------------- */
 
 static gboolean
-push_event_final_calback(gridcluster_event_t *e, gpointer udata, gpointer edata, GError **err)
+push_event_final_calback(gridcluster_event_t * e, gpointer udata,
+	gpointer edata, GError ** err)
 {
 	(void) e;
 	(void) edata;
@@ -1048,23 +1111,28 @@ push_event_final_calback(gridcluster_event_t *e, gpointer udata, gpointer edata,
 }
 
 static gboolean
-push_event_address_forwarder(gridcluster_event_t *e, gpointer udata, gpointer edata, GError **err, const addr_info_t *a)
+push_event_address_forwarder(gridcluster_event_t * e, gpointer udata,
+	gpointer edata, GError ** err, const addr_info_t * a)
 {
 	(void) e;
 	(void) udata;
-	return NULL != action_create_targeted((struct event_handle_s*)edata, NULL, a, err);
+	return NULL != action_create_targeted((struct event_handle_s *) edata, NULL,
+		a, err);
 }
 
 static gboolean
-push_event_service_forwarder (gridcluster_event_t *e, gpointer udata, gpointer edata, GError **err, const gchar *s)
+push_event_service_forwarder(gridcluster_event_t * e, gpointer udata,
+	gpointer edata, GError ** err, const gchar * s)
 {
 	(void) e;
 	(void) udata;
-	return NULL != action_create_targeted((struct event_handle_s*)edata, s, NULL, err);
+	return NULL != action_create_targeted((struct event_handle_s *) edata, s,
+		NULL, err);
 }
 
 static gboolean
-process_event(namespace_data_t *ns_data, struct event_handle_s *handle, GError **error)
+process_event(namespace_data_t * ns_data, struct event_handle_s *handle,
+	GError ** error)
 {
 	static struct gridcluster_event_hooks_s hooks = {
 		push_event_address_forwarder,
@@ -1074,16 +1142,16 @@ process_event(namespace_data_t *ns_data, struct event_handle_s *handle, GError *
 	};
 	gint rc;
 
-	rc = gridcluster_manage_event_no_defaults(ns_data->conscience->event_handler,
-			handle->event, handle, error, &hooks);
+	rc = gridcluster_manage_event_no_defaults(ns_data->conscience->
+		event_handler, handle->event, handle, error, &hooks);
 	if (rc)
 		return TRUE;
-	GSETERROR(error,"Failed to manage the event");
+	GSETERROR(error, "Failed to manage the event");
 	return FALSE;
 }
 
 static guint
-agent_run_incoming_events(namespace_data_t *ns_data, guint max)
+agent_run_incoming_events(namespace_data_t * ns_data, guint max)
 {
 	GSList *earliest = NULL, *l;
 	guint counter_ok, counter_error;
@@ -1091,7 +1159,8 @@ agent_run_incoming_events(namespace_data_t *ns_data, guint max)
 	const gchar *dirname;
 	GHashTable *ht_cid;
 
-	gboolean filter_event_not_yet_managed(path_data_t *pd) {
+	gboolean filter_event_not_yet_managed(path_data_t * pd)
+	{
 		return NULL == g_hash_table_lookup(ht_cid, pd->id);
 	}
 
@@ -1109,38 +1178,40 @@ agent_run_incoming_events(namespace_data_t *ns_data, guint max)
 
 	counter_ok = counter_error = 0;
 	ht_cid = __extract_cid_ht();
-	earliest = agent_list_earliest_events(dirname, max, delay, filter_event_not_yet_managed);
+	earliest =
+		agent_list_earliest_events(dirname, max, delay,
+		filter_event_not_yet_managed);
 	g_hash_table_destroy(ht_cid);
 
 #ifdef HAVE_EXTRA_DEBUG
 	if (earliest && TRACE_ENABLED()) {
-		TRACE("[NS=%s] incoming elements from [%s], delayed events for [%ld] seconds :",
+		TRACE
+			("[NS=%s] incoming elements from [%s], delayed events for [%ld] seconds :",
 			ns_data->name, dirname, delay);
-		for (l=earliest; l ;l=l->next) {
+		for (l = earliest; l; l = l->next) {
 			struct path_data_s *pd = l->data;
-			TRACE(" XATTR[%ld:%"G_GINT64_FORMAT"] CID[%s] PATH[%s]",
-					pd->xattr_time, pd->xattr_seq,
-					pd->str_cid, pd->relpath);
+
+			TRACE(" XATTR[%ld:%" G_GINT64_FORMAT "] CID[%s] PATH[%s]",
+				pd->xattr_time, pd->xattr_seq, pd->str_cid, pd->relpath);
 		}
 	}
 #endif
 
-	for (l=earliest; l ;l=l->next) {
+	for (l = earliest; l; l = l->next) {
 		path_data_t *pd;
 		struct event_handle_s *handle;
 		GError *err;
 		gboolean rc;
 
-		pd = (path_data_t*)l->data;
+		pd = (path_data_t *) l->data;
 
 		err = NULL;
 		handle = event_handle_load(ns_data, dirname, pd, &err);
 		if (!handle) {
-			counter_error ++;
-			ERROR("[NS=%s] Event error CID[%s] time[%ld] seq[%"G_GINT64_FORMAT"] at [%s] : %s",
-				ns_data->name,
-				pd->str_cid, pd->xattr_time, pd->xattr_seq,
-				pd->relpath, gerror_get_message(err));
+			counter_error++;
+			ERROR("[NS=%s] Event error CID[%s] time[%ld] seq[%" G_GINT64_FORMAT
+				"] at [%s] : %s", ns_data->name, pd->str_cid, pd->xattr_time,
+				pd->xattr_seq, pd->relpath, gerror_get_message(err));
 			g_clear_error(&err);
 			continue;
 		}
@@ -1153,18 +1224,17 @@ agent_run_incoming_events(namespace_data_t *ns_data, guint max)
 		event_handle_unref(handle);
 
 		if (!rc) {
-			counter_error ++;
-			ERROR("[NS=%s] Process error CID[%s] time[%ld] seq[%"G_GINT64_FORMAT"] at [%s] : %s",
-				ns_data->name,
-				pd->str_cid, pd->xattr_time, pd->xattr_seq,
-				pd->relpath, gerror_get_message(err));
+			counter_error++;
+			ERROR("[NS=%s] Process error CID[%s] time[%ld] seq[%"
+				G_GINT64_FORMAT "] at [%s] : %s", ns_data->name, pd->str_cid,
+				pd->xattr_time, pd->xattr_seq, pd->relpath,
+				gerror_get_message(err));
 		}
 		else {
 			counter_ok++;
-			INFO("[NS=%s] Managed CID[%s] time[%ld] seq[%"G_GINT64_FORMAT"] at [%s]",
-				ns_data->name,
-				pd->str_cid, pd->xattr_time, pd->xattr_seq,
-				pd->relpath);
+			INFO("[NS=%s] Managed CID[%s] time[%ld] seq[%" G_GINT64_FORMAT
+				"] at [%s]", ns_data->name, pd->str_cid, pd->xattr_time,
+				pd->xattr_seq, pd->relpath);
 
 		}
 
@@ -1207,7 +1277,7 @@ action_status_is_delayed(struct event_action_s *action, time_t now)
 }
 
 static guint
-agent_start_idle_actions(namespace_data_t *ns_data, guint max)
+agent_start_idle_actions(namespace_data_t * ns_data, guint max)
 {
 	time_t now;
 	guint counter_ok, counter_err;
@@ -1219,7 +1289,7 @@ agent_start_idle_actions(namespace_data_t *ns_data, guint max)
 	counter_ok = counter_err = 0;
 	list_of_values = g_hash_table_get_values(ht_idle_actions);
 	now = time(0);
-	for (l=list_of_values; l ;l=l->next) {
+	for (l = list_of_values; l; l = l->next) {
 		GError *err;
 		struct event_action_s *action;
 
@@ -1228,56 +1298,52 @@ agent_start_idle_actions(namespace_data_t *ns_data, guint max)
 
 		if (counter_ok > max)
 			break;
-		
+
 		switch (action->action_status) {
-		case ES_NONE:
-			if (action_push_is_delayed(action, now) ) {
-				TRACE("ACTION[%s] PUSH delayed", action->id);
-				/*action_make_idle(action);*/
-			}
-			else if (!action_start_worker_push(action, &err)) {
-				WARN("ACTION[%s] PUSH request startup failed : %s",
+			case ES_NONE:
+				if (action_push_is_delayed(action, now)) {
+					TRACE("ACTION[%s] PUSH delayed", action->id);
+				}
+				else if (!action_start_worker_push(action, &err)) {
+					WARN("ACTION[%s] PUSH request startup failed : %s",
 						action->id, gerror_get_message(err));
-				/*action_make_idle(action);*/
-				++ counter_err;
-			}
-			else {
-				++ action->attempts.push;
-				action->last_request = time(0);
-				action->action_status = ES_PUSH_PENDING;
-				action_make_pending(action);
-				INFO("ACTION[%s] PUSH request started", action->id);
-				++ counter_ok;
-			}
-			break;
-		case ES_PUSHED:
-			if (action_status_is_delayed(action, now)) {
-				TRACE("ACTION[%s] STATUS delayed", action->id);
-				/*action_make_idle(action);*/
-			}
-			else if (!action_start_worker_status(action, &err)) {
-				WARN("ACTION[%s] STATUS request startup failed : %s",
+					++counter_err;
+				}
+				else {
+					++action->attempts.push;
+					action->last_request = time(0);
+					action->action_status = ES_PUSH_PENDING;
+					action_make_pending(action);
+					INFO("ACTION[%s] PUSH request started", action->id);
+					++counter_ok;
+				}
+				break;
+			case ES_PUSHED:
+				if (action_status_is_delayed(action, now)) {
+					TRACE("ACTION[%s] STATUS delayed", action->id);
+				}
+				else if (!action_start_worker_status(action, &err)) {
+					WARN("ACTION[%s] STATUS request startup failed : %s",
 						action->id, gerror_get_message(err));
-				/*action_make_idle(action);*/
-				++ counter_err;
-			}
-			else {
-				++ action->attempts.status;
-				action->last_request = time(0);
-				action->action_status = ES_STATUS_PENDING;
-				action_make_pending(action);
-				INFO("ACTION[%s] STATUS request started", action->id);
-				++ counter_ok;
-			}
-			break;
-		default:
-			FATAL("ACTION[%s] is pending but in idle set", action->id);
+					++counter_err;
+				}
+				else {
+					++action->attempts.status;
+					action->last_request = time(0);
+					action->action_status = ES_STATUS_PENDING;
+					action_make_pending(action);
+					INFO("ACTION[%s] STATUS request started", action->id);
+					++counter_ok;
+				}
+				break;
+			default:
+				FATAL("ACTION[%s] is pending but in idle set", action->id);
 #ifdef HAVE_EXTRA_DEBUG
-			g_error("ACTION[%s] is pending but in idle set", action->id);
+				g_error("ACTION[%s] is pending but in idle set", action->id);
 #endif
-			action->action_status = ES_PUSHED;
-			action_make_idle(action);
-			break;
+				action->action_status = ES_PUSHED;
+				action_make_idle(action);
+				break;
 		}
 
 		if (err)
@@ -1291,14 +1357,14 @@ agent_start_idle_actions(namespace_data_t *ns_data, guint max)
 /* ------------------------------------------------------------------------- */
 
 static inline void
-build_taskid(gchar *dst, gsize dst_size, const gchar *ns_name)
+build_taskid(gchar * dst, gsize dst_size, const gchar * ns_name)
 {
-	g_snprintf(dst, dst_size, TASK_ID".%s", ns_name);
+	g_snprintf(dst, dst_size, TASK_ID ".%s", ns_name);
 }
 
 /* Define the per-namespace subtask action */
 static int
-task_action_events(gpointer task_param, GError **error)
+task_action_events(gpointer task_param, GError ** error)
 {
 	guint current;
 	gchar *ns_name;
@@ -1309,11 +1375,11 @@ task_action_events(gpointer task_param, GError **error)
 
 	ns_name = task_param;
 	if (!ns_name) {
-		GSETERROR(error,"Misconfigured gridagent task (no session data)");
+		GSETERROR(error, "Misconfigured gridagent task (no session data)");
 		return 0;
 	}
 
-	g_strlcpy(task_data.ns_name, ns_name, sizeof(task_data.ns_name)-1);
+	g_strlcpy(task_data.ns_name, ns_name, sizeof(task_data.ns_name) - 1);
 	build_taskid(task_data.task_id, sizeof(task_data.task_id), ns_name);
 
 	if (!event_enable_manage) {
@@ -1324,21 +1390,22 @@ task_action_events(gpointer task_param, GError **error)
 
 	ns_data = g_hash_table_lookup(namespaces, ns_name);
 	if (!ns_data || !ns_data->conscience) {
-		GSETERROR(error,"Namespace misconfigured");
+		GSETERROR(error, "Namespace misconfigured");
 		goto error_label;
 	}
 	if (!check_spool_dirs(ns_data, error)) {
-		GSETERROR(error,"Spool directory state failure");
+		GSETERROR(error, "Spool directory state failure");
 		goto error_label;
 	}
 
 	/* Start some actions */
 	current = agent_count_pending_actions();
 	DEBUG("[task_id=%s] ACTIONS this turn : max=%u current=%u",
-			task_data.task_id, max_events_actions_pending, current);
+		task_data.task_id, max_events_actions_pending, current);
 	if (max_events_actions_pending > current) {
 		guint managed = agent_start_idle_actions(ns_data,
-				max_events_actions_pending - current);
+			max_events_actions_pending - current);
+
 		if (managed)
 			DEBUG("[task_id=%s] %u idle tasks started (total %u)",
 				task_data.task_id, managed, agent_count_pending_actions());
@@ -1346,12 +1413,14 @@ task_action_events(gpointer task_param, GError **error)
 
 	current = agent_count_pending_events();
 	DEBUG("[task_id=%s] EVENTS this turn : max=%u current=%u",
-			task_data.task_id, max_events_pending, current);
+		task_data.task_id, max_events_pending, current);
 	if (max_events_pending > current) {
-		guint managed = agent_run_incoming_events(ns_data, max_events_pending - current + 10);
+		guint managed =
+			agent_run_incoming_events(ns_data,
+			max_events_pending - current + 10);
 		if (managed)
-			INFO("[task_id=%s] %u new events managed (total %u)", task_data.task_id,
-					managed, agent_count_pending_events());
+			INFO("[task_id=%s] %u new events managed (total %u)",
+				task_data.task_id, managed, agent_count_pending_events());
 	}
 
 	task_done(task_data.task_id);
@@ -1362,9 +1431,9 @@ error_label:
 }
 
 static void
-_recover_actions(namespace_data_t *ns_data)
+_recover_actions(namespace_data_t * ns_data)
 {
-	const gchar *basename;
+	const gchar *bn;
 	const gchar *dirname;
 	guint count;
 	GError *err;
@@ -1376,20 +1445,20 @@ _recover_actions(namespace_data_t *ns_data)
 	gdir = g_dir_open(dirname, 0, &err);
 	if (!gdir) {
 		ERROR("[NS=%s] Failed to recover previous actions : %s",
-				ns_data->name, gerror_get_message(err));
+			ns_data->name, gerror_get_message(err));
 		g_clear_error(&err);
 		return;
 	}
 
-	while (NULL != (basename = g_dir_read_name(gdir))) {
+	while (NULL != (bn = g_dir_read_name(gdir))) {
 		gchar *fullpath;
 
-		fullpath = g_strconcat(dirname, G_DIR_SEPARATOR_S, basename, NULL);
+		fullpath = g_strconcat(dirname, G_DIR_SEPARATOR_S, bn, NULL);
 		if (NULL == action_load(ns_data, fullpath, &err))
 			ERROR("[NS=%s] Failed to recover ACTION[%s] : %s",
-					ns_data->name, basename, gerror_get_message(err));
+				ns_data->name, bn, gerror_get_message(err));
 		else
-			++ count;
+			++count;
 		if (err)
 			g_clear_error(&err);
 		g_free(fullpath);
@@ -1402,10 +1471,10 @@ _recover_actions(namespace_data_t *ns_data)
 }
 
 int
-agent_start_event_all_tasks(const gchar *ns_name, GError **error)
+agent_start_event_all_tasks(const gchar * ns_name, GError ** error)
 {
 	namespace_data_t *ns_data;
-	gchar task_id[sizeof(TASK_ID)+LIMIT_LENGTH_NSNAME+1];
+	gchar task_id[sizeof(TASK_ID) + LIMIT_LENGTH_NSNAME + 1];
 	task_t *task;
 
 	build_taskid(task_id, sizeof(task_id), ns_name);
@@ -1425,7 +1494,7 @@ agent_start_event_all_tasks(const gchar *ns_name, GError **error)
 	set_task_callbacks(task, task_action_events, g_free, g_strdup(ns_name));
 
 	if (!add_task_to_schedule(task, error)) {
-		GSETERROR(error,"[task_id=%s] Failed to start a sub worker", task_id);
+		GSETERROR(error, "[task_id=%s] Failed to start a sub worker", task_id);
 		return 0;
 	}
 	DEBUG("[task_id=%s] subtask started ", task_id);
@@ -1434,4 +1503,3 @@ agent_start_event_all_tasks(const gchar *ns_name, GError **error)
 
 	return 1;
 }
-

@@ -1,26 +1,9 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 
 #include <test-dept.h>
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 #include <rawx.h>
 
 #include "../lib/chunk_db.h"
@@ -41,7 +24,7 @@ setup()
 	GError *error = NULL;
 
 	struct chunk_textinfo_s chunk = {
-		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 
+		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 		CONTENT_NAME,
 		"1024",
 		"2",
@@ -63,11 +46,15 @@ setup()
 	log4c_init();
 
 	/* Create fake volume root */
-	mkdir(VOLUME_ROOT, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH);
+	mkdir(VOLUME_ROOT,
+		S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH |
+		S_IWOTH | S_IXOTH);
 
 	/* Create fake chunk */
 	close(open(CHUNK_PATH,
-		O_CREAT, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH));
+			O_CREAT,
+			S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH
+			| S_IWOTH | S_IXOTH));
 
 	if (!set_rawx_info_in_attr(CHUNK_PATH, &error, &content, &chunk))
 		ERROR(error->message);
@@ -93,14 +80,14 @@ test_args_null()
 {
 	GError *error = NULL;
 
-        test_dept_assert_false(save_chunk_to_db(NULL, VOLUME_ROOT, &error));
-        test_dept_assert_true(error);
+	test_dept_assert_false(save_chunk_to_db(NULL, VOLUME_ROOT, &error));
+	test_dept_assert_true(error);
 
 	g_clear_error(&error);
 	error = NULL;
 
-        test_dept_assert_false(save_chunk_to_db(CHUNK_PATH, NULL, &error));
-        test_dept_assert_true(error);
+	test_dept_assert_false(save_chunk_to_db(CHUNK_PATH, NULL, &error));
+	test_dept_assert_true(error);
 }
 
 void
@@ -108,7 +95,8 @@ test_arg_chunk_path_unexistant()
 {
 	GError *error = NULL;
 
-	test_dept_assert_false(save_chunk_to_db("/path/to/nowhere", VOLUME_ROOT, &error));
+	test_dept_assert_false(save_chunk_to_db("/path/to/nowhere", VOLUME_ROOT,
+			&error));
 	test_dept_assert_true(error);
 }
 
@@ -117,7 +105,8 @@ test_arg_volume_root_unexistant()
 {
 	GError *error = NULL;
 
-	test_dept_assert_false(save_chunk_to_db(CHUNK_PATH, "/path/to/nowhere", &error));
+	test_dept_assert_false(save_chunk_to_db(CHUNK_PATH, "/path/to/nowhere",
+			&error));
 	test_dept_assert_true(error);
 }
 
@@ -125,12 +114,14 @@ void
 test_chunk_added_to_content_db()
 {
 	GError *error = NULL;
-	GSList* list_chunk;
+	GSList *list_chunk;
 
 	test_dept_assert_true(save_chunk_to_db(CHUNK_PATH, VOLUME_ROOT, &error));
-	test_dept_assert_true(get_content_chunks(VOLUME_ROOT, CONTENT_NAME, &list_chunk, &error));
+	test_dept_assert_true(get_content_chunks(VOLUME_ROOT, CONTENT_NAME,
+			&list_chunk, &error));
 	test_dept_assert_true(list_chunk);
-	test_dept_assert_equals_string(((char*)g_slist_nth(list_chunk, 0)->data), CHUNK_PATH);
+	test_dept_assert_equals_string(((char *) g_slist_nth(list_chunk, 0)->data),
+		CHUNK_PATH);
 
 	return;
 }
@@ -139,12 +130,14 @@ void
 test_chunk_added_to_container_db()
 {
 	GError *error = NULL;
-	GSList* list_chunk;
+	GSList *list_chunk;
 
 	test_dept_assert_true(save_chunk_to_db(CHUNK_PATH, VOLUME_ROOT, &error));
-	test_dept_assert_true(get_container_chunks(VOLUME_ROOT, CONTAINER_ID, &list_chunk, &error));
+	test_dept_assert_true(get_container_chunks(VOLUME_ROOT, CONTAINER_ID,
+			&list_chunk, &error));
 	test_dept_assert_true(list_chunk);
-	test_dept_assert_equals_string(((char*)g_slist_nth(list_chunk, 0)->data), CHUNK_PATH);
+	test_dept_assert_equals_string(((char *) g_slist_nth(list_chunk, 0)->data),
+		CHUNK_PATH);
 
 	return;
 }

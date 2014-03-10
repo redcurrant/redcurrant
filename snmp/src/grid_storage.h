@@ -1,219 +1,210 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef _GRID_STORAGE_H
 #define _GRID_STORAGE_H
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 
 config_require(util_funcs)
-config_add_mib(GRIDSTORAGE-MIB)
+	config_add_mib(GRIDSTORAGE - MIB)
 
-struct meta2_snmp_data {
-	char namespace[LIMIT_LENGTH_NSNAME];
-	char addr[STRLEN_ADDRINFO];
-	int score;
-	guint32 nb_thread;
-	guint32 req_total;
-	guint32 req_create;
-	guint32 req_content_retrieve;
-	guint32 req_list;
-	guint32 req_close;
-	guint32 req_destroy;
-	guint32 req_content_remove;
-	guint32 req_open;
-	guint32 req_failures;
-	guint32 req_content_add;
-	guint32 req_content_append;
-	guint32 req_content_commit;
-	guint32 req_chunk_commit;
-	guint32 req_rplcontent;
-	guint32 req_statcontent;
+		struct meta2_snmp_data
+		{
+			char namespace[LIMIT_LENGTH_NSNAME];
+			char addr[STRLEN_ADDRINFO];
+			int score;
+			guint32 nb_thread;
+			guint32 req_total;
+			guint32 req_create;
+			guint32 req_content_retrieve;
+			guint32 req_list;
+			guint32 req_close;
+			guint32 req_destroy;
+			guint32 req_content_remove;
+			guint32 req_open;
+			guint32 req_failures;
+			guint32 req_content_add;
+			guint32 req_content_append;
+			guint32 req_content_commit;
+			guint32 req_chunk_commit;
+			guint32 req_rplcontent;
+			guint32 req_statcontent;
 
-	guint32 time_create;
-	guint32 time_content_retrieve;
-	guint32 time_list;
-	guint32 time_close;
-	guint32 time_destroy;
-	guint32 time_content_remove;
-	guint32 time_open;
-	guint32 time_content_add;
-	guint32 time_content_append;
-	guint32 time_content_commit;
-	guint32 time_chunk_commit;
-	guint32 time_rplcontent;
-	guint32 time_statcontent;
+			guint32 time_create;
+			guint32 time_content_retrieve;
+			guint32 time_list;
+			guint32 time_close;
+			guint32 time_destroy;
+			guint32 time_content_remove;
+			guint32 time_open;
+			guint32 time_content_add;
+			guint32 time_content_append;
+			guint32 time_content_commit;
+			guint32 time_chunk_commit;
+			guint32 time_rplcontent;
+			guint32 time_statcontent;
 
-	guint32 req_maintenance_getcontent;
-	guint32 req_maintenance_getchunks;
-	guint32 req_maintenance_setcontent;
-	guint32 req_maintenance_setchunks;
-	guint32 req_maintenance_delcontent;
-	guint32 req_maintenance_delchunks;
-	guint32 req_maintenance_other;
+			guint32 req_maintenance_getcontent;
+			guint32 req_maintenance_getchunks;
+			guint32 req_maintenance_setcontent;
+			guint32 req_maintenance_setchunks;
+			guint32 req_maintenance_delcontent;
+			guint32 req_maintenance_delchunks;
+			guint32 req_maintenance_other;
 
-	guint32 time_maintenance_getcontent;
-	guint32 time_maintenance_getchunks;
-	guint32 time_maintenance_setcontent;
-	guint32 time_maintenance_setchunks;
-	guint32 time_maintenance_delcontent;
-	guint32 time_maintenance_delchunks;
-	guint32 time_maintenance_other;
+			guint32 time_maintenance_getcontent;
+			guint32 time_maintenance_getchunks;
+			guint32 time_maintenance_setcontent;
+			guint32 time_maintenance_setchunks;
+			guint32 time_maintenance_delcontent;
+			guint32 time_maintenance_delchunks;
+			guint32 time_maintenance_other;
 
-	guint32 req_prop_set_content;
-	guint32 req_prop_set_container;
-	guint32 req_prop_get_content;
-	guint32 req_prop_get_container;
-	guint32 req_prop_rm_content;
-	guint32 req_prop_rm_container;
-	guint32 req_prop_rpl_set_container;
-	guint32 req_prop_rpl_rm_container;
+			guint32 req_prop_set_content;
+			guint32 req_prop_set_container;
+			guint32 req_prop_get_content;
+			guint32 req_prop_get_container;
+			guint32 req_prop_rm_content;
+			guint32 req_prop_rm_container;
+			guint32 req_prop_rpl_set_container;
+			guint32 req_prop_rpl_rm_container;
 
-	guint32 time_prop_set_content;
-	guint32 time_prop_set_container;
-	guint32 time_prop_get_content;
-	guint32 time_prop_get_container;
-	guint32 time_prop_rm_content;
-	guint32 time_prop_rm_container;
-	guint32 time_prop_rpl_set_container;
-	guint32 time_prop_rpl_rm_container;
-};
+			guint32 time_prop_set_content;
+			guint32 time_prop_set_container;
+			guint32 time_prop_get_content;
+			guint32 time_prop_get_container;
+			guint32 time_prop_rm_content;
+			guint32 time_prop_rm_container;
+			guint32 time_prop_rpl_set_container;
+			guint32 time_prop_rpl_rm_container;
+		};
 
-struct rawx_snmp_data {
-	char namespace[LIMIT_LENGTH_NSNAME];
-	char volume[LIMIT_LENGTH_VOLUMENAME];
-	char addr[STRLEN_ADDRINFO];
-	int score;
-	int free_chunk;
-	int io_idle;
+		struct rawx_snmp_data
+		{
+			char namespace[LIMIT_LENGTH_NSNAME];
+			char volume[LIMIT_LENGTH_VOLUMENAME];
+			char addr[STRLEN_ADDRINFO];
+			int score;
+			int free_chunk;
+			int io_idle;
 
-	guint32 req_all;
-	guint32 req_get;
-	guint32 req_put;
-	guint32 req_del; 
-	guint32 req_info; 
-	guint32 req_stat; 
-	guint32 req_raw; 
-	guint32 req_other; 
+			guint32 req_all;
+			guint32 req_get;
+			guint32 req_put;
+			guint32 req_del;
+			guint32 req_info;
+			guint32 req_stat;
+			guint32 req_raw;
+			guint32 req_other;
 
-	guint32 rep_2xx;
-	guint32 rep_4xx;
-	guint32 rep_5xx;
-	guint32 rep_403;
-	guint32 rep_404;
-	guint32 rep_other;
+			guint32 rep_2xx;
+			guint32 rep_4xx;
+			guint32 rep_5xx;
+			guint32 rep_403;
+			guint32 rep_404;
+			guint32 rep_other;
 
-	guint32 bytes_read;
-	guint32 bytes_written;
-};
+			guint32 bytes_read;
+			guint32 bytes_written;
+		};
 
-struct saver_snmp_data {
-	char namespace[LIMIT_LENGTH_NSNAME];
-	char addr[STRLEN_ADDRINFO];
-	int score;
+		struct saver_snmp_data
+		{
+			char namespace[LIMIT_LENGTH_NSNAME];
+			char addr[STRLEN_ADDRINFO];
+			int score;
 
-	guint32 req_push;
-	guint32 req_status;
-	guint32 workers_bytes;
-	guint32 workers_ok;
-	guint32 workers_ko;
-};
+			guint32 req_push;
+			guint32 req_status;
+			guint32 workers_bytes;
+			guint32 workers_ok;
+			guint32 workers_ko;
+		};
 
-struct tsmx_snmp_data {
-	char namespace[LIMIT_LENGTH_NSNAME];
-	char addr[STRLEN_ADDRINFO];
-	int score;
+		struct tsmx_snmp_data
+		{
+			char namespace[LIMIT_LENGTH_NSNAME];
+			char addr[STRLEN_ADDRINFO];
+			int score;
 
-	int idle_log;
-	int idle_db;
-	int idle_stg;
-	guint32 req_put;
-	guint32 req_get;
-	guint32 req_del;
-	guint32 failed;
-	guint32 bytes_in;
-	guint32 bytes_out;
-};
+			int idle_log;
+			int idle_db;
+			int idle_stg;
+			guint32 req_put;
+			guint32 req_get;
+			guint32 req_del;
+			guint32 failed;
+			guint32 bytes_in;
+			guint32 bytes_out;
+		};
 
-struct solr_snmp_data {
-	char namespace[LIMIT_LENGTH_NSNAME];
-	char addr[STRLEN_ADDRINFO];
-	int score;
+		struct solr_snmp_data
+		{
+			char namespace[LIMIT_LENGTH_NSNAME];
+			char addr[STRLEN_ADDRINFO];
+			int score;
 
-	guint32 req_update;
-	guint32 req_search;
-	guint32 commits;
-	guint32 time_update;
-	guint32 time_search;
-};
+			guint32 req_update;
+			guint32 req_search;
+			guint32 commits;
+			guint32 time_update;
+			guint32 time_search;
+		};
 
-struct rplx_snmp_data {
-	char namespace[LIMIT_LENGTH_NSNAME];
-	char addr[STRLEN_ADDRINFO];
-	int score;
+		struct rplx_snmp_data
+		{
+			char namespace[LIMIT_LENGTH_NSNAME];
+			char addr[STRLEN_ADDRINFO];
+			int score;
 
-	guint32 nb_thread;
-	guint32 worker_current;
-	guint32 worker_idle;
-	guint32 worker_max;
-	guint32 worker_queue;
-	guint32 req_push;
-	guint32 req_status;
-	guint32 req_total;
-	guint32 time_push;
-	guint32 time_status;
-	guint32 time_total;
-};
+			guint32 nb_thread;
+			guint32 worker_current;
+			guint32 worker_idle;
+			guint32 worker_max;
+			guint32 worker_queue;
+			guint32 req_push;
+			guint32 req_status;
+			guint32 req_total;
+			guint32 time_push;
+			guint32 time_status;
+			guint32 time_total;
+		};
 
-struct evt_snmp_data {
-	char namespace[LIMIT_LENGTH_NSNAME];
-	guint32	incoming_nb;
-	guint32 incoming_age;
-	guint32 incoming_oldest;
-	guint32 pending_nb;
-	guint32 pending_age;
-	guint32 pending_oldest;
-};
+		struct evt_snmp_data
+		{
+			char namespace[LIMIT_LENGTH_NSNAME];
+			guint32 incoming_nb;
+			guint32 incoming_age;
+			guint32 incoming_oldest;
+			guint32 pending_nb;
+			guint32 pending_age;
+			guint32 pending_oldest;
+		};
 
-struct csc_snmp_data {
-	char namespace[LIMIT_LENGTH_NSNAME];
-	char addr[STRLEN_ADDRINFO];
-	guint32 nb_thread;
-	guint32 nb_rawx;
-	guint32 nb_rawx_online;
-};
+		struct csc_snmp_data
+		{
+			char namespace[LIMIT_LENGTH_NSNAME];
+			char addr[STRLEN_ADDRINFO];
+			guint32 nb_thread;
+			guint32 nb_rawx;
+			guint32 nb_rawx_online;
+		};
 
-void init_grid_storage(void);
-FindVarMethod var_meta2_number;
-FindVarMethod var_meta2_entry;
-FindVarMethod var_rawx_number;
-FindVarMethod var_rawx_entry;
-FindVarMethod var_tsmx_number;
-FindVarMethod var_tsmx_entry;
-FindVarMethod var_saver_number;
-FindVarMethod var_saver_entry;
-FindVarMethod var_solr_number;
-FindVarMethod var_solr_entry;
-FindVarMethod var_rplx_number;
-FindVarMethod var_rplx_entry;
-FindVarMethod var_evt_number;
-FindVarMethod var_evt_entry;
-FindVarMethod var_csc_number;
-FindVarMethod var_csc_entry;
+		void init_grid_storage(void);
+		FindVarMethod var_meta2_number;
+		FindVarMethod var_meta2_entry;
+		FindVarMethod var_rawx_number;
+		FindVarMethod var_rawx_entry;
+		FindVarMethod var_tsmx_number;
+		FindVarMethod var_tsmx_entry;
+		FindVarMethod var_saver_number;
+		FindVarMethod var_saver_entry;
+		FindVarMethod var_solr_number;
+		FindVarMethod var_solr_entry;
+		FindVarMethod var_rplx_number;
+		FindVarMethod var_rplx_entry;
+		FindVarMethod var_evt_number;
+		FindVarMethod var_evt_entry;
+		FindVarMethod var_csc_number;
+		FindVarMethod var_csc_entry;
 
 #define META2_NUMBER                 0
 #define META2_INDEX                  1
@@ -223,7 +214,7 @@ FindVarMethod var_csc_entry;
 #define META2_REQ_ALLGETS            5
 #define META2_REQ_LIST               6
 #define META2_REQ_CLOSE              7
-#define META2_REQ_DESTROY            8    
+#define META2_REQ_DESTROY            8
 #define META2_REQ_CONTENT_RM         9
 #define META2_REQ_OPEN               10
 #define META2_REQ_FAIL               11
@@ -383,7 +374,7 @@ FindVarMethod var_csc_entry;
 #define CSC_NB_RAWX		6
 #define CSC_NB_RAWX_ONLINE	7
 
-#ifndef RAWX_STAT_URL          
+#ifndef RAWX_STAT_URL
 #define RAWX_STAT_URL                 "rawx.rep"
 #endif
 
@@ -455,12 +446,15 @@ FindVarMethod var_csc_entry;
 #define RAWX_STATKEY_BYTES_READ       RAWX_STATKEY_REP_PREFIX".bread"
 #endif
 
-#ifndef RAWX_STATKEY_BYTES_WRITTEN    
+#ifndef RAWX_STATKEY_BYTES_WRITTEN
 #define RAWX_STATKEY_BYTES_WRITTEN    RAWX_STATKEY_REP_PREFIX".bwritten"
 #endif
 
 #ifndef META2_STAT_REQ_TOTAL
 #define META2_STAT_REQ_TOTAL        "meta2.req.gauge.total"
+#endif
+#ifndef META2_STAT_REQ_TOTAL_V2
+#define META2_STAT_REQ_TOTAL_V2     "gridd.counter.allreq"
 #endif
 #ifndef META2_STAT_REQ_FAIL
 #define META2_STAT_REQ_FAIL         "meta2.req.gauge.failures"
@@ -469,112 +463,256 @@ FindVarMethod var_csc_entry;
 #ifndef META2_STAT_REQ_CREATE
 #define META2_STAT_REQ_CREATE       "meta2.req.gauge.create"
 #endif
+#ifndef META2_STAT_REQ_CREATE_V1
+#define META2_STAT_REQ_CREATE_V1    "gridd.counter.req.REQ_M2_CREATE"
+#endif
+#ifndef META2_STAT_REQ_CREATE_V2
+#define META2_STAT_REQ_CREATE_V2    "gridd.counter.req.M2V2_CREATE"
+#endif
 #ifndef META2_STAT_REQ_OPEN
 #define META2_STAT_REQ_OPEN         "meta2.req.gauge.open"
+#endif
+#ifndef META2_STAT_REQ_OPEN_V2
+#define META2_STAT_REQ_OPEN_V2      "gridd.counter.req.REQ_M2_OPEN"
 #endif
 #ifndef META2_STAT_REQ_CLOSE
 #define META2_STAT_REQ_CLOSE        "meta2.req.gauge.close"
 #endif
+#ifndef META2_STAT_REQ_CLOSE_V2
+#define META2_STAT_REQ_CLOSE_V2     "gridd.counter.req.REQ_M2_CLOSE"
+#endif
 #ifndef META2_STAT_REQ_DESTROY
 #define META2_STAT_REQ_DESTROY      "meta2.req.gauge.destroy"
+#endif
+#ifndef META2_STAT_REQ_DESTROY_V1
+#define META2_STAT_REQ_DESTROY_V1   "gridd.counter.req.REQ_M2_DESTROY"
+#endif
+#ifndef META2_STAT_REQ_DESTROY_V2
+#define META2_STAT_REQ_DESTROY_V2   "gridd.counter.req.M2V2_DESTROY"
 #endif
 
 #ifndef META2_STAT_REQ_LIST
 #define META2_STAT_REQ_LIST         "meta2.req.gauge.list"
 #endif
+#ifndef META2_STAT_REQ_LIST_V1
+#define META2_STAT_REQ_LIST_V1      "gridd.counter.req.REQ_M2_LIST"
+#endif
+#ifndef META2_STAT_REQ_LIST_V2
+#define META2_STAT_REQ_LIST_V2      "gridd.counter.req.M2V2_LIST"
+#endif
 #ifndef META2_STAT_REQ_CONTENT_RET
 #define META2_STAT_REQ_CONTENT_RET  "meta2.req.gauge.content_retrieve"
+#endif
+#ifndef META2_STAT_REQ_CONTENT_RET_V1
+#define META2_STAT_REQ_CONTENT_RET_V1  "gridd.counter.req.REQ_M2_CONTENTRETRIEVE"
+#endif
+#ifndef META2_STAT_REQ_CONTENT_RET_V2
+#define META2_STAT_REQ_CONTENT_RET_V2  "gridd.counter.req.M2V2_GET"
 #endif
 #ifndef META2_STAT_REQ_CONTENT_RM
 #define META2_STAT_REQ_CONTENT_RM   "meta2.req.gauge.content_remove"
 #endif
+#ifndef META2_STAT_REQ_CONTENT_RM_V1
+#define META2_STAT_REQ_CONTENT_RM_V1 "gridd.counter.req.REQ_M2_CONTENTREMOVE"
+#endif
+#ifndef META2_STAT_REQ_CONTENT_RM_V2
+#define META2_STAT_REQ_CONTENT_RM_V2 "gridd.counter.req.M2V2_DEL"
+#endif
 #ifndef META2_STAT_REQ_CONTENT_ADD
-#define META2_STAT_REQ_CONTENT_ADD  "meta2.req.gauge.content_add"
+#define META2_STAT_REQ_CONTENT_ADD    "meta2.req.gauge.content_add"
+#endif
+#ifndef META2_STAT_REQ_CONTENT_ADD_V1
+#define META2_STAT_REQ_CONTENT_ADD_V1  "gridd.counter.req.REQ_M2_CONTENTADD"
+#endif
+#ifndef META2_STAT_REQ_CONTENT_ADD_V2
+#define META2_STAT_REQ_CONTENT_ADD_V2  "gridd.counter.req.M2V2_PUT"
 #endif
 #ifndef META2_STAT_REQ_CONTENT_APPEND
 #define META2_STAT_REQ_CONTENT_APPEND "meta2.req.gauge.content_append"
 #endif
+#ifndef META2_STAT_REQ_CONTENT_APPEND_V1
+#define META2_STAT_REQ_CONTENT_APPEND_V1 "gridd.counter.req.REQ_M2_CONTENTAPPEND"
+#endif
+#ifndef META2_STAT_REQ_CONTENT_APPEND_V2
+#define META2_STAT_REQ_CONTENT_APPEND_V2 "gridd.counter.req.M2V2_APPEND"
+#endif
 #ifndef META2_STAT_REQ_CONTENT_COMMIT
 #define META2_STAT_REQ_CONTENT_COMMIT "meta2.req.gauge.content_commit"
+#endif
+#ifndef META2_STAT_REQ_CONTENT_COMMIT_V1
+#define META2_STAT_REQ_CONTENT_COMMIT_V1 "gridd.counter.req.REQ_M2_CONTENTCOMMIT"
 #endif
 #ifndef META2_STAT_REQ_CHUNK_COMMIT
 #define META2_STAT_REQ_CHUNK_COMMIT   "meta2.req.gauge.chunks_commit"
 #endif
+#ifndef META2_STAT_REQ_CHUNK_COMMIT_V1
+#define META2_STAT_REQ_CHUNK_COMMIT_V1   "gridd.counter.req.REQ_M2_CHUNK_COMMIT"
+#endif
 
 #ifndef META2_STAT_REQ_RAW_GETCONTENT
-#define META2_STAT_REQ_RAW_GETCONTENT "meta2.req.gauge.maintenance_getcontent"
+#define META2_STAT_REQ_RAW_GETCONTENT "meta2.req.counter.maintenance_getcontent"
+#endif
+#ifndef META2_STAT_REQ_RAW_GETCONTENT_V1
+#define META2_STAT_REQ_RAW_GETCONTENT_V1 "gridd.counter.req.REQ_M2RAW_CONTENT_GET"
 #endif
 #ifndef META2_STAT_REQ_RAW_GETCHUNK
-#define META2_STAT_REQ_RAW_GETCHUNK   "meta2.req.gauge.maintenance_getchunks"
+#define META2_STAT_REQ_RAW_GETCHUNK   "meta2.req.counter.maintenance_getchunks"
+#endif
+#ifndef META2_STAT_REQ_RAW_GETCHUNK_V1
+#define META2_STAT_REQ_RAW_GETCHUNK_V1   "gridd.counter.req.REQ_M2RAW_CHUNKS_GET"
 #endif
 #ifndef META2_STAT_REQ_RAW_SETCONTENT
-#define META2_STAT_REQ_RAW_SETCONTENT "meta2.req.gauge.maintenance_setcontent"
+#define META2_STAT_REQ_RAW_SETCONTENT "meta2.req.counter.maintenance_setcontent"
+#endif
+#ifndef META2_STAT_REQ_RAW_SETCONTENT_V1
+#define META2_STAT_REQ_RAW_SETCONTENT_V1 "gridd.counter.req.REQ_M2RAW_CONTENT_SET"
 #endif
 #ifndef META2_STAT_REQ_RAW_SETCHUNK
-#define META2_STAT_REQ_RAW_SETCHUNK   "meta2.req.gauge.maintenance_setchunks"
+#define META2_STAT_REQ_RAW_SETCHUNK   "meta2.req.counter.maintenance_setchunks"
+#endif
+#ifndef META2_STAT_REQ_RAW_SETCHUNK_V1
+#define META2_STAT_REQ_RAW_SETCHUNK_V1   "gridd.counter.req.REQ_M2RAW_CHUNKS_SET"
 #endif
 #ifndef META2_STAT_REQ_RAW_DELCONTENT
-#define META2_STAT_REQ_RAW_DELCONTENT "meta2.req.gauge.maintenance_delcontent"
+#define META2_STAT_REQ_RAW_DELCONTENT "meta2.req.counter.maintenance_delcontent"
+#endif
+#ifndef META2_STAT_REQ_RAW_DELCONTENT_V1
+#define META2_STAT_REQ_RAW_DELCONTENT_V1 "gridd.counter.req.REQ_M2RAW_CONTENT_DEL"
 #endif
 #ifndef META2_STAT_REQ_RAW_DELCHUNK
-#define META2_STAT_REQ_RAW_DELCHUNK   "meta2.req.gauge.maintenance_delchunks"
+#define META2_STAT_REQ_RAW_DELCHUNK   "meta2.req.counter.maintenance_delchunks"
+#endif
+#ifndef META2_STAT_REQ_RAW_DELCHUNK_V1
+#define META2_STAT_REQ_RAW_DELCHUNK_V1   "gridd.counter.req.REQ_M2RAW_CHUNKS_DEL"
 #endif
 #ifndef META2_STAT_REQ_RAW_OTHER
-#define META2_STAT_REQ_RAW_OTHER      "meta2.req.gauge.maintenance_other"
+#define META2_STAT_REQ_RAW_OTHER      "meta2.req.counter.maintenance_other"
 #endif
 
 #ifndef META2_STAT_TIME_CREATE
 #define META2_STAT_TIME_CREATE      "meta2.req.time.create"
 #endif
+#ifndef META2_STAT_TIME_CREATE_V1
+#define META2_STAT_TIME_CREATE_V1   "gridd.counter.time.REQ_M2_CREATE"
+#endif
+#ifndef META2_STAT_TIME_CREATE_V2
+#define META2_STAT_TIME_CREATE_V2   "gridd.counter.time.M2V2_CREATE"
+#endif
 #ifndef META2_STAT_TIME_OPEN
 #define META2_STAT_TIME_OPEN        "meta2.req.time.open"
+#endif
+#ifndef META2_STAT_TIME_OPEN_V1
+#define META2_STAT_TIME_OPEN_V1        "gridd.counter.time.REQ_M2_OPEN"
 #endif
 #ifndef META2_STAT_TIME_CLOSE
 #define META2_STAT_TIME_CLOSE       "meta2.req.time.close"
 #endif
+#ifndef META2_STAT_TIME_CLOSE_V1
+#define META2_STAT_TIME_CLOSE_V1       "gridd.counter.time.REQ_M2_CLOSE"
+#endif
 #ifndef META2_STAT_TIME_DESTROY
 #define META2_STAT_TIME_DESTROY     "meta2.req.time.destroy"
+#endif
+#ifndef META2_STAT_TIME_DESTROY_V1
+#define META2_STAT_TIME_DESTROY_V1     "gridd.counter.time.REQ_M2_DESTROY"
+#endif
+#ifndef META2_STAT_TIME_DESTROY_V2
+#define META2_STAT_TIME_DESTROY_V2  "gridd.counter.time.M2V2_DESTROY"
 #endif
 
 #ifndef META2_STAT_TIME_LIST
 #define META2_STAT_TIME_LIST           "meta2.req.time.list"
 #endif
+#ifndef META2_STAT_TIME_LIST_V1
+#define META2_STAT_TIME_LIST_V1        "gridd.counter.time.REQ_M2_LIST"
+#endif
+#ifndef META2_STAT_TIME_LIST_V2
+#define META2_STAT_TIME_LIST_V2        "gridd.counter.time.M2V2_LIST"
+#endif
 #ifndef META2_STAT_TIME_CONTENT_RM
 #define META2_STAT_TIME_CONTENT_RM     "meta2.req.time.content_remove"
 #endif
-#ifndef META2_STAT_TIME_CONTENT_RET    
+#ifndef META2_STAT_TIME_CONTENT_RM_V1
+#define META2_STAT_TIME_CONTENT_RM_V1  "gridd.counter.time.REQ_M2_CONTENTREMOVE"
+#endif
+#ifndef META2_STAT_TIME_CONTENT_RM_V2
+#define META2_STAT_TIME_CONTENT_RM_V2  "gridd.counter.time.M2V2_DEL"
+#endif
+#ifndef META2_STAT_TIME_CONTENT_RET
 #define META2_STAT_TIME_CONTENT_RET    "meta2.req.time.content_retrieve"
 #endif
-#ifndef META2_STAT_TIME_CONTENT_ADD    
+#ifndef META2_STAT_TIME_CONTENT_RET_V1
+#define META2_STAT_TIME_CONTENT_RET_V1 "gridd.counter.time.REQ_M2RAW_CHUNKS_GET"
+#endif
+#ifndef META2_STAT_TIME_CONTENT_RET_V2
+#define META2_STAT_TIME_CONTENT_RET_V2 "gridd.counter.time.M2V2_GET"
+#endif
+#ifndef META2_STAT_TIME_CONTENT_ADD
 #define META2_STAT_TIME_CONTENT_ADD    "meta2.req.time.content_add"
+#endif
+#ifndef META2_STAT_TIME_CONTENT_ADD_V1
+#define META2_STAT_TIME_CONTENT_ADD_V1  "gridd.counter.time.REQ_M2_CONTENTADD"
+#endif
+#ifndef META2_STAT_TIME_CONTENT_ADD_V2
+#define META2_STAT_TIME_CONTENT_ADD_V2 "gridd.counter.time.M2V2_PUT"
 #endif
 #ifndef META2_STAT_TIME_CONTENT_APPEND
 #define META2_STAT_TIME_CONTENT_APPEND "meta2.req.time.content_append"
 #endif
+#ifndef META2_STAT_TIME_CONTENT_APPEND_V1
+#define META2_STAT_TIME_CONTENT_APPEND_V1 "gridd.counter.time.REQ_M2_CONTENTAPPEND"
+#endif
+#ifndef META2_STAT_TIME_CONTENT_APPEND_V2
+#define META2_STAT_TIME_CONTENT_APPEND_V2 "gridd.counter.time.M2V2_APPEND"
+#endif
 #ifndef META2_STAT_TIME_CHUNK_CI
 #define META2_STAT_TIME_CHUNK_CI       "meta2.req.time.chunks_commit"
 #endif
+#ifndef META2_STAT_TIME_CHUNK_CI_V1
+#define META2_STAT_TIME_CHUNK_CI_V1    "gridd.counter.time.REQ_M2_CHUNK_COMMIT"
+#endif
 #ifndef META2_STAT_TIME_CONTENT_CI
 #define META2_STAT_TIME_CONTENT_CI     "meta2.req.time.content_commit"
+#endif
+#ifndef META2_STAT_TIME_CONTENT_CI_V1
+#define META2_STAT_TIME_CONTENT_CI_V1  "gridd.counter.time.REQ_M2_CONTENTCOMMIT"
 #endif
 
 #ifndef META2_STAT_TIME_RAW_GETCONTENT
 #define META2_STAT_TIME_RAW_GETCONTENT "meta2.req.time.maintenance_getcontent"
 #endif
+#ifndef META2_STAT_TIME_RAW_GETCONTENT_V1
+#define META2_STAT_TIME_RAW_GETCONTENT_V1 "gridd.counter.time.REQ_M2RAW_CONTENT_GET"
+#endif
 #ifndef META2_STAT_TIME_RAW_GETCHUNK
 #define META2_STAT_TIME_RAW_GETCHUNK   "meta2.req.time.maintenance_getchunks"
+#endif
+#ifndef META2_STAT_TIME_RAW_GETCHUNK_V1
+#define META2_STAT_TIME_RAW_GETCHUNK_V1   "gridd.counter.time.REQ_M2RAW_CHUNKS_GET"
 #endif
 #ifndef META2_STAT_TIME_RAW_SETCONTENT
 #define META2_STAT_TIME_RAW_SETCONTENT "meta2.req.time.maintenance_setcontent"
 #endif
+#ifndef META2_STAT_TIME_RAW_SETCONTENT_V1
+#define META2_STAT_TIME_RAW_SETCONTENT_V1 "gridd.counter.time.REQ_M2RAW_CONTENT_SET"
+#endif
 #ifndef META2_STAT_TIME_RAW_SETCHUNK
 #define META2_STAT_TIME_RAW_SETCHUNK   "meta2.req.time.maintenance_setchunks"
+#endif
+#ifndef META2_STAT_TIME_RAW_SETCHUNK_V1
+#define META2_STAT_TIME_RAW_SETCHUNK_V1   "gridd.counter.time.REQ_M2RAW_CHUNKS_SET"
 #endif
 #ifndef META2_STAT_TIME_RAW_DELCONTENT
 #define META2_STAT_TIME_RAW_DELCONTENT "meta2.req.time.maintenance_delcontent"
 #endif
+#ifndef META2_STAT_TIME_RAW_DELCONTENT_V1
+#define META2_STAT_TIME_RAW_DELCONTENT_V1 "gridd.counter.time.REQ_M2RAW_CONTENT_DEL"
+#endif
 #ifndef META2_STAT_TIME_RAW_DELCHUNK
 #define META2_STAT_TIME_RAW_DELCHUNK   "meta2.req.time.maintenance_delchunks"
+#endif
+#ifndef META2_STAT_TIME_RAW_DELCHUNK_V1
+#define META2_STAT_TIME_RAW_DELCHUNK_V1   "gridd.counter.time.REQ_M2RAW_CHUNKS_DEL"
 #endif
 #ifndef META2_STAT_TIME_RAW_OTHER
 #define META2_STAT_TIME_RAW_OTHER      "meta2.req.time.maintenance_other"
@@ -594,7 +732,10 @@ FindVarMethod var_csc_entry;
 #endif
 
 #ifndef META2_STAT_NB_THREAD
-#define META2_STAT_NB_THREAD        "server.cnx.gauge.total"
+#define META2_STAT_NB_THREAD           "server.cnx.gauge.total"
+#endif
+#ifndef META2_STAT_NB_THREAD_V2
+#define META2_STAT_NB_THREAD_V2        "server.thread.gauge.total"
 #endif
 
 #ifndef META2_STAT_REQ_PROP_GET_CONTAINER
@@ -776,4 +917,4 @@ FindVarMethod var_csc_entry;
 #define MAX_SRV 512
 #endif
 
-#endif	/* _GRID_STORAGE_H */
+#endif /* _GRID_STORAGE_H */

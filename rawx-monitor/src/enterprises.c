@@ -1,59 +1,40 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "rawx-monitor.snmp"
 #endif
 
-#ifdef HAVE_COMPAT
-# include <metautils_compat.h>
-#else
-# include <metautils.h>
-#endif
+#include <metautils/lib/metautils.h>
 
-#include "./filer_monitor.h"
+#include "filer_monitor.h"
 
 static struct enterprise_s **enterprises = NULL;
 
 void
 enterprises_init(void)
 {
-	enterprises = g_malloc0(sizeof(struct enterprise_s*));
+	enterprises = g_malloc0(sizeof(struct enterprise_s *));
 }
 
 void
 enterprises_register(struct enterprise_s *e)
 {
 	guint len;
-	
+
 	XTRACE("Entering");
-	len = g_strv_length((gchar**) enterprises);
-	enterprises = g_realloc(enterprises, (len+2) * sizeof(struct enterprise_s*));
+	len = g_strv_length((gchar **) enterprises);
+	enterprises =
+		g_realloc(enterprises, (len + 2) * sizeof(struct enterprise_s *));
 	enterprises[len] = e;
-	enterprises[len+1] = NULL;
+	enterprises[len + 1] = NULL;
 	XTRACE("Added at %d", len);
 }
 
-struct enterprise_s*
+struct enterprise_s *
 enterprises_get_instance(oid needle)
 {
 	struct enterprise_s **ptr;
+
 	XTRACE("Entering");
-	for (ptr=enterprises; *ptr ;ptr++) {
+	for (ptr = enterprises; *ptr; ptr++) {
 		if (needle == (*ptr)->code) {
 			XTRACE("Found %p", *ptr);
 			return *ptr;
@@ -63,9 +44,9 @@ enterprises_get_instance(oid needle)
 	return NULL;
 }
 
-struct filer_s*
-filer_init(const gchar *host, struct snmp_auth_s *snmp_auth,
-	struct filer_auth_s *auth, GError **err)
+struct filer_s *
+filer_init(const gchar * host, struct snmp_auth_s *snmp_auth,
+	struct filer_auth_s *auth, GError ** err)
 {
 	struct filer_s *filer;
 	char wrk_host[sizeof(filer->str_addr)];
@@ -88,7 +69,7 @@ filer_init(const gchar *host, struct snmp_auth_s *snmp_auth,
 
 	bzero(wrk_host, sizeof(wrk_host));
 	g_strlcpy(wrk_host, host, sizeof(host));
-	
+
 	do {
 		netsnmp_session *session = NULL;
 		netsnmp_session snmp_session;
@@ -102,7 +83,8 @@ filer_init(const gchar *host, struct snmp_auth_s *snmp_auth,
 		rc = snmp_get_enterprise_code(session, &oid_enterprise, err);
 		snmp_close(session);
 		if (!rc) {
-			GSETERROR(err, "Failed to determine the Enterprise ID for addr=[%s]", host);
+			GSETERROR(err,
+				"Failed to determine the Enterprise ID for addr=[%s]", host);
 			return NULL;
 		}
 	} while (0);
@@ -113,7 +95,7 @@ filer_init(const gchar *host, struct snmp_auth_s *snmp_auth,
 		GSETERROR(err, "Enterprise not managed");
 		return NULL;
 	}
-	
+
 	filer = g_malloc0(sizeof(*filer));
 	g_strlcpy(filer->str_addr, host, sizeof(filer->str_addr));
 	filer->oid_enterprise = oid_enterprise;
@@ -142,7 +124,7 @@ filer_fini(struct filer_s *filer)
 
 	e = filer->enterprise;
 	if (e) {
-		if (filer->ctx) 
+		if (filer->ctx)
 			e->clean_filer(filer->ctx);
 		filer->enterprise = NULL;
 	}
@@ -150,4 +132,3 @@ filer_fini(struct filer_s *filer)
 	bzero(filer, sizeof(*filer));
 	g_free(filer);
 }
-

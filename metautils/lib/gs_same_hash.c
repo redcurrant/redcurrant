@@ -1,33 +1,22 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
 
-#include <metautils.h>
-#include <common_main.h>
+#include <string.h>
 
-static gchar* memory[65536];
+#include "./metautils.h"
+#include "./resolv.h"
+#include "./common_main.h"
+
+#define COUNT 65536
+
+static gchar *memory[65536];
 static GString *prefix;
 
 static struct grid_main_option_s *
 main_option(void)
 {
 	static struct grid_main_option_s options[] = {
-		{"Prefix",OT_STRING,{.str=&prefix},
+		{"Prefix", OT_STRING, {.str = &prefix},
 			"Explicit prefix to the reference name"},
-		{NULL,0,{.b=NULL},NULL}
+		{NULL, 0, {.b = NULL}, NULL}
 	};
 	return options;
 }
@@ -38,7 +27,8 @@ main_action(void)
 	gint64 counter;
 	GChecksum *c;
 	gchar num[64];
-	union {
+	union
+	{
 		guint8 b[32];
 		guint16 prefix;
 	} bin;
@@ -50,7 +40,7 @@ main_action(void)
 
 	if (prefix && prefix->len > 0) {
 		/* pre-loads the memory with the prefix only */
-		g_checksum_update(c, (guint8*) prefix->str, prefix->len);
+		g_checksum_update(c, (guint8 *) prefix->str, prefix->len);
 		binsize = sizeof(bin.b);
 		g_checksum_get_digest(c, bin.b, &binsize);
 		memory[bin.prefix] = g_strdup(prefix->str);
@@ -59,19 +49,20 @@ main_action(void)
 	while (grid_main_is_running()) {
 
 		GString *gstr = g_string_new("");
+
 		if (prefix && prefix->len > 0)
 			g_string_append_len(gstr, prefix->str, prefix->len);
-		g_snprintf(num, sizeof(num), "%"G_GINT64_FORMAT, counter++);
+		g_snprintf(num, sizeof(num), "%" G_GINT64_FORMAT, counter++);
 		g_string_append(gstr, num);
 
 		g_checksum_reset(c);
-		g_checksum_update(c, (guint8*) gstr->str, gstr->len);
+		g_checksum_update(c, (guint8 *) gstr->str, gstr->len);
 		binsize = sizeof(bin.b);
 		g_checksum_get_digest(c, bin.b, &binsize);
 
 		if (memory[bin.prefix]) {
 			g_print("%02X%02X %s %s\n", bin.b[0], bin.b[1],
-					memory[bin.prefix], gstr->str);
+				memory[bin.prefix], gstr->str);
 			g_free(memory[bin.prefix]);
 		}
 
@@ -92,7 +83,8 @@ static void
 main_specific_fini(void)
 {
 	guint i;
-	for (i=0; i<sizeof(memory) ;i++) {
+
+	for (i = 0; i < COUNT; i++) {
 		if (memory[i])
 			g_free(memory[i]);
 	}
@@ -132,4 +124,3 @@ main(int argc, char **argv)
 {
 	return grid_main_cli(argc, argv, &main_callbacks);
 }
-

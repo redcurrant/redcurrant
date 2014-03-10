@@ -1,30 +1,8 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef  G_LOG_DOMAIN
-# define G_LOG_DOMAIN "m1v2.test.list"
-#endif
-#ifndef  LOG_DOMAIN
-# define LOG_DOMAIN G_LOG_DOMAIN
+#define G_LOG_DOMAIN "m1v2.test.list"
 #endif
 
-#include <metautils.h>
-#include <loggers.h>
-#include <common_main.h>
+#include <metautils/lib/metautils.h>
 
 #include "./meta1_remote.h"
 
@@ -40,7 +18,7 @@ static struct grid_main_option_s *
 main_option(void)
 {
 	static struct grid_main_option_s options[] = {
-		{NULL,0,{.b=NULL},NULL}
+		{NULL, 0, {.b = NULL}, NULL}
 	};
 	return options;
 }
@@ -52,13 +30,17 @@ main_action(void)
 	GByteArray *result = NULL;
 
 	if (*srvurl && *srvtype) {
-		GRID_INFO("Listing the references on M1V2 [%s] for NS [%s], prefix [%s], srvtype [%s] and srvurl [%s]",
-				m1url, nsname, prefix_hex, srvtype, srvurl);
-		err = meta1v2_remote_list_references_by_service(&m1addr, nsname, prefix, srvtype, srvurl, &result);
+		GRID_INFO
+			("Listing the references on M1V2 [%s] for NS [%s], prefix [%s], srvtype [%s] and srvurl [%s]",
+			m1url, nsname, prefix_hex, srvtype, srvurl);
+		err =
+			meta1v2_remote_list_references_by_service(&m1addr, nsname, prefix,
+			srvtype, srvurl, &result);
 	}
 	else {
-		GRID_INFO("Listing the references on M1V2 [%s] for NS [%s] and prefix [%s]",
-				m1url, nsname, prefix_hex);
+		GRID_INFO
+			("Listing the references on M1V2 [%s] for NS [%s] and prefix [%s]",
+			m1url, nsname, prefix_hex);
 		err = meta1v2_remote_list_references(&m1addr, nsname, prefix, &result);
 	}
 
@@ -70,8 +52,8 @@ main_action(void)
 	}
 
 	g_print("# Buffer size=%u\n", result->len);
-	g_byte_array_append(result, (guint8*)"", 1);
-	g_print("%s\n", (gchar*)result->data);
+	g_byte_array_append(result, (guint8 *) "", 1);
+	g_print("%s\n", (gchar *) result->data);
 	metautils_gba_unref(result);
 }
 
@@ -79,7 +61,7 @@ static void
 main_set_defaults(void)
 {
 	ZERO(m1url);
-	memset(&m1addr, 0, sizeof(&m1addr));
+	memset(&m1addr, 0, sizeof(m1addr));
 	ZERO(nsname);
 	ZERO(prefix_hex);
 	memset(prefix, 0, sizeof(container_id_t));
@@ -115,7 +97,8 @@ main_configure(int argc, char **argv)
 	}
 
 	g_strlcpy(prefix_hex, argv[2], sizeof(prefix_hex));
-	if (!hex2bin(argv[2], prefix, MIN(strlen(prefix_hex)/2,sizeof(container_id_t)), &err)) {
+	if (!hex2bin(argv[2], prefix, MIN(strlen(prefix_hex) / 2,
+				sizeof(container_id_t)), &err)) {
 		GRID_WARN("Invalid hex prefix [%s] : %s", argv[2], err->message);
 		g_clear_error(&err);
 		return FALSE;
@@ -162,4 +145,3 @@ main(int argc, char **argv)
 {
 	return grid_main_cli(argc, argv, &main_callbacks);
 }
-

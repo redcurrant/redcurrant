@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  @file
  Chunk database management system.
@@ -31,7 +14,7 @@
 
 #include <glib.h>
 
-#define CONTENT_DB_NAME "content-to-chunk.db"		/*!< The name of the content Berkley db */
+#define CONTENT_DB_NAME "content-to-chunk.db"	/*!< The name of the content Berkley db */
 #define CONTAINER_DB_NAME "container-to-chunk.db"	/*!< The name of the container Berkley db */
 
 /**
@@ -57,9 +40,8 @@
  @test Test execution
 	- Execute and check the work was done using native Berkley db API
  */
-gboolean add_chunk_to_db(const gchar* volume_root, const gchar* chunk_path,
-		const gchar* content_name, const gchar* container_id,
-		GError **error);
+gboolean add_chunk_to_db(const gchar * volume_root, const gchar * chunk_path,
+	const gchar * content_name, const gchar * container_id, GError ** error);
 
 /**
  Fill the list_chunk given in args with all chunks belonging to the given content
@@ -85,8 +67,9 @@ gboolean add_chunk_to_db(const gchar* volume_root, const gchar* chunk_path,
 	- Execute with a different content_name and check the list returned is NULL
 
  */
-gboolean get_content_chunks(const gchar* volume_root, const gchar *container_id, const gchar* content_name,
-		GSList **list_chunk, GError **error);
+gboolean get_content_chunks(const gchar * volume_root,
+	const gchar * container_id, const gchar * content_name,
+	GSList ** list_chunk, GError ** error);
 
 
 /**
@@ -111,17 +94,18 @@ gboolean get_content_chunks(const gchar* volume_root, const gchar *container_id,
 	- Execute with the same container_id and check the list is filled with the correct chunk_path
 	- Execute with a different container_id and check the list returned is NULL
  */
-gboolean get_container_chunks(const gchar* volume_root, const gchar* container_id, GSList **list_chunk, GError **error);
+gboolean get_container_chunks(const gchar * volume_root,
+	const gchar * container_id, GSList ** list_chunk, GError ** error);
 
-gboolean list_container_chunks(const gchar* volume_root, GError **error,
-		gboolean (*cb)(GByteArray *gba_k, GByteArray *gba_v));
+gboolean list_container_chunks(const gchar * volume_root, GError ** error,
+	gboolean(*cb) (GByteArray * gba_k, GByteArray * gba_v));
 
-gboolean list_content_chunks(const gchar* volume_root, GError **error,
-		gboolean (*cb)(GByteArray *gba_k, GByteArray *gba_v));
+gboolean list_content_chunks(const gchar * volume_root, GError ** error,
+	gboolean(*cb) (GByteArray * gba_k, GByteArray * gba_v));
 
-void prepare_chunks_db(const gchar* volume_root);
-void commit_chunks_db(const gchar* volume_root);
-void rollback_chunks_db(const gchar* volume_root);
+void prepare_chunks_db(const gchar * volume_root);
+void commit_chunks_db(const gchar * volume_root);
+void rollback_chunks_db(const gchar * volume_root);
 
 /** @} */
 

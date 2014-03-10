@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file meta2_checker.h
  * META2 database integrity checker module
@@ -29,16 +12,17 @@
  * @{
  */
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 
 /**
  * Internal data passed to the meta2_check callback
  */
-struct meta2_checker_data_s {
+struct meta2_checker_data_s
+{
 	gchar ns_name[LIMIT_LENGTH_NSNAME];	/*!< A namespace name */
-	addr_info_t cs_addr;			/*!< A conscience addr */
+	addr_info_t cs_addr;		/*!< A conscience addr */
 };
- 
+
 /**
  * Check META2 database integrity
  * Check META2 data are correctly backed up in chunks attributes
@@ -85,7 +69,7 @@ struct meta2_checker_data_s {
 	- Execute callback and check it returns FALSE
 	- Check that the missing chunk was logged
  */
-gboolean check_meta2(const gchar* meta2_db_path, void* data, GError** error);
+gboolean check_meta2(const gchar * meta2_db_path, void *data, GError ** error);
 
 /** @} */
 

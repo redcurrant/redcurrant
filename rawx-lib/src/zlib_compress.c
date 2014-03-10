@@ -1,53 +1,31 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "rawx.compress"
 #endif
+
 #undef PACKAGE_BUGREPORT
 #undef PACKAGE_NAME
 #undef PACKAGE_STRING
 #undef PACKAGE_TARNAME
 #undef PACKAGE_VERSION
 
-#ifdef HAVE_COMPAT
-# include <metautils_compat.h>
-#endif
-
 #ifdef APR_HAVE_STDIO_H
-#include <stdio.h>              /* for sprintf() */
+#include <stdio.h>				/* for sprintf() */
 #endif
 
 #include <unistd.h>
 #include <string.h>
 
-# include <glib.h>
-# include <metatypes.h>
-# include <metautils.h>
-# include <metacomm.h>
-# include <rawx.h>
-
 #include <zlib.h>
 #include <zconf.h>
-#include "./compression.h"
+
+#include <metautils/lib/metautils.h>
+
+#include "rawx.h"
+#include "compression.h"
 
 /* magic file header for zlib block compressed files */
 static const unsigned char magic[8] =
-    { 0x00, 0xe9, 0x5a, 0x4c, 0x49, 0x42, 0xff, 0x1a };
+	{ 0x00, 0xe9, 0x5a, 0x4c, 0x49, 0x42, 0xff, 0x1a };
 
 #define HEADER_SIZE (sizeof(magic) + sizeof(guint32))
 
@@ -58,18 +36,20 @@ get_working_buffer_size(uLong uncompressed_size)
 }
 
 int
-zlib_write_compress_header(FILE *fd, guint32 blocksize, gulong *checksum, guint32 *compressed_size)
+zlib_write_compress_header(FILE * fd, guint32 blocksize, gulong * checksum,
+	guint32 * compressed_size)
 {
 	gsize written = 0;
-	
+
 	GByteArray *headers = NULL;
 	int status = 1;
-	headers = g_byte_array_new();	
+
+	headers = g_byte_array_new();
 
 #define HEADER_APPEND(V, S) g_byte_array_append(headers,(guint8*)V, S);
 
-	headers = HEADER_APPEND(&magic, sizeof(magic)); /* char[8] */
-	headers = HEADER_APPEND(&blocksize, sizeof(blocksize)); /* guint32 */
+	headers = HEADER_APPEND(&magic, sizeof(magic));	/* char[8] */
+	headers = HEADER_APPEND(&blocksize, sizeof(blocksize));	/* guint32 */
 
 	written = fwrite(headers->data, headers->len, 1, fd);
 
@@ -79,31 +59,32 @@ zlib_write_compress_header(FILE *fd, guint32 blocksize, gulong *checksum, guint3
 	}
 
 	*compressed_size = *compressed_size + headers->len;
-	
+
 	*checksum = adler32(0, NULL, 0);
 
 	status = 0;
 
 end:
 
-	if(headers)
+	if (headers)
 		g_byte_array_free(headers, TRUE);
 
 	return status;
 }
 
 int
-zlib_write_compress_eof(FILE *fd, gulong checksum, guint32 *compressed_size)
+zlib_write_compress_eof(FILE * fd, gulong checksum, guint32 * compressed_size)
 {
 	guint32 eof_marker = 0;
 	gsize written = 0;
 	int result = 1;
 
 	GByteArray *eof = NULL;
+
 	eof = g_byte_array_new();
-	eof = g_byte_array_append(eof, (guint8*)&eof_marker, sizeof(guint32));
-	eof = g_byte_array_append(eof, (guint8*)&checksum, sizeof(gulong));
-	
+	eof = g_byte_array_append(eof, (guint8 *) & eof_marker, sizeof(guint32));
+	eof = g_byte_array_append(eof, (guint8 *) & checksum, sizeof(gulong));
+
 	written = fwrite(eof->data, eof->len, 1, fd);
 
 	if (written != 1) {
@@ -112,28 +93,28 @@ zlib_write_compress_eof(FILE *fd, gulong checksum, guint32 *compressed_size)
 	}
 
 	*compressed_size = *compressed_size + eof->len;
-	
+
 	result = 0;
 
 end:
 
-	if(eof)
+	if (eof)
 		g_byte_array_free(eof, TRUE);
 
 	return result;
 }
 
 int
-zlib_compress_chunk_part(const void *buf, gsize bufsize, GByteArray *result, gulong* checksum)
+zlib_compress_chunk_part(const void *buf, gsize bufsize, GByteArray * result,
+	gulong * checksum)
 {
-	guint8* out = NULL;
-	//gulong out_len = 0;
+	guint8 *out = NULL;
 	gulong bufsize_ulong = bufsize;
 	gulong out_max;
 	int r = 0;
 
 	/* Sanity check */
-	if(!result) {
+	if (!result) {
 		ERROR("Invalid parameter : %p", result);
 		return 1;
 	}
@@ -141,15 +122,15 @@ zlib_compress_chunk_part(const void *buf, gsize bufsize, GByteArray *result, gul
 	out_max = get_working_buffer_size(bufsize);
 	out = g_malloc0(out_max);
 	*checksum = adler32(*checksum, buf, bufsize_ulong);
-		
-	if (buf == NULL || out == NULL){
+
+	if (buf == NULL || out == NULL) {
 		r = 1;
 		goto err;
 	}
 
 	/* compress block */
 	r = compress(out, &out_max, buf, bufsize_ulong);
-	if (r != Z_OK){
+	if (r != Z_OK) {
 		/* this should NEVER happen */
 		ERROR("internal error - compression failed");
 		r = 2;
@@ -177,11 +158,11 @@ zlib_compress_chunk_part(const void *buf, gsize bufsize, GByteArray *result, gul
 err:
 	if (out)
 		g_free(out);
-	return r; 
+	return r;
 }
 
 static int
-_zlib_fill_decompressed_buffer(struct compressed_chunk_s * chunk, gsize to_skip)
+_zlib_fill_decompressed_buffer(struct compressed_chunk_s *chunk, gsize to_skip)
 {
 	gsize nb_read = 0;
 	gsize total_skipped = 0;
@@ -189,7 +170,7 @@ _zlib_fill_decompressed_buffer(struct compressed_chunk_s * chunk, gsize to_skip)
 	gulong out_len;
 	int r;
 
-	if(chunk->buf)
+	if (chunk->buf)
 		g_free(chunk->buf);
 
 	chunk->buf = NULL;
@@ -197,7 +178,7 @@ _zlib_fill_decompressed_buffer(struct compressed_chunk_s * chunk, gsize to_skip)
 	chunk->buf_offset = 0;
 	chunk->data_len = 0;
 
-	while(1) {
+	while (1) {
 		/* read uncompressed size */
 		nb_read = 0;
 		nb_read = fread(&out_len, sizeof(out_len), 1, chunk->fd);
@@ -207,7 +188,7 @@ _zlib_fill_decompressed_buffer(struct compressed_chunk_s * chunk, gsize to_skip)
 			return -1;
 		}
 		/* exit if last block (EOF marker) */
-		if(out_len == 0) {
+		if (out_len == 0) {
 			return 0;
 		}
 
@@ -220,15 +201,16 @@ _zlib_fill_decompressed_buffer(struct compressed_chunk_s * chunk, gsize to_skip)
 			return -1;
 		}
 		/* check if we are in good block */
-		if(to_skip < total_skipped + out_len) {
+		if (to_skip < total_skipped + out_len) {
 			/* data in this block */
 			chunk->data_len = out_len;
 			chunk->buf_offset = to_skip - total_skipped;
 			break;
-		} else {
+		}
+		else {
 			/* don't need to uncompress this block, go to the next */
 			total_skipped += out_len;
-			if(fseek(chunk->fd, in_len, SEEK_CUR)) {
+			if (fseek(chunk->fd, in_len, SEEK_CUR)) {
 				/* fseek issue */
 				return -1;
 			}
@@ -238,12 +220,15 @@ _zlib_fill_decompressed_buffer(struct compressed_chunk_s * chunk, gsize to_skip)
 	/* Consider the "to_skip" bytes already read */
 	chunk->read += to_skip;
 
-	DEBUG("_fill_decompressed_buffer: current block compressed size (read from file): %"G_GSIZE_FORMAT, in_len);
-	DEBUG("_fill_decompressed_buffer: block_size = %u", (uint)chunk->block_size);
+	DEBUG
+		("_fill_decompressed_buffer: current block compressed size (read from file): %"
+		G_GSIZE_FORMAT, in_len);
+	DEBUG("_fill_decompressed_buffer: block_size = %u",
+		(uint) chunk->block_size);
 
 	/* sanity check of the size values */
 	if (in_len > chunk->block_size || chunk->data_len > chunk->block_size ||
-			in_len == 0 || in_len > chunk->data_len){
+		in_len == 0 || in_len > chunk->data_len) {
 		DEBUG("_fill_decompressed_buffer: block size error - data corrupted\n");
 		r = -1;
 		goto err;
@@ -262,8 +247,8 @@ _zlib_fill_decompressed_buffer(struct compressed_chunk_s * chunk, gsize to_skip)
 			goto err;
 		}
 	}
-	else { /* in_len < chunk->data_len */
-		guint8* in;
+	else {						/* in_len < chunk->data_len */
+		guint8 *in;
 		gulong new_len;
 
 		/* place compressed block at the end of the buffer */
@@ -271,8 +256,8 @@ _zlib_fill_decompressed_buffer(struct compressed_chunk_s * chunk, gsize to_skip)
 		chunk->buf = g_malloc0(chunk->buf_len);
 
 		TRACE("_fill_uncompressed_buffer: before decompress"
-				" (input=%u max_out=%u expected=%u)",
-				(uint)in_len, (uint)chunk->buf_len, (uint)chunk->data_len);
+			" (input=%u max_out=%u expected=%u)",
+			(uint) in_len, (uint) chunk->buf_len, (uint) chunk->data_len);
 
 		in = g_malloc0(in_len);
 		nb_read = 0;
@@ -304,55 +289,56 @@ err:
 }
 
 gboolean
-zlib_compressed_chunk_check_integrity(struct compressed_chunk_s *chunk)
+zlib_compressed_chunk_check_integrity(struct compressed_chunk_s * chunk)
 {
 	gchar *eof_info = NULL;
-	gulong c;	
+	gulong c;
 	gsize len;
 	gsize nb_read;
 	gboolean status = FALSE;
 
- 	/* len = sizeof(guint32) + sizeof(gulong); */
- 	len = sizeof(guint32) + sizeof(guint32);
+	/* len = sizeof(guint32) + sizeof(gulong); */
+	len = sizeof(guint32) + sizeof(guint32);
 
 	eof_info = g_malloc0(len);
 
 	nb_read = 0;
-	nb_read  = fread(eof_info, len, 1, chunk->fd);
-	
+	nb_read = fread(eof_info, len, 1, chunk->fd);
+
 	if (nb_read != 1) {
-		printf("Failed to read %"G_GSIZE_FORMAT" bytes from chunk", len);
-		goto end;	
+		printf("Failed to read %" G_GSIZE_FORMAT " bytes from chunk", len);
+		goto end;
 	}
 
 	DEBUG("chunk->checksum : %lu\n", chunk->checksum);
-	
-	c = *((gulong*)(eof_info + sizeof(guint32)));	
+
+	c = *((gulong *) (eof_info + sizeof(guint32)));
 
 	DEBUG("c (get from file): %lu\n", c);
 	/* eof_info + sizeof(guint32) */
-	if(memcmp(&c, &(chunk->checksum), sizeof(gulong)) != 0)
+	if (memcmp(&c, &(chunk->checksum), sizeof(gulong)) != 0)
 		goto end;
-	
+
 	status = TRUE;
 
 end:
 
-	if(eof_info)
-		g_free(eof_info);	
-	
-	return status;	
+	if (eof_info)
+		g_free(eof_info);
+
+	return status;
 }
 
-int 
-zlib_compressed_chunk_get_data(struct compressed_chunk_s *chunk, gsize offset, guint8 *buf, gsize buf_len, GError **error)
+int
+zlib_compressed_chunk_get_data(struct compressed_chunk_s *chunk, gsize offset,
+	guint8 * buf, gsize buf_len, GError ** error)
 {
 	gsize max_to_read;
 	gsize to_skip = 0;
 
 	(void) error;
-	
-	if(offset > 0) {
+
+	if (offset > 0) {
 		to_skip = offset - (chunk->data_len - chunk->buf_offset);
 		chunk->buf_offset = MIN(chunk->data_len, chunk->buf_offset + offset);
 	}
@@ -360,31 +346,25 @@ zlib_compressed_chunk_get_data(struct compressed_chunk_s *chunk, gsize offset, g
 	if (!chunk->buf || !chunk->data_len || chunk->buf_offset >= chunk->data_len) {
 		int rf;
 
-		rf = _zlib_fill_decompressed_buffer(chunk, to_skip);	
+		rf = _zlib_fill_decompressed_buffer(chunk, to_skip);
 		if (rf < 0) {
 			TRACE("An error occured while filling buffer");
 			return -1;
 		}
 
-		/* 
-		if (rf == 0) {
-			TRACE("compressed_chunk_get_data : EOF");
-			if(!zlib_compressed_chunk_check_integrity(chunk)){
-				DEBUG("Wrong checksum, data seems to be corrupted...");	
-				return -1;
-			}
-		}*/
-		DEBUG("Entering compressed_chunk_get_data, buffer refilled, max=%u buf_offset=%u data_len=%u",
-				(uint)buf_len, (uint)chunk->buf_offset, (uint)chunk->data_len);
+		DEBUG
+			("Entering compressed_chunk_get_data, buffer refilled, max=%u buf_offset=%u data_len=%u",
+			(uint) buf_len, (uint) chunk->buf_offset, (uint) chunk->data_len);
 	}
 	else {
-		DEBUG("Entering compressed_chunk_get_data, reusing data, max=%u buf_offset=%u data_len=%u",
-				(uint)buf_len, (uint)chunk->buf_offset, (uint)chunk->data_len);
+		DEBUG
+			("Entering compressed_chunk_get_data, reusing data, max=%u buf_offset=%u data_len=%u",
+			(uint) buf_len, (uint) chunk->buf_offset, (uint) chunk->data_len);
 	}
 
 
 	if (!chunk->buf || !chunk->data_len) {
-		DEBUG("This must never happened");	
+		DEBUG("This must never happened");
 		return -1;
 	}
 
@@ -396,40 +376,42 @@ zlib_compressed_chunk_get_data(struct compressed_chunk_s *chunk, gsize offset, g
 		chunk->buf_offset += max_to_read;
 	}
 
-	DEBUG("Exiting compressed_chunk_get_data, max=%u read=%u buf_offset=%u data_len=%u",
-			(uint)buf_len, (uint)max_to_read, (uint)chunk->buf_offset, (uint)chunk->data_len);
+	DEBUG
+		("Exiting compressed_chunk_get_data, max=%u read=%u buf_offset=%u data_len=%u",
+		(uint) buf_len, (uint) max_to_read, (uint) chunk->buf_offset,
+		(uint) chunk->data_len);
 	return max_to_read;
 }
 
 int
-zlib_compressed_chunk_init(struct compressed_chunk_s *chunk, const gchar *path)
+zlib_compressed_chunk_init(struct compressed_chunk_s *chunk, const gchar * path)
 {
-	int r = 0;	
+	int r = 0;
 	gsize nb_read;
 	guint8 headers[HEADER_SIZE];
-	GError * error = NULL;
+	GError *error = NULL;
 	struct chunk_textinfo_s cti;
 	struct compressed_chunk_s ck;
 
 	bzero(headers, sizeof(headers));
 	bzero(&cti, sizeof(cti));
 	bzero(&ck, sizeof(ck));
-	
+
 	/* Get chunk uncompressed size in his attr */
-	if (!get_chunk_info_in_attr(path, &error, &cti)){
+	if (!get_chunk_info_in_attr(path, &error, &cti)) {
 		DEBUG("Failed to get chunk info in attr : %s", error->message);
 		g_clear_error(&error);
 		return 1;
 	}
 
 	ck.uncompressed_size = g_strdup(cti.size);
-	DEBUG("size get in attr = %s", ck.uncompressed_size); 
+	DEBUG("size get in attr = %s", ck.uncompressed_size);
 
 	/* Read magic header & flags */
 	/* place block at top of buffer */
 	/*
- 	 * Step 1: check magic header, read flags & block size, init checksum
- 	*/
+	 * Step 1: check magic header, read flags & block size, init checksum
+	 */
 
 	ck.fd = fopen(path, "r");
 
@@ -438,7 +420,7 @@ zlib_compressed_chunk_init(struct compressed_chunk_s *chunk, const gchar *path)
 		r = 1;
 		goto err;
 	}
-	
+
 	TRACE("compressed_chunk_init: compressed chunk open");
 
 	/* compile for read all header info in one call */
@@ -451,9 +433,10 @@ zlib_compressed_chunk_init(struct compressed_chunk_s *chunk, const gchar *path)
 		goto err;
 	}
 
-	do { /* extract all headers */
-		#define GETNEXTPTR(Res,Ptr,Type) do { Res = *((Type *)Ptr); Ptr = ((char*)Ptr) + sizeof(Type); } while (0)
-		char *ptr = ((char*)headers + sizeof(magic));
+	do {						/* extract all headers */
+#define GETNEXTPTR(Res,Ptr,Type) do { Res = *((Type *)Ptr); Ptr = ((char*)Ptr) + sizeof(Type); } while (0)
+		char *ptr = ((char *) headers + sizeof(magic));
+
 		GETNEXTPTR(ck.block_size, ptr, guint32);
 	} while (0);
 
@@ -461,18 +444,18 @@ zlib_compressed_chunk_init(struct compressed_chunk_s *chunk, const gchar *path)
 		r = 4;
 		goto err;
 	}
-    	if (ck.block_size < 1024 || ck.block_size > 8*1024*1024L){
-        	r = 6;
-        	goto err;
-    	}
+	if (ck.block_size < 1024 || ck.block_size > 8 * 1024 * 1024L) {
+		r = 6;
+		goto err;
+	}
 
 	TRACE("ck.block_size : %d", ck.block_size);
 
-	ck.checksum = adler32(0,NULL,0);
+	ck.checksum = adler32(0, NULL, 0);
 	memcpy(chunk, &ck, sizeof(ck));
 	TRACE("chunk->uncompressed_size = %s", chunk->uncompressed_size);
 
-	r=0;
+	r = 0;
 
 err:
 	if (error)
@@ -482,10 +465,9 @@ err:
 }
 
 gboolean
-zlib_init_compress_checksum(gulong* checksum)
+zlib_init_compress_checksum(gulong * checksum)
 {
 	TRACE("Init checksum in zlib context");
-	*checksum = adler32(0,NULL,0);
+	*checksum = adler32(0, NULL, 0);
 	return TRUE;
 }
-

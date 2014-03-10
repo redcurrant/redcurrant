@@ -1,22 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "grid.tools.uncompress"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "grid.tools.uncompress"
 #endif
 
 #include <assert.h>
@@ -31,15 +14,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
 #include <signal.h>
 
-#include <glib.h>
-
-#include <metatypes.h>
-#include <metautils.h>
-#include <metacomm.h>
-#include "./gs_rawx_tools.h"
+#include <metautils/lib/metautils.h>
+#include "gs_rawx_tools.h"
 
 #define DECOMPRESSION_MAX_BUFSIZE 512000
 
@@ -54,7 +32,7 @@ gchar *algo = NULL;
 int blocksize = DEFAULT_COMPRESSION_BLOCKSIZE;
 
 
-struct compression_ctx_s* comp_ctx = NULL;
+struct compression_ctx_s *comp_ctx = NULL;
 struct compressed_chunk_s *cp_chunk = NULL;
 
 guint32 checksum;
@@ -82,23 +60,23 @@ parse_opt(int argc, char **args)
 
 	while ((opt = getopt(argc, args, "hvpq")) != -1) {
 		switch (opt) {
-		case 'h':
-			flag_help = ~0;
-			break;
-		case 'v':
-			flag_verbose++;
-			break;
-		case 'p':
-			PRINT_DEBUG("Preserve mode activated\n");
-			preserve = TRUE;
-			break;
-		case 'q':
-			flag_quiet = ~0;
-			break;
-		case '?':
-		default:
-			PRINT_ERROR("unexpected %c (%s)\n", optopt, strerror(opterr));
-			return 0;
+			case 'h':
+				flag_help = ~0;
+				break;
+			case 'v':
+				flag_verbose++;
+				break;
+			case 'p':
+				PRINT_DEBUG("Preserve mode activated\n");
+				preserve = TRUE;
+				break;
+			case 'q':
+				flag_quiet = ~0;
+				break;
+			case '?':
+			default:
+				PRINT_ERROR("unexpected %c (%s)\n", optopt, strerror(opterr));
+				return 0;
 		}
 	}
 
@@ -106,7 +84,7 @@ parse_opt(int argc, char **args)
 }
 
 int
-main(int argc, char** args)
+main(int argc, char **args)
 {
 	int rc = -1;
 
@@ -127,17 +105,21 @@ main(int argc, char** args)
 	if (optind < argc) {
 		GError *local_error = NULL;
 		int i;
+
 		for (i = optind; i < argc; i++) {
 			/* Sanity check */
 			PRINT_DEBUG("Going to work with chunk file [%s]\n", args[i]);
 			/* Run decompression */
-			if(uncompress_chunk(args[i], preserve, &local_error) != 1) {
-				if(local_error)
-					PRINT_ERROR("Failed to uncompress chunk [%s] :\n %s", args[i], local_error->message);
+			if (uncompress_chunk(args[i], preserve, &local_error) != 1) {
+				if (local_error)
+					PRINT_ERROR("Failed to uncompress chunk [%s] :\n %s",
+						args[i], local_error->message);
 				else
-					PRINT_ERROR("Failed to uncompress chunk [%s] : no error\n",args[i]);
-			} else {
-				PRINT_DEBUG("Chunk [%s] uncompressed\n",args[i]);
+					PRINT_ERROR("Failed to uncompress chunk [%s] : no error\n",
+						args[i]);
+			}
+			else {
+				PRINT_DEBUG("Chunk [%s] uncompressed\n", args[i]);
 			}
 		}
 	}

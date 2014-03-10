@@ -1,37 +1,18 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "server.msg"
-#endif /*LOG_DOMAIN*/
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "server.msg"
+#endif /*G_LOG_DOMAIN */
 
 #include <string.h>
 #include <sys/time.h>
 
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
+
 #include "./server_internals.h"
 #include "./message_handler.h"
 
-#include <metautils.h>
-#include <metacomm.h>
-
-#include <glib.h>
-
 static void
-_log_addr(GString *gs, int fd)
+_log_addr(GString * gs, int fd)
 {
 	struct sockaddr_storage ss;
 	socklen_t ss_len;
@@ -41,12 +22,13 @@ _log_addr(GString *gs, int fd)
 	memset(&ss, 0, sizeof(ss));
 	ss_len = sizeof(ss);
 
-	if (0 != getsockname(fd, (struct sockaddr*)&ss, &ss_len)) 
+	if (0 != getsockname(fd, (struct sockaddr *) &ss, &ss_len))
 		g_string_append_c(gs, '?');
 	else {
 		memset(buf_port, 0, sizeof(buf_port));
 		memset(buf_addr, 0, sizeof(buf_addr));
-		format_addr((struct sockaddr*)&ss, buf_addr, sizeof(buf_addr), buf_port, sizeof(buf_port), NULL);
+		format_addr((struct sockaddr *) &ss, buf_addr, sizeof(buf_addr),
+			buf_port, sizeof(buf_port), NULL);
 
 		g_string_append(gs, buf_addr);
 		g_string_append_c(gs, ':');
@@ -55,12 +37,13 @@ _log_addr(GString *gs, int fd)
 
 	g_string_append_c(gs, ' ');
 
-	if (0 != getpeername(fd, (struct sockaddr*)&ss, &ss_len)) 
+	if (0 != getpeername(fd, (struct sockaddr *) &ss, &ss_len))
 		g_string_append_c(gs, '?');
 	else {
 		memset(buf_port, 0, sizeof(buf_port));
 		memset(buf_addr, 0, sizeof(buf_addr));
-		format_addr((struct sockaddr*)&ss, buf_addr, sizeof(buf_addr), buf_port, sizeof(buf_port), NULL);
+		format_addr((struct sockaddr *) &ss, buf_addr, sizeof(buf_addr),
+			buf_port, sizeof(buf_port), NULL);
 
 		g_string_append(gs, buf_addr);
 		g_string_append_c(gs, ':');
@@ -69,7 +52,7 @@ _log_addr(GString *gs, int fd)
 }
 
 static void
-_log_time(GString *gs, struct request_context_s *req_ctx)
+_log_time(GString * gs, struct request_context_s *req_ctx)
 {
 	struct timeval tvnow, tvdiff;
 
@@ -80,10 +63,10 @@ _log_time(GString *gs, struct request_context_s *req_ctx)
 }
 
 static void
-_log_reqid(GString *gs, MESSAGE req)
+_log_reqid(GString * gs, MESSAGE req)
 {
-	void *field=NULL;
-	gsize field_len=0;
+	void *field = NULL;
+	gsize field_len = 0;
 
 	g_string_append_c(gs, ' ');
 
@@ -94,19 +77,19 @@ _log_reqid(GString *gs, MESSAGE req)
 	else {
 		gsize max = field_len * 2 + 2;
 		char *hex;
-		
+
 		hex = g_alloca(max);
 		memset(hex, 0, max);
 		buffer2str(field, field_len, hex, max);
-		g_string_append(gs, (gchar*)hex);
+		g_string_append(gs, (gchar *) hex);
 	}
 }
 
 static void
-_log_reqname(GString *gs, MESSAGE req)
+_log_reqname(GString * gs, MESSAGE req)
 {
-	void *field=NULL;
-	gsize field_len=0;
+	void *field = NULL;
+	gsize field_len = 0;
 
 	if (0 > message_get_NAME(req, &field, &field_len, NULL)) {
 		g_string_append_c(gs, ' ');
@@ -114,12 +97,13 @@ _log_reqname(GString *gs, MESSAGE req)
 	}
 	else {
 		int i_len = field_len;
-		g_string_append_printf(gs, " %.*s", i_len, (char*)field);
+
+		g_string_append_printf(gs, " %.*s", i_len, (char *) field);
 	}
 }
 
 static void
-_log_args(GString *gs, const gchar *fmt, va_list vargs)
+_log_args(GString * gs, const gchar * fmt, va_list vargs)
 {
 	g_string_append_c(gs, ' ');
 	g_string_append_c(gs, '[');
@@ -129,7 +113,7 @@ _log_args(GString *gs, const gchar *fmt, va_list vargs)
 }
 
 static void
-_log_message(GString *gs, struct reply_context_s *ctx)
+_log_message(GString * gs, struct reply_context_s *ctx)
 {
 	if (!ctx->header.msg)
 		g_string_append(gs, " 200 OK");
@@ -138,7 +122,7 @@ _log_message(GString *gs, struct reply_context_s *ctx)
 }
 
 void
-reply_context_log_access (struct reply_context_s *ctx, const gchar *fmt, ...)
+reply_context_log_access(struct reply_context_s *ctx, const gchar * fmt, ...)
 {
 	va_list va;
 	GString *gs;
@@ -163,4 +147,3 @@ reply_context_log_access (struct reply_context_s *ctx, const gchar *fmt, ...)
 	g_log("access", GRID_LOGLVL_INFO, gs->str);
 	(void) g_string_free(gs, TRUE);
 }
-

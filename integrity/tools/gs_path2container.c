@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gs_path2container"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gs_path2container"
 #endif
 #include <stdlib.h>
 #include <string.h>
@@ -29,12 +9,8 @@
 #include <unistd.h>
 #include <poll.h>
 
-#include <glib.h>
-#include <glib/gstdio.h>
-
-#include <metautils.h>
-#include <common_main.h>
-#include <gridcluster.h>
+#include <metautils/lib/metautils.h>
+#include <cluster/lib/gridcluster.h>
 
 static gboolean flag_auto_enabled = FALSE;
 
@@ -50,11 +26,11 @@ static GSList *list_of_paths = NULL;
 /* ------------------------------------------------------------------------- */
 
 static void
-hash_path(const gchar *path)
+hash_path(const gchar * path)
 {
 	gsize size;
 	gsize path_len;
-	gchar container_name[LIMIT_LENGTH_CONTAINERNAME+1];
+	gchar container_name[LIMIT_LENGTH_CONTAINERNAME + 1];
 
 	path_len = strlen(path);
 
@@ -63,45 +39,48 @@ hash_path(const gchar *path)
 	if (size <= 0)
 		size = path_len - auto_hoffset;
 
-	if ((gsize)auto_hoffset >= path_len) {
-		GRID_ERROR("Invalid hash offset (%"G_GINT64_FORMAT"), exceeding the path length (%d)", auto_hoffset, (int)path_len);
+	if ((gsize) auto_hoffset >= path_len) {
+		GRID_ERROR("Invalid hash offset (%" G_GINT64_FORMAT
+			"), exceeding the path length (%d)", auto_hoffset, (int) path_len);
 		abort();
 	}
 	if (size > path_len) {
-		GRID_ERROR("Invalid hash size (%"G_GINT64_FORMAT"), exceeding the path length (%d)", auto_hlength, (int)path_len);
+		GRID_ERROR("Invalid hash size (%" G_GINT64_FORMAT
+			"), exceeding the path length (%d)", auto_hlength, (int) path_len);
 		abort();
 	}
-	if (size+auto_hoffset > path_len) {
-		GRID_ERROR("Invalid hash offset/size (%"G_GINT64_FORMAT"/%"G_GSIZE_FORMAT"), exceeding the path length (%d)",
-				auto_hoffset, size, (int)path_len);
+	if (size + auto_hoffset > path_len) {
+		GRID_ERROR("Invalid hash offset/size (%" G_GINT64_FORMAT "/%"
+			G_GSIZE_FORMAT "), exceeding the path length (%d)", auto_hoffset,
+			size, (int) path_len);
 		abort();
 	}
 
 	/* Hash itself */
-	GRID_DEBUG("Hashing [%s] (len=%"G_GSIZE_FORMAT") (bits=%"G_GSIZE_FORMAT")",
-		path+auto_hoffset, size, auto_bitlength);
+	GRID_DEBUG("Hashing [%s] (len=%" G_GSIZE_FORMAT ") (bits=%" G_GSIZE_FORMAT
+		")", path + auto_hoffset, size, auto_bitlength);
 
-	metautils_hash_content_path(path+auto_hoffset, size,
+	metautils_hash_content_path(path + auto_hoffset, size,
 		container_name, sizeof(container_name), auto_bitlength);
 
 	g_print("%s %s\n", path, container_name);
 }
 
 static void
-chomp(gchar *path)
+chomp(gchar * path)
 {
 	gchar *s;
 	register gchar c;
 
-	s = path+(strlen(path)-1);
-	for (; s>=path && (c=*s) && (c=='\r' || c=='\n'); s--)
+	s = path + (strlen(path) - 1);
+	for (; s >= path && (c = *s) && (c == '\r' || c == '\n'); s--)
 		*s = '\0';
 }
 
 static void
 hash_path_from_input()
 {
-	gchar path[LIMIT_LENGTH_CONTENTPATH+1];
+	gchar path[LIMIT_LENGTH_CONTENTPATH + 1];
 
 	for (;;) {
 		int prc;
@@ -116,7 +95,7 @@ hash_path_from_input()
 			GRID_ERROR("Input error : %s", strerror(errno));
 			break;
 		}
-		
+
 		pfd.fd = 0;
 		pfd.events = POLL_IN;
 		pfd.revents = 0;
@@ -146,11 +125,13 @@ static gboolean
 main_configure(int argc, char **args)
 {
 	char **p_arg;
+
 	(void) argc;
 
 	/* Lazy namespace initiation */
 	if (ns_name->str[0]) {
 		GError *error = NULL;
+
 		if (!(ns_info = get_namespace_info(ns_name->str, &error))) {
 			GRID_ERROR("Namespace [%s] cannot be loaded : %s",
 				ns_name->str, gerror_get_message(error));
@@ -160,7 +141,7 @@ main_configure(int argc, char **args)
 	}
 
 	/* Configure the offset/size/bitlength values */
-	if (auto_hoffset<=0 && auto_hlength<=0) {
+	if (auto_hoffset <= 0 && auto_hlength <= 0) {
 		if (ns_info) {
 			/* Get it from the namspace */
 			auto_hoffset = namespace_get_autocontainer_src_offset(ns_info);
@@ -180,17 +161,20 @@ main_configure(int argc, char **args)
 		auto_hlength = 0;
 
 	if (auto_bitlength <= 0) {
-		GRID_ERROR("Invalid hash bitlength [%"G_GINT64_FORMAT"] (negative)", auto_bitlength);
+		GRID_ERROR("Invalid hash bitlength [%" G_GINT64_FORMAT "] (negative)",
+			auto_bitlength);
 		return FALSE;
 	}
 	if (auto_bitlength > 256) {
-		GRID_ERROR("Invalid hash bitlength [%"G_GINT64_FORMAT"] (too high)", auto_bitlength);
+		GRID_ERROR("Invalid hash bitlength [%" G_GINT64_FORMAT "] (too high)",
+			auto_bitlength);
 		return FALSE;
 	}
 
 	/* Prepare the args for later */
-	for (p_arg=args; p_arg && *p_arg ;p_arg++) {
-		if (!g_ascii_strcasecmp(*p_arg, "-") || !g_ascii_strcasecmp(*p_arg, "--"))
+	for (p_arg = args; p_arg && *p_arg; p_arg++) {
+		if (!g_ascii_strcasecmp(*p_arg, "-")
+			|| !g_ascii_strcasecmp(*p_arg, "--"))
 			flag_read_stdin = TRUE;
 		else
 			list_of_paths = g_slist_prepend(list_of_paths, *p_arg);
@@ -221,21 +205,21 @@ main_specific_fini(void)
 	}
 }
 
-static struct grid_main_option_s*
+static struct grid_main_option_s *
 main_get_options(void)
 {
 	static struct grid_main_option_s options[] = {
-		{"AutoContainerEnable", OT_BOOL, {.b=&flag_auto_enabled},
+		{"AutoContainerEnable", OT_BOOL, {.b = &flag_auto_enabled},
 			"Perform an automatical hash of the content"},
-		{"AutoContainerHashBits", OT_INT64, {.i64=&auto_bitlength},
+		{"AutoContainerHashBits", OT_INT64, {.i64 = &auto_bitlength},
 			"Sets the auto-hash lengh in bits"},
-		{"AutoContainerHashOffset", OT_INT64, {.i64=&auto_hoffset},
+		{"AutoContainerHashOffset", OT_INT64, {.i64 = &auto_hoffset},
 			"Sets the the offset in the content name used in the auto-hash computation"},
-		{"AutoContainerHashSize", OT_INT64, {.i64=&auto_hlength},
+		{"AutoContainerHashSize", OT_INT64, {.i64 = &auto_hlength},
 			"Sets the the number of bytes in the content name used in the auto-hash computation"},
-		{"Namespace", OT_STRING, {.str=&ns_name},
+		{"Namespace", OT_STRING, {.str = &ns_name},
 			"Optional namespace, its offset/size/bitlength will be used"},
-		{NULL, 0, {.b=0}, NULL}
+		{NULL, 0, {.b = 0}, NULL}
 	};
 
 	return options;
@@ -246,7 +230,6 @@ main_set_defaults(void)
 {
 	flag_read_stdin = FALSE;
 	list_of_paths = NULL;
-	bzero(ns_name, sizeof(ns_name));
 	ns_name = g_string_new("");
 }
 
@@ -257,7 +240,7 @@ main_action(void)
 
 	/* Read the paths on the command line */
 	list_of_paths = g_slist_reverse(list_of_paths);
-	for (l=list_of_paths; l ;l=l->next) {
+	for (l = list_of_paths; l; l = l->next) {
 		if (!l->data)
 			continue;
 		hash_path(l->data);
@@ -269,18 +252,16 @@ main_action(void)
 	}
 }
 
-static const gchar*
+static const gchar *
 main_get_usage(void)
 {
 	static gchar xtra_usage[] =
 		"\tExpected arguments: TOKEN...\n"
-		"\twith TOKEN an arbitrary string, or '-' to read other tokens on stdin:\n"
-		;
+		"\twith TOKEN an arbitrary string, or '-' to read other tokens on stdin:\n";
 	return xtra_usage;
 }
 
-static struct grid_main_callbacks cb =
-{
+static struct grid_main_callbacks cb = {
 	.options = main_get_options,
 	.action = main_action,
 	.set_defaults = main_set_defaults,
@@ -295,4 +276,3 @@ main(int argc, char **argv)
 {
 	return grid_main_cli(argc, argv, &cb);
 }
-

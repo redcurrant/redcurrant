@@ -1,6 +1,4 @@
-include_directories(BEFORE .
-		../../../metautils/lib
-		../../main)
+include_directories(BEFORE . ../.. ../../..)
 
 add_library(statsclient SHARED stats_remote.c stats_remote.h)
 set_target_properties(statsclient PROPERTIES SOVERSION ${ABI_VERSION})

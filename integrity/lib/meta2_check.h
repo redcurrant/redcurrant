@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file meta2_check.h
  * META2 checking library
@@ -29,8 +12,8 @@
  * @{
  */
 
-#include <metautils.h>
- 
+#include <metautils/lib/metautils.h>
+
 /**
  * Execute maintenance (mainly vacuum) on SQLITE database
  *
@@ -41,7 +24,7 @@
  *
  * - Execute VACUUM command on sqlite database
  */
-gboolean meta2_sqlite_maintenance(const gchar* meta2_db_path, GError **error);
+gboolean meta2_sqlite_maintenance(const gchar * meta2_db_path, GError ** error);
 
 /**
  * Check chunk properties consistancy between chunk from META2 and chunk from RAWX
@@ -55,7 +38,8 @@ gboolean meta2_sqlite_maintenance(const gchar* meta2_db_path, GError **error);
  * - Use rawx_client_get_direcoty_data() to retreive the content/chunk infos from the RAWX
  * - Use the check_chunk_referencing() function to find diffs
  */
-gboolean check_meta2_chunk(const struct meta2_raw_content_s* raw_content, GSList** broken, GError** error);
+gboolean check_meta2_chunk(const struct meta2_raw_content_s *raw_content,
+	GSList ** broken, GError ** error);
 
 /** @} */
 

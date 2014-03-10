@@ -1,31 +1,8 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metautils"
 #endif
 
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "metautils"
-#endif
-
-#include <stdlib.h>
-#include <string.h>
-#include "./metautils.h"
+#include "metautils.h"
 
 static void
 clean_tag_value(struct service_tag_s *tag)
@@ -55,7 +32,8 @@ service_tag_set_value_i64(struct service_tag_s *tag, gint64 i)
 }
 
 gboolean
-service_tag_get_value_i64(struct service_tag_s *tag, gint64* i, GError** error)
+service_tag_get_value_i64(struct service_tag_s * tag, gint64 * i,
+	GError ** error)
 {
 	if (tag == NULL) {
 		GSETERROR(error, "Argument tag is NULL");
@@ -88,7 +66,8 @@ service_tag_set_value_float(struct service_tag_s *tag, gdouble r)
 }
 
 gboolean
-service_tag_get_value_float(struct service_tag_s *tag, gdouble *r, GError** error)
+service_tag_get_value_float(struct service_tag_s * tag, gdouble * r,
+	GError ** error)
 {
 	if (tag == NULL) {
 		GSETERROR(error, "Argument tag is NULL");
@@ -121,7 +100,8 @@ service_tag_set_value_boolean(struct service_tag_s *tag, gboolean b)
 }
 
 gboolean
-service_tag_get_value_boolean(struct service_tag_s *tag, gboolean *b, GError **error)
+service_tag_get_value_boolean(struct service_tag_s * tag, gboolean * b,
+	GError ** error)
 {
 	if (tag == NULL) {
 		GSETERROR(error, "Argument tag is NULL");
@@ -144,7 +124,7 @@ service_tag_get_value_boolean(struct service_tag_s *tag, gboolean *b, GError **e
 }
 
 void
-service_tag_set_value_string(struct service_tag_s *tag, gchar * s)
+service_tag_set_value_string(struct service_tag_s *tag, const gchar * s)
 {
 	gsize str_length;
 
@@ -165,7 +145,8 @@ service_tag_set_value_string(struct service_tag_s *tag, gchar * s)
 }
 
 gboolean
-service_tag_get_value_string(struct service_tag_s *tag, gchar * s, gsize s_size, GError **error)
+service_tag_get_value_string(struct service_tag_s *tag, gchar * s, gsize s_size,
+	GError ** error)
 {
 	if (tag == NULL) {
 		GSETERROR(error, "Argument tag is NULL");
@@ -180,7 +161,7 @@ service_tag_get_value_string(struct service_tag_s *tag, gchar * s, gsize s_size,
 	if (tag->type == STVT_BUF) {
 		g_strlcpy(s, tag->value.buf, s_size);
 	}
-	else if (tag->type ==  STVT_STR) {
+	else if (tag->type == STVT_STR) {
 		g_strlcpy(s, tag->value.s, s_size);
 	}
 	else {
@@ -192,7 +173,8 @@ service_tag_get_value_string(struct service_tag_s *tag, gchar * s, gsize s_size,
 }
 
 void
-service_tag_set_value_macro(struct service_tag_s *tag, const gchar * type, const gchar * param)
+service_tag_set_value_macro(struct service_tag_s *tag, const gchar * type,
+	const gchar * param)
 {
 	if (!tag || !type)
 		return;
@@ -204,7 +186,8 @@ service_tag_set_value_macro(struct service_tag_s *tag, const gchar * type, const
 }
 
 gboolean
-service_tag_get_value_macro(struct service_tag_s *tag, gchar * type, gsize type_size, gchar* param, gsize param_size, GError** error)
+service_tag_get_value_macro(struct service_tag_s *tag, gchar * type,
+	gsize type_size, gchar * param, gsize param_size, GError ** error)
 {
 	if (tag == NULL) {
 		GSETERROR(error, "Argument tag is NULL");
@@ -244,24 +227,25 @@ service_tag_copy(struct service_tag_s *dst, struct service_tag_s *src)
 
 	/*copy the value */
 	switch (src->type) {
-	case STVT_I64:
-		service_tag_set_value_i64(dst, src->value.i);
-		return;
-	case STVT_REAL:
-		service_tag_set_value_float(dst, src->value.r);
-		return;
-	case STVT_BOOL:
-		service_tag_set_value_boolean(dst, src->value.b);
-		return;
-	case STVT_STR:
-		service_tag_set_value_string(dst, src->value.s);
-		return;
-	case STVT_BUF:
-		service_tag_set_value_string(dst, src->value.buf);
-		return;
-	case STVT_MACRO:
-		service_tag_set_value_macro(dst, src->value.macro.type, src->value.macro.param);
-		return;
+		case STVT_I64:
+			service_tag_set_value_i64(dst, src->value.i);
+			return;
+		case STVT_REAL:
+			service_tag_set_value_float(dst, src->value.r);
+			return;
+		case STVT_BOOL:
+			service_tag_set_value_boolean(dst, src->value.b);
+			return;
+		case STVT_STR:
+			service_tag_set_value_string(dst, src->value.s);
+			return;
+		case STVT_BUF:
+			service_tag_set_value_string(dst, src->value.buf);
+			return;
+		case STVT_MACRO:
+			service_tag_set_value_macro(dst, src->value.macro.type,
+				src->value.macro.param);
+			return;
 	}
 }
 
@@ -273,11 +257,7 @@ service_tag_dup(struct service_tag_s *src)
 	if (!src)
 		return NULL;
 
-	result = g_try_malloc0(sizeof(struct service_tag_s));
-	if (!result) {
-		abort();
-		return NULL;
-	}
+	result = g_malloc0(sizeof(struct service_tag_s));
 	service_tag_copy(result, src);
 	return result;
 }
@@ -314,7 +294,8 @@ service_tag_destroy(struct service_tag_s *tag)
 }
 
 gsize
-service_tag_to_string(const struct service_tag_s *tag, gchar * dst, gsize dst_size)
+service_tag_to_string(const struct service_tag_s *tag, gchar * dst,
+	gsize dst_size)
 {
 	register int s;
 
@@ -326,22 +307,25 @@ service_tag_to_string(const struct service_tag_s *tag, gchar * dst, gsize dst_si
 		return 0;
 
 	switch (tag->type) {
-	case STVT_I64:
-		return g_snprintf(dst, dst_size, "%"G_GINT64_FORMAT, tag->value.i);
-	case STVT_REAL:
-		return g_snprintf(dst, dst_size, "%lf", tag->value.r);
-	case STVT_BOOL:
-		return g_snprintf(dst, dst_size, "%s", tag->value.b ? "true" : "false");
-	case STVT_STR:
-		return g_snprintf(dst, dst_size, "%s", tag->value.s);
-	case STVT_BUF:
-		s = sizeof(tag->value.buf);
-		return g_snprintf(dst, dst_size, "%.*s", s, tag->value.buf);
-	case STVT_MACRO:
-		if (tag->value.macro.param && *(tag->value.macro.param))
-			return g_snprintf(dst, dst_size, "${%s}", tag->value.macro.type);
-		else
-			return g_snprintf(dst, dst_size, "${%s.%s}", tag->value.macro.type, tag->value.macro.param);
+		case STVT_I64:
+			return g_snprintf(dst, dst_size, "%" G_GINT64_FORMAT, tag->value.i);
+		case STVT_REAL:
+			return g_snprintf(dst, dst_size, "%lf", tag->value.r);
+		case STVT_BOOL:
+			return g_snprintf(dst, dst_size, "%s",
+				tag->value.b ? "true" : "false");
+		case STVT_STR:
+			return g_snprintf(dst, dst_size, "%s", tag->value.s);
+		case STVT_BUF:
+			s = sizeof(tag->value.buf);
+			return g_snprintf(dst, dst_size, "%.*s", s, tag->value.buf);
+		case STVT_MACRO:
+			if (tag->value.macro.param && *(tag->value.macro.param))
+				return g_snprintf(dst, dst_size, "${%s}",
+					tag->value.macro.type);
+			else
+				return g_snprintf(dst, dst_size, "${%s.%s}",
+					tag->value.macro.type, tag->value.macro.param);
 	}
 	return 0;
 }
@@ -373,7 +357,7 @@ service_info_cleanv(struct service_info_s **siv, gboolean content_only)
 	if (!siv)
 		return;
 	if (content_only) {
-		for (; *siv ;++siv)
+		for (; *siv; ++siv)
 			service_info_clean(*siv);
 	}
 	else {
@@ -421,7 +405,8 @@ service_info_sort_by_score(gconstpointer a, gconstpointer b)
 }
 
 gboolean
-service_info_equal(const struct service_info_s * si1, const struct service_info_s * si2)
+service_info_equal(const struct service_info_s * si1,
+	const struct service_info_s * si2)
 {
 	gchar str_addr1[64], str_addr2[64];
 
@@ -437,82 +422,64 @@ service_info_equal(const struct service_info_s * si1, const struct service_info_
 	if (!addr_info_equal(&(si1->addr), &(si2->addr))) {
 		addr_info_to_string(&(si1->addr), str_addr1, sizeof(str_addr1));
 		addr_info_to_string(&(si2->addr), str_addr2, sizeof(str_addr2));
-		DEBUG("service_info addr don't match ([%s] / [%s])", str_addr1, str_addr2);
+		DEBUG("service_info addr don't match ([%s] / [%s])", str_addr1,
+			str_addr2);
 		return FALSE;
 	}
 
 	if (0 != strcmp(si1->ns_name, si2->ns_name)) {
-		DEBUG("service_info ns_name don't match ([%s] / [%s])", si1->ns_name, si2->ns_name);
+		DEBUG("service_info ns_name don't match ([%s] / [%s])", si1->ns_name,
+			si2->ns_name);
 		return FALSE;
 	}
 
 	if (0 != strcmp(si1->type, si2->type)) {
-		DEBUG("service_info type don't match ([%s] / [%s])", si1->type, si2->type);
+		DEBUG("service_info type don't match ([%s] / [%s])", si1->type,
+			si2->type);
 		return FALSE;
 	}
 
 	return TRUE;
 }
 
-meta1_info_t *
-service_info_convert_to_m1info(struct service_info_s * srv)
+// for test <NS part> from a complete VNS name only
+gboolean
+service_info_equal_v2(const struct service_info_s * si1,
+	const struct service_info_s * si2)
 {
-	meta1_info_t *mi;
+	const gchar *sep = NULL;
 
-	if (!srv)
-		return NULL;
-	if (!(mi = g_try_malloc0(sizeof(meta1_info_t))))
-		abort();
-	memcpy(&(mi->addr), &(srv->addr), sizeof(addr_info_t));
-	memcpy(&(mi->score), &(srv->score), sizeof(score_t));
-	return mi;
+	if (si1 == si2)
+		return TRUE;
+
+	if (si1 == NULL || si2 == NULL)
+		return FALSE;
+
+	// for compare NS part from VNS name, 
+	if (NULL != (sep = strchr(si2->ns_name, '.'))) {
+		gboolean result = FALSE;
+		struct service_info_s *si2_tmp = service_info_dup(si2);
+
+		g_strlcpy(si2_tmp->ns_name, si2->ns_name, sep - si2->ns_name + 1);
+		//VNS part not used here: = g_strdup(sep+1);
+		result = service_info_equal(si1, si2_tmp);
+		service_info_clean(si2_tmp);
+		return result;
+	}
+
+	return service_info_equal(si1, si2);
 }
 
-meta2_info_t *
-service_info_convert_to_m2info(struct service_info_s * srv)
-{
-	meta2_info_t *mi;
-
-	if (!srv)
-		return NULL;
-	if (!(mi = g_try_malloc0(sizeof(meta2_info_t))))
-		abort();
-	memcpy(&(mi->addr), &(srv->addr), sizeof(addr_info_t));
-	memcpy(&(mi->score), &(srv->score), sizeof(score_t));
-	return mi;
-}
 
 meta0_info_t *
 service_info_convert_to_m0info(struct service_info_s * srv)
 {
-	meta0_info_t *mi;
-
 	if (!srv)
 		return NULL;
-	if (!(mi = g_try_malloc0(sizeof(meta2_info_t))))
-		abort();
+	meta0_info_t *mi = g_malloc0(sizeof(meta0_info_t));
+
 	memcpy(&(mi->addr), &(srv->addr), sizeof(addr_info_t));
 	return mi;
-}
-
-volume_info_t *
-service_info_convert_to_volinfo(struct service_info_s * srv)
-{
-	volume_info_t *vi;
-	struct service_tag_s *tag;
-
-	if (!srv)
-		return NULL;
-	if (!(vi = g_try_malloc0(sizeof(volume_info_t))))
-		abort();
-	tag = service_info_get_tag(srv->tags, "tag.vol");
-	if (tag)
-		service_tag_to_string(tag, vi->name, sizeof(vi->name));
-	else
-		vi->name[0] = '/';
-	memcpy(&(vi->addr), &(srv->addr), sizeof(addr_info_t));
-	memcpy(&(vi->score), &(srv->score), sizeof(score_t));
-	return vi;
 }
 
 struct service_tag_s *
@@ -547,11 +514,7 @@ service_info_ensure_tag(GPtrArray * a, const gchar * name)
 		return NULL;
 	srvtag = service_info_get_tag(a, name);
 	if (!srvtag) {
-		srvtag = g_try_malloc0(sizeof(struct service_tag_s));
-		if (!srvtag) {
-			abort();
-			return NULL;
-		}
+		srvtag = g_malloc0(sizeof(struct service_tag_s));
 		g_strlcpy(srvtag->name, name, sizeof(srvtag->name));
 		g_ptr_array_add(a, srvtag);
 		srvtag->type = STVT_BOOL;
@@ -587,12 +550,14 @@ service_info_remove_tag(GPtrArray * a, const gchar * name)
 }
 
 gboolean
-service_info_set_address(struct service_info_s * si, const gchar * host, int port, GError ** error)
+service_info_set_address(struct service_info_s * si, const gchar * host,
+	int port, GError ** error)
 {
 	addr_info_t *addr;
 
 	if (!si || !host || port < 0 || port > 65535) {
-		GSETERROR(error, "Invalid parameter si=%p host=%p port=%i", si, host, port);
+		GSETERROR(error, "Invalid parameter si=%p host=%p port=%i", si, host,
+			port);
 		return FALSE;
 	}
 
@@ -609,8 +574,8 @@ service_info_set_address(struct service_info_s * si, const gchar * host, int por
 	return TRUE;
 }
 
-GSList*
-service_info_extract_nsname(GSList *services, gboolean copy)
+GSList *
+service_info_extract_nsname(GSList * services, gboolean copy)
 {
 	struct service_info_s *si;
 	GHashTable *ht;
@@ -619,7 +584,7 @@ service_info_extract_nsname(GSList *services, gboolean copy)
 	gpointer k, v;
 
 	ht = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
-	for (l=services; l ;l=l->next) {
+	for (l = services; l; l = l->next) {
 		si = l->data;
 		g_hash_table_insert(ht, si->ns_name, si->ns_name);
 	}
@@ -627,33 +592,38 @@ service_info_extract_nsname(GSList *services, gboolean copy)
 	result = NULL;
 	g_hash_table_iter_init(&iter, ht);
 	while (g_hash_table_iter_next(&iter, &k, &v))
-		result = g_slist_prepend(result, copy ? g_strndup(k, LIMIT_LENGTH_NSNAME) : k);
+		result =
+			g_slist_prepend(result, copy ? g_strndup(k,
+				LIMIT_LENGTH_NSNAME) : k);
 
 	g_hash_table_destroy(ht);
 	return result;
 }
 
 gchar *
-service_info_to_string(const service_info_t *si)
+service_info_to_string(const service_info_t * si)
 {
 	guint count = 0;
 	gchar **strv = NULL;
-	void concat(gchar *s) {
+
+	void concat(gchar * s)
+	{
 		count = count + 1;
-		strv = g_realloc(strv, (count+1) * sizeof(gchar*));
-		strv[count-1] = s;
+		strv = g_realloc(strv, (count + 1) * sizeof(gchar *));
+		strv[count - 1] = s;
 		strv[count] = NULL;
 	}
 
 	if (!si)
 		return g_strdup("NULL");
 
-	strv = g_malloc0((count+1) * sizeof(gchar*));
+	strv = g_malloc0((count + 1) * sizeof(gchar *));
 
 	/* header string */
 	concat(g_strdup_printf("%s|%s", si->ns_name, si->type));
 	do {
 		gchar str_addr[STRLEN_ADDRINFO];
+
 		addr_info_to_string(&(si->addr), str_addr, sizeof(str_addr));
 		concat(g_strdup(str_addr));
 	} while (0);
@@ -664,7 +634,8 @@ service_info_to_string(const service_info_t *si)
 		int i, max;
 		struct service_tag_s *tag;
 		gchar str_tag[1024];
-		for (i=0, max=si->tags->len; i<max ;i++) {
+
+		for (i = 0, max = si->tags->len; i < max; i++) {
 			tag = g_ptr_array_index((si->tags), i);
 			bzero(str_tag, sizeof(str_tag));
 			service_tag_to_string(tag, str_tag, sizeof(str_tag));
@@ -672,7 +643,8 @@ service_info_to_string(const service_info_t *si)
 		}
 	}
 
-	gchar *result = g_strjoinv("|",strv);
+	gchar *result = g_strjoinv("|", strv);
+
 	g_strfreev(strv);
 	return result;
 }
@@ -681,6 +653,7 @@ void
 service_info_swap(struct service_info_s *si0, struct service_info_s *si1)
 {
 	struct service_info_s tmp;
+
 	g_assert(si0 != NULL);
 	g_assert(si1 != NULL);
 	memcpy(&tmp, si0, sizeof(struct service_info_s));
@@ -688,22 +661,37 @@ service_info_swap(struct service_info_s *si0, struct service_info_s *si1)
 	memcpy(si1, &tmp, sizeof(struct service_info_s));
 }
 
-gchar*
-metautils_rawx_get_volume(struct service_info_s *si)
+const gchar *
+service_info_get_tag_value(const struct service_info_s *si,
+	const gchar * name, const gchar * def)
 {
-	gchar volname[1024];
 	struct service_tag_s *tag;
 
-	if (!si->tags)
-		return g_strdup("/");
-
-	tag = service_info_get_tag(si->tags, NAME_TAGNAME_RAWX_VOL);
-	if (!tag)
-		return g_strdup("/");
-
-	if (!service_tag_get_value_string(tag, volname, sizeof(volname), NULL))
-		return g_strdup("/");
-
-	return g_strdup(volname);
+	if (!si || !si->tags)
+		return def;
+	if (!(tag = service_info_get_tag(si->tags, name)))
+		return def;
+	if (tag->type == STVT_STR)
+		return tag->value.s;
+	if (tag->type == STVT_BUF)
+		return tag->value.buf;
+	return def;
 }
 
+const gchar *
+service_info_get_rawx_location(const struct service_info_s *si, const gchar * d)
+{
+	return service_info_get_tag_value(si, NAME_TAGNAME_RAWX_LOC, d);
+}
+
+const gchar *
+service_info_get_rawx_volume(const struct service_info_s *si, const gchar * d)
+{
+	return service_info_get_tag_value(si, NAME_TAGNAME_RAWX_VOL, d);
+}
+
+const gchar *
+service_info_get_stgclass(const struct service_info_s *si, const gchar * d)
+{
+	return service_info_get_tag_value(si, NAME_TAGNAME_RAWX_STGCLASS, d);
+}

@@ -1,22 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "grid.utils.test"
+#define G_LOG_DOMAIN "grid.utils.test"
 #endif
 
 #include <stddef.h>
@@ -27,11 +10,9 @@
 #include <fcntl.h>
 #include <sys/epoll.h>
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
 
-#include "./network_server.h"
-#include "./loggers.h"
-#include "./common_main.h"
+#include "network_server.h"
 
 static struct network_server_s *server = NULL;
 
@@ -39,7 +20,7 @@ static void
 grid_main_action(void)
 {
 	GError *err = NULL;
-	
+
 	g_assert(server != NULL);
 
 	err = network_server_open_servers(server);
@@ -53,7 +34,7 @@ static struct grid_main_option_s *
 grid_main_get_options(void)
 {
 	static struct grid_main_option_s options[] = {
-		{NULL, 0, {.i=0}, NULL}
+		{NULL, 0, {.i = 0}, NULL}
 	};
 
 	return options;
@@ -82,7 +63,7 @@ grid_main_configure(int argc, char **argv)
 	(void) argv;
 
 	network_server_bind_host_throughput(server, "127.0.0.1:6000",
-			NULL, transport_devnull_factory);
+		NULL, transport_devnull_factory);
 
 	return TRUE;
 }
@@ -111,8 +92,7 @@ static struct grid_main_callbacks main_callbacks = {
 };
 
 int
-main(int argc, char ** argv)
+main(int argc, char **argv)
 {
 	return grid_main(argc, argv, &main_callbacks);
 }
-

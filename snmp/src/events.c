@@ -1,62 +1,52 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "grid.snmp.event"
+#endif
 
 #include <string.h>
-#include <glib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <attr/xattr.h>
+
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/agent/net-snmp-agent-includes.h>
 
+#include <glib.h>
+
 #include "events.h"
 
 
+//TODO: FIXME: same function on cluster/agent/event_common.c 
 static int
-path_get_incoming_time(const gchar *path, time_t *t)
+path_get_incoming_time(const gchar * path, time_t * t)
 {
-        gint64 i64;
-        gssize str_len;
-        gchar str[128];
+	gint64 i64;
+	gssize str_len;
+	gchar str[128];
 
-        bzero(str, sizeof(str));
-        str_len = getxattr(path, "user.grid.agent.incoming-time", str, sizeof(str));
-        if (str_len < 0)
-                return -1;
-        if (str_len == 0) {
-                errno = ERANGE;
-                return -1;
-        }
+	bzero(str, sizeof(str));
+	str_len = getxattr(path, "user.grid.agent.incoming-time", str, sizeof(str));
+	if (str_len < 0)
+		return -1;
+	if (str_len == 0) {
+		errno = ERANGE;
+		return -1;
+	}
 
-        i64 = g_ascii_strtoll(str, NULL, 10);
-        if (i64 >= G_MAXLONG) {
-                errno = ERANGE;
-                return -1;
-        }
+	i64 = g_ascii_strtoll(str, NULL, 10);
+	if (i64 >= G_MAXLONG) {
+		errno = ERANGE;
+		return -1;
+	}
 
-        *t = i64;
-        errno = 0;
-        return 0;
+	*t = i64;
+	errno = 0;
+	return 0;
 }
 
 gboolean
-stat_events(spooldir_stat_t *spstat, const gchar *dir)
+stat_events(spooldir_stat_t * spstat, const gchar * dir)
 {
 	const gchar *path;
 	GDir *gdir = NULL;
@@ -81,17 +71,20 @@ stat_events(spooldir_stat_t *spstat, const gchar *dir)
 		fullpath = g_strconcat(dir, G_DIR_SEPARATOR_S, path, NULL);
 
 		if (-1 == stat(fullpath, &evt_stat))
-			DEBUGMSGTL(("grid", "stat(%s) error : %s", fullpath, strerror(errno)));
+			DEBUGMSGTL(("grid", "stat(%s) error : %s", fullpath,
+					strerror(errno)));
 		else if (S_ISDIR(evt_stat.st_mode))
 			stat_events(spstat, fullpath);
 		else if (S_ISREG(evt_stat.st_mode)) {
 			if (0 != path_get_incoming_time(fullpath, &xattr_time))
-				DEBUGMSGTL(("grid", "Invalid event, missing XATTR (time) at [%s]", fullpath));
+				DEBUGMSGTL(("grid",
+						"Invalid event, missing XATTR (time) at [%s]",
+						fullpath));
 			else {
 				spstat->nb_evt++;
 				age = time(NULL) - xattr_time;
 				spstat->total_age += age;
-				if (spstat->oldest < (guint32)age)
+				if (spstat->oldest < (guint32) age)
 					spstat->oldest = age;
 			}
 		}
@@ -103,7 +96,7 @@ stat_events(spooldir_stat_t *spstat, const gchar *dir)
 	return TRUE;
 }
 
-GSList*
+GSList *
 list_ns(const gchar * dir)
 {
 	const gchar *path;

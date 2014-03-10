@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file chunk_crawler.h
  * Chunk crawler module
@@ -23,10 +6,9 @@
 #ifndef CHUNK_CRAWLER_H
 #define CHUNK_CRAWLER_H
 
-#include <glib.h>
-
-#include "../lib/volume_scanner.h"
-#include "config.h"
+#include <metautils/lib/metautils.h>
+#include <integrity/lib/volume_scanner.h>
+#include <integrity/main/config.h>
 
 /**
  * @defgroup integrity_loop_main_chunk_crawler Chunk Crawler
@@ -56,7 +38,8 @@
 	- Check that chunk has been added to volume_root_path/container-to-chunk.db
 	- Check that chunk has been added to volume_root_path/content-to-chunk.db
  */
-gboolean save_chunk_to_db(const gchar * chunk_path, void *data, GError ** error);
+gboolean save_chunk_to_db(const gchar * chunk_path, void *data,
+	GError ** error);
 
 /**
  * Extract the volume path from service tags to fill the volume_scanning_info callback user data
@@ -68,8 +51,9 @@ gboolean save_chunk_to_db(const gchar * chunk_path, void *data, GError ** error)
  *
  * @return TRUE or FALSE if an error occured (error is set)
  */
-gboolean fill_scanning_info_for_chunk_crawler(struct volume_scanning_info_s *scanning_info, service_info_t * service_info,
-    struct integrity_loop_config_s *config, GError ** error);
+gboolean fill_scanning_info_for_chunk_crawler(struct volume_scanning_info_s
+	*scanning_info, service_info_t * service_info,
+	struct integrity_loop_config_s *config, GError ** error);
 
 /** @} */
 

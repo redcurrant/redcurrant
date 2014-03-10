@@ -1,38 +1,19 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #define MODULE_NAME "stats"
 
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN MODULE_NAME".plugin"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN MODULE_NAME".plugin"
 #endif
 
 #include <string.h>
 #include <sys/time.h>
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
 
-#include <metautils.h>
-#include <metacomm.h>
-
-#include "../../main/plugin.h"
-#include "../../main/message_handler.h"
-#include "../../main/srvtimer.h"
-#include "../../main/srvstats.h"
+#include <gridd/main/plugin.h>
+#include <gridd/main/message_handler.h>
+#include <gridd/main/srvtimer.h>
+#include <gridd/main/srvstats.h>
 
 #include "./msg_stats.h"
 
@@ -40,45 +21,49 @@
 
 
 static gint
-plugin_matcher (MESSAGE m, void *param, GError **err)
+plugin_matcher(MESSAGE m, void *param, GError ** err)
 {
 	void *field = NULL;
-	gsize nameLen=0;
-	
+	gsize nameLen = 0;
+
 	(void) param;
 
 	if (!m) {
 		GSETERROR(err, "invalid parameter");
 		return -1;
 	}
-	
-	if (!message_has_NAME(m,err)) {
+
+	if (!message_has_NAME(m, err)) {
 		DEBUG("the message has no NAME field");
 		return 0;
 	}
-	
+
 	message_get_NAME(m, &field, &nameLen, err);
-	if (!field || nameLen<=0) {
+	if (!field || nameLen <= 0) {
 		INFO("cannot get the NAME field of the message");
 		return 0;
 	}
-	
-	return (nameLen==sizeof(MSG_NAME)-1)
-		&& !g_ascii_strncasecmp((gchar*)field, MSG_NAME, sizeof(MSG_NAME)-1);
+
+	return (nameLen == sizeof(MSG_NAME) - 1)
+		&& !g_ascii_strncasecmp((gchar *) field, MSG_NAME,
+		sizeof(MSG_NAME) - 1);
 }
 
 
 static gint
-handler_get_stats(struct request_context_s *req_ctx, const char* pattern, GError **err)
+handler_get_stats(struct request_context_s *req_ctx, const char *pattern,
+	GError ** err)
 {
 	gint rc;
 	struct reply_context_s ctx;
 
 	memset(&ctx, 0x00, sizeof(struct reply_context_s));
 	ctx.req_ctx = req_ctx;
-	
-	void msg_append_field(gpointer u, const gchar *name, GVariant *gv) {
+
+	void msg_append_field(gpointer u, const gchar * name, GVariant * gv)
+	{
 		gchar *n, *v;
+
 		(void) u;
 
 		if (!gv)
@@ -106,12 +91,12 @@ handler_get_stats(struct request_context_s *req_ctx, const char* pattern, GError
 
 
 static gint
-plugin_handler (MESSAGE m, gint fd, void *param, GError **err)
+plugin_handler(MESSAGE m, gint fd, void *param, GError ** err)
 {
 	gint rc;
 	gchar tmpPattern[256];
-	void *pattern=NULL;
-	gsize patternLen=0;
+	void *pattern = NULL;
+	gsize patternLen = 0;
 	struct request_context_s ctx;
 
 	(void) param;
@@ -121,27 +106,30 @@ plugin_handler (MESSAGE m, gint fd, void *param, GError **err)
 	ctx.fd = fd;
 	ctx.request = m;
 
-	rc = message_get_field(m, MSGKEY_PATTERN, sizeof(MSGKEY_PATTERN)-1, &pattern, &patternLen, err);
+	rc = message_get_field(m, MSGKEY_PATTERN, sizeof(MSGKEY_PATTERN) - 1,
+		&pattern, &patternLen, err);
 	switch (rc) {
 
 		case -1:
-			GSETERROR(err,"Cannot lookup the parameter %s", MSGKEY_PATTERN);
+			GSETERROR(err, "Cannot lookup the parameter %s", MSGKEY_PATTERN);
 			return 0;
 		case 0:
-			GSETERROR(err,"no pattern provided %s", MSGKEY_PATTERN);
+			GSETERROR(err, "no pattern provided %s", MSGKEY_PATTERN);
 			return 0;
 		case 1:
-			DEBUG("pattern found under key %s : %.*s (length=%"G_GSIZE_FORMAT")",
-				MSGKEY_PATTERN, (int)patternLen, (char*)pattern, patternLen);
-			if (patternLen > sizeof(tmpPattern)-1) {
-				GSETERROR(err,"pattern too long, maximum %u characters", sizeof(tmpPattern)-1);
+			DEBUG("pattern found under key %s : %.*s (length=%" G_GSIZE_FORMAT
+				")", MSGKEY_PATTERN, (int) patternLen, (char *) pattern,
+				patternLen);
+			if (patternLen > sizeof(tmpPattern) - 1) {
+				GSETERROR(err, "pattern too long, maximum %u characters",
+					sizeof(tmpPattern) - 1);
 				return 0;
 			}
 			memcpy(tmpPattern, pattern, patternLen);
-			return handler_get_stats (&ctx, tmpPattern, err);
+			return handler_get_stats(&ctx, tmpPattern, err);
 	}
 
-	GSETERROR(err,"bad return code from message_get_field : %d", rc);
+	GSETERROR(err, "bad return code from message_get_field : %d", rc);
 	return 0;
 }
 
@@ -149,28 +137,29 @@ plugin_handler (MESSAGE m, gint fd, void *param, GError **err)
 /* ------------------------------------------------------------------------- */
 
 
-static gint plugin_init (GHashTable *params, GError **err)
+static gint
+plugin_init(GHashTable * params, GError ** err)
 {
 	if (!params) {
-		GSETERROR(err,"invalid parameter");
+		GSETERROR(err, "invalid parameter");
 		return 0;
 	}
-	
-	message_handler_add ("stats", plugin_matcher, plugin_handler, err);
+
+	message_handler_add("stats", plugin_matcher, plugin_handler, err);
 
 	return 1;
 }
 
 
-static gint plugin_close (GError **err)
+static gint
+plugin_close(GError ** err)
 {
 	(void) err;
 	return 1;
 }
 
 
-struct exported_api_s exported_symbol = 
-{
+struct exported_api_s exported_symbol = {
 	MODULE_NAME,
 	plugin_init,
 	plugin_close,
@@ -178,12 +167,10 @@ struct exported_api_s exported_symbol =
 	NULL
 };
 
-struct exported_api_s exported_symbol_v2 = 
-{
+struct exported_api_s exported_symbol_v2 = {
 	MODULE_NAME,
 	plugin_init,
 	plugin_close,
 	NULL,
 	NULL
 };
-

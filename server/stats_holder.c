@@ -1,33 +1,14 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "grid.utils.stats"
+#define G_LOG_DOMAIN "grid.utils.stats"
 #endif
 
 #include <stdarg.h>
 #include <fnmatch.h>
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
 
-#include "./internals.h"
-#include "./stats_holder.h"
-#include "./hashstr.h"
-#include "./stats_holder.h"
+#include "internals.h"
+#include "stats_holder.h"
 
 struct grid_stats_holder_s
 {
@@ -44,12 +25,12 @@ _gsh_check(struct grid_stats_holder_s *gsh)
 }
 
 static inline void
-_real_increment_h(GTree *hashset, hashstr_t *hn, guint64 v)
+_real_increment_h(GTree * hashset, hashstr_t * hn, guint64 v)
 {
 	gpointer old;
 
 	if ((old = g_tree_lookup(hashset, hn)) != NULL) {
-		*((guint64*)old) += v;
+		*((guint64 *) old) += v;
 	}
 	else {
 		g_tree_replace(hashset, hashstr_dup(hn), g_memdup(&v, sizeof(v)));
@@ -57,7 +38,7 @@ _real_increment_h(GTree *hashset, hashstr_t *hn, guint64 v)
 }
 
 static void
-_real_increment(GTree *hashset, const gchar *n, guint64 v)
+_real_increment(GTree * hashset, const gchar * n, guint64 v)
 {
 	struct hashstr_s *hn;
 
@@ -66,7 +47,7 @@ _real_increment(GTree *hashset, const gchar *n, guint64 v)
 }
 
 static guint64
-_real_get(GTree *hashset, const gchar *n)
+_real_get(GTree * hashset, const gchar * n)
 {
 	guint64 *p;
 	struct hashstr_s *hn;
@@ -82,10 +63,10 @@ struct grid_stats_holder_s *
 grid_stats_holder_init(void)
 {
 	struct grid_stats_holder_s *result = g_malloc0(sizeof(*result));
+
 	result->lock = g_mutex_new();
-	result->hashset = g_tree_new_full(
-			hashstr_quick_cmpdata, NULL,
-			g_free, g_free);
+	result->hashset = g_tree_new_full(hashstr_quick_cmpdata, NULL,
+		g_free, g_free);
 	return result;
 }
 
@@ -97,6 +78,7 @@ grid_stats_holder_clean(struct grid_stats_holder_s *gsh)
 
 	if (gsh->lock) {
 		GMutex *lock = gsh->lock;
+
 		gsh->lock = NULL;
 		g_mutex_lock(lock);
 		g_mutex_unlock(lock);
@@ -123,10 +105,10 @@ grid_stats_holder_set(struct grid_stats_holder_s *gsh, ...)
 
 	va_start(va, gsh);
 	g_mutex_lock(gsh->lock);
-	while ((n = va_arg(va, gchar*)) != NULL) {
+	while ((n = va_arg(va, gchar *)) != NULL) {
 		v = va_arg(va, guint64);
 		g_tree_replace(gsh->hashset, hashstr_create(n),
-				g_memdup(&v, sizeof(v)));
+			g_memdup(&v, sizeof(v)));
 	}
 	g_mutex_unlock(gsh->lock);
 	va_end(va);
@@ -143,7 +125,7 @@ grid_stats_holder_increment(struct grid_stats_holder_s *gsh, ...)
 		return;
 
 	va_start(va, gsh);
-	while ((n = va_arg(va, gchar*)) != NULL) {
+	while ((n = va_arg(va, gchar *)) != NULL) {
 		v = va_arg(va, guint64);
 		_real_increment(gsh->hashset, n, v);
 	}
@@ -162,20 +144,22 @@ grid_stats_holder_get(struct grid_stats_holder_s *gsh, ...)
 
 	va_start(va, gsh);
 	g_mutex_lock(gsh->lock);
-	while ((n = va_arg(va, gchar*)) && (pv = va_arg(va, guint64*)))
+	while ((n = va_arg(va, gchar *)) && (pv = va_arg(va, guint64 *)))
 		*pv = _real_get(gsh->hashset, n);
 	g_mutex_unlock(gsh->lock);
 	va_end(va);
 }
 
 void
-grid_stats_holder_foreach(struct grid_stats_holder_s *gsh, const gchar *p,
-	gboolean (*output)(const gchar *, guint64 value))
+grid_stats_holder_foreach(struct grid_stats_holder_s *gsh, const gchar * p,
+	gboolean(*output) (const gchar *, guint64 value))
 {
-	gboolean traverser(gpointer k, gpointer pv, gpointer ignored) {
+	gboolean traverser(gpointer k, gpointer pv, gpointer ignored)
+	{
 		(void) ignored;
-		guint64 v = *((guint64*)pv);
-		const gchar *n = hashstr_str((struct hashstr_s*)k);
+		guint64 v = *((guint64 *) pv);
+		const gchar *n = hashstr_str((struct hashstr_s *) k);
+
 		if (!p || !*p || 0 != fnmatch(p, n, FNM_NOESCAPE))
 			output(n, v);
 		return FALSE;
@@ -192,10 +176,11 @@ grid_stats_holder_foreach(struct grid_stats_holder_s *gsh, const gchar *p,
 void
 grid_stats_holder_zero(struct grid_stats_holder_s *gsh)
 {
-	gboolean traverser(gpointer k, gpointer v, gpointer ignored) {
+	gboolean traverser(gpointer k, gpointer v, gpointer ignored)
+	{
 		(void) k;
 		(void) ignored;
-		*((guint64*)v) = 0;
+		*((guint64 *) v) = 0;
 		return FALSE;
 	}
 
@@ -206,13 +191,15 @@ grid_stats_holder_zero(struct grid_stats_holder_s *gsh)
 
 void
 grid_stats_holder_increment_merge(struct grid_stats_holder_s *base,
-		struct grid_stats_holder_s *inc)
+	struct grid_stats_holder_s *inc)
 {
-	gboolean traverser(gpointer k, gpointer pv, gpointer ignored) {
+	gboolean traverser(gpointer k, gpointer pv, gpointer ignored)
+	{
 		guint64 v;
+
 		(void) ignored;
-		if (0 != (v = *((guint64*)pv)))
-			_real_increment_h(base->hashset, (struct hashstr_s*)k, v);
+		if (0 != (v = *((guint64 *) pv)))
+			_real_increment_h(base->hashset, (struct hashstr_s *) k, v);
 		return FALSE;
 	}
 
@@ -233,15 +220,15 @@ struct grid_single_rrd_s
 	guint64 l0[];
 };
 
-struct grid_single_rrd_s*
+struct grid_single_rrd_s *
 grid_single_rrd_create(time_t period)
 {
 	struct grid_single_rrd_s *result;
 
-	SERVER_ASSERT(period > 1);
+	EXTRA_ASSERT(period > 1);
 
 	result = g_malloc0(sizeof(struct grid_single_rrd_s)
-			+ (period * sizeof(guint64)));
+		+ (period * sizeof(guint64)));
 	result->last = time(0);
 	result->period = period;
 
@@ -260,7 +247,7 @@ _gsr_blank_empty_slots(struct grid_single_rrd_s *gsr, guint64 v, time_t now)
 {
 	time_t i;
 
-	for (i=gsr->last; i<now ;)
+	for (i = gsr->last; i < now;)
 		gsr->l0[(i++) % gsr->period] = v;
 	gsr->last = now;
 }
@@ -289,16 +276,16 @@ grid_single_rrd_get(struct grid_single_rrd_s *gsr)
 }
 
 guint64
-grid_single_rrd_get_delta(struct grid_single_rrd_s *gsr, time_t period)
+grid_single_rrd_get_delta(struct grid_single_rrd_s * gsr, time_t period)
 {
 	time_t now;
 
-	SERVER_ASSERT(period < gsr->period);
+	EXTRA_ASSERT(period < gsr->period);
 
 	if ((now = time(0)) != gsr->last)
 		_gsr_blank_empty_slots(gsr, gsr->l0[gsr->last % gsr->period], now);
 
-	return gsr->l0[now % gsr->period] - gsr->l0[(now-period) % gsr->period];
+	return gsr->l0[now % gsr->period] - gsr->l0[(now - period) % gsr->period];
 }
 
 void
@@ -309,14 +296,15 @@ grid_single_rrd_feed(struct grid_stats_holder_s *gsh, ...)
 	va_list va;
 	time_t now;
 
-	SERVER_ASSERT(gsh != NULL);
+	EXTRA_ASSERT(gsh != NULL);
 
 	now = time(0);
 
 	va_start(va, gsh);
 	g_mutex_lock(gsh->lock);
-	while (NULL != (n = va_arg(va, gchar*))) {
-		gsr = va_arg(va, struct grid_single_rrd_s*);
+	while (NULL != (n = va_arg(va, gchar *))) {
+		gsr = va_arg(va, struct grid_single_rrd_s *);
+
 		if (!gsr)
 			break;
 		if (now != gsr->last)
@@ -327,4 +315,3 @@ grid_single_rrd_feed(struct grid_stats_holder_s *gsh, ...)
 	g_mutex_unlock(gsh->lock);
 	va_end(va);
 }
-

@@ -1,26 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
-#endif
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "metacomm.meta2_maintenance"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "metacomm.meta2_maintenance"
 #endif
 
 #include <string.h>
@@ -48,10 +27,11 @@ static struct abstract_sequence_handler_s meta2_property_descr = {
 	"meta2_property"
 };
 
-DEFINE_SEQUENCE_MARSHALLER_GBA( &meta2_property_descr,  meta2_property_marshall_gba);
-DEFINE_SEQUENCE_MARSHALLER(     &meta2_property_descr,  meta2_property_marshall);
-DEFINE_SEQUENCE_UNMARSHALLER(   &meta2_property_descr,  meta2_property_unmarshall);
-DEFINE_BODY_MANAGER(             meta2_property_concat, meta2_property_unmarshall);
+DEFINE_SEQUENCE_MARSHALLER_GBA(&meta2_property_descr,
+	meta2_property_marshall_gba);
+DEFINE_SEQUENCE_MARSHALLER(&meta2_property_descr, meta2_property_marshall);
+DEFINE_SEQUENCE_UNMARSHALLER(&meta2_property_descr, meta2_property_unmarshall);
+DEFINE_BODY_MANAGER(meta2_property_concat, meta2_property_unmarshall);
 
 /* ------------------------------------------------------------------------- */
 
@@ -66,10 +46,14 @@ static struct abstract_sequence_handler_s meta2_raw_content_header_descr = {
 	"meta2_raw_content_header"
 };
 
-DEFINE_SEQUENCE_MARSHALLER_GBA( &meta2_raw_content_header_descr,  meta2_raw_content_header_marshall_gba);
-DEFINE_SEQUENCE_MARSHALLER(     &meta2_raw_content_header_descr,  meta2_raw_content_header_marshall);
-DEFINE_SEQUENCE_UNMARSHALLER(   &meta2_raw_content_header_descr,  meta2_raw_content_header_unmarshall);
-DEFINE_BODY_MANAGER(             meta2_raw_content_header_concat, meta2_raw_content_header_unmarshall);
+DEFINE_SEQUENCE_MARSHALLER_GBA(&meta2_raw_content_header_descr,
+	meta2_raw_content_header_marshall_gba);
+DEFINE_SEQUENCE_MARSHALLER(&meta2_raw_content_header_descr,
+	meta2_raw_content_header_marshall);
+DEFINE_SEQUENCE_UNMARSHALLER(&meta2_raw_content_header_descr,
+	meta2_raw_content_header_unmarshall);
+DEFINE_BODY_MANAGER(meta2_raw_content_header_concat,
+	meta2_raw_content_header_unmarshall);
 
 /* ------------------------------------------------------------------------- */
 
@@ -85,10 +69,13 @@ static struct abstract_sequence_handler_s meta2_raw_content_descr = {
 	"meta2_raw_content"
 };
 
-DEFINE_SEQUENCE_MARSHALLER_GBA( &meta2_raw_content_descr,  meta2_raw_content_marshall_gba);
-DEFINE_SEQUENCE_MARSHALLER(     &meta2_raw_content_descr,  meta2_raw_content_marshall);
-DEFINE_SEQUENCE_UNMARSHALLER(   &meta2_raw_content_descr,  meta2_raw_content_unmarshall);
-DEFINE_BODY_MANAGER(             meta2_raw_content_concat, meta2_raw_content_unmarshall);
+DEFINE_SEQUENCE_MARSHALLER_GBA(&meta2_raw_content_descr,
+	meta2_raw_content_marshall_gba);
+DEFINE_SEQUENCE_MARSHALLER(&meta2_raw_content_descr,
+	meta2_raw_content_marshall);
+DEFINE_SEQUENCE_UNMARSHALLER(&meta2_raw_content_descr,
+	meta2_raw_content_unmarshall);
+DEFINE_BODY_MANAGER(meta2_raw_content_concat, meta2_raw_content_unmarshall);
 #endif /* HAVE_UNUSED_CODE */
 
 /* ------------------------------------------------------------------------- */
@@ -104,10 +91,12 @@ static struct abstract_sequence_handler_s meta2_raw_chunk_descr = {
 	"meta2_raw_chunk"
 };
 
-DEFINE_SEQUENCE_MARSHALLER_GBA( &meta2_raw_chunk_descr,  meta2_raw_chunk_marshall_gba);
-DEFINE_SEQUENCE_MARSHALLER(     &meta2_raw_chunk_descr,  meta2_raw_chunk_marshall);
-DEFINE_SEQUENCE_UNMARSHALLER(   &meta2_raw_chunk_descr,  meta2_raw_chunk_unmarshall);
-DEFINE_BODY_MANAGER(             meta2_raw_chunk_concat, meta2_raw_chunk_unmarshall);
+DEFINE_SEQUENCE_MARSHALLER_GBA(&meta2_raw_chunk_descr,
+	meta2_raw_chunk_marshall_gba);
+DEFINE_SEQUENCE_MARSHALLER(&meta2_raw_chunk_descr, meta2_raw_chunk_marshall);
+DEFINE_SEQUENCE_UNMARSHALLER(&meta2_raw_chunk_descr,
+	meta2_raw_chunk_unmarshall);
+DEFINE_BODY_MANAGER(meta2_raw_chunk_concat, meta2_raw_chunk_unmarshall);
 
 /* ------------------------------------------------------------------------- */
 
@@ -122,10 +111,14 @@ static struct abstract_sequence_handler_s meta2_raw_content_v2_descr = {
 	"meta2_raw_content_v2"
 };
 
-DEFINE_SEQUENCE_MARSHALLER_GBA( &meta2_raw_content_v2_descr,     meta2_raw_content_v2_marshall_gba);
-DEFINE_SEQUENCE_MARSHALLER(     &meta2_raw_content_v2_descr,     meta2_raw_content_v2_marshall);
-DEFINE_SEQUENCE_UNMARSHALLER(   &meta2_raw_content_v2_descr,     meta2_raw_content_v2_unmarshall);
-DEFINE_BODY_MANAGER(             meta2_raw_content_v2_concat,    meta2_raw_content_v2_unmarshall);
+DEFINE_SEQUENCE_MARSHALLER_GBA(&meta2_raw_content_v2_descr,
+	meta2_raw_content_v2_marshall_gba);
+DEFINE_SEQUENCE_MARSHALLER(&meta2_raw_content_v2_descr,
+	meta2_raw_content_v2_marshall);
+DEFINE_SEQUENCE_UNMARSHALLER(&meta2_raw_content_v2_descr,
+	meta2_raw_content_v2_unmarshall);
+DEFINE_BODY_MANAGER(meta2_raw_content_v2_concat,
+	meta2_raw_content_v2_unmarshall);
 
 /* ------------------------------------------------------------------------- */
 
@@ -140,7 +133,8 @@ free_OCTET_STRING(OCTET_STRING_t * os)
 /* ------------------------------------------------------------------------- */
 
 GSList *
-meta2_maintenance_sized_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, gsize array_size, GError ** err)
+meta2_maintenance_sized_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len,
+	gsize array_size, GError ** err)
 {
 	int i;
 	asn_dec_rval_t decRet;
@@ -154,16 +148,18 @@ meta2_maintenance_sized_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, gs
 
 	/*decode the sequence */
 	codecCtx.max_stack_size = 0;
-	decRet = ber_decode(&codecCtx, &asn_DEF_ArrayList, (void *) &result_asn, buf, buf_len);
+	decRet =
+		ber_decode(&codecCtx, &asn_DEF_ArrayList, (void *) &result_asn, buf,
+		buf_len);
 	switch (decRet.code) {
-	case RC_OK:
-		break;
-	case RC_FAIL:
-		GSETERROR(err, "Cannot deserialize: %s", "invalid content");
-		goto error_decode;
-	case RC_WMORE:
-		GSETERROR(err, "Cannot deserialize: %s", "uncomplete content");
-		goto error_decode;
+		case RC_OK:
+			break;
+		case RC_FAIL:
+			GSETERROR(err, "Cannot deserialize: %s", "invalid content");
+			goto error_decode;
+		case RC_WMORE:
+			GSETERROR(err, "Cannot deserialize: %s", "uncomplete content");
+			goto error_decode;
 	}
 	if (!result_asn)
 		goto error_decode;
@@ -192,7 +188,7 @@ meta2_maintenance_sized_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, gs
 	result_asn->list.free = free_OCTET_STRING;
 	ASN_STRUCT_FREE(asn_DEF_ArrayList, result_asn);
 	return result;
-      error_size:
+error_size:
 	if (result) {
 		GSList *pL;
 
@@ -200,32 +196,36 @@ meta2_maintenance_sized_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, gs
 			g_free(pL->data);
 		g_slist_free(result);
 	}
-      error_decode:
-      error_params:
+error_decode:
+error_params:
 	return NULL;
 }
 
 
 GSList *
-meta2_maintenance_sized_arrays_unmarshall_bytearray(GByteArray * encoded, gsize array_size, GError ** err)
+meta2_maintenance_sized_arrays_unmarshall_bytearray(GByteArray * encoded,
+	gsize array_size, GError ** err)
 {
 	if (!encoded) {
 		GSETERROR(err, "Invalid parameter");
 		return NULL;
 	}
-	return meta2_maintenance_sized_arrays_unmarshall_buffer(encoded->data, encoded->len, array_size, err);
+	return meta2_maintenance_sized_arrays_unmarshall_buffer(encoded->data,
+		encoded->len, array_size, err);
 }
 
 
 GByteArray *
-meta2_maintenance_sized_arrays_marshall(GSList * arrays, gsize array_size, GError ** err)
+meta2_maintenance_sized_arrays_marshall(GSList * arrays, gsize array_size,
+	GError ** err)
 {
 	GSList *lCursor;
 	ArrayList_t list_asn;
 	asn_enc_rval_t encRet;
 	GByteArray *result = NULL;
 
-	int write_f(const void *b, gsize bSize, void *key) {
+	int write_f(const void *b, gsize bSize, void *key)
+	{
 		(void) key;
 		g_byte_array_append(result, b, bSize);
 		return 0;
@@ -243,7 +243,8 @@ meta2_maintenance_sized_arrays_marshall(GSList * arrays, gsize array_size, GErro
 	for (lCursor = arrays; lCursor; lCursor = lCursor->next) {
 		OCTET_STRING_t *os;
 
-		os = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING, lCursor->data, array_size);
+		os = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING, lCursor->data,
+			array_size);
 		if (!os)
 			continue;
 		asn_set_add(&(list_asn.list), os);
@@ -259,7 +260,7 @@ meta2_maintenance_sized_arrays_marshall(GSList * arrays, gsize array_size, GErro
 	ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_ArrayList, &list_asn);
 	return result;
 
-      error_encode:
+error_encode:
 	GSETERROR(err, "Failed to encode arrays");
 	return NULL;
 }
@@ -269,18 +270,21 @@ meta2_maintenance_sized_arrays_marshall(GSList * arrays, gsize array_size, GErro
 
 
 GSList *
-meta2_maintenance_arrays_unmarshall_bytearray(GByteArray * encoded, GError ** err)
+meta2_maintenance_arrays_unmarshall_bytearray(GByteArray * encoded,
+	GError ** err)
 {
 	if (!encoded) {
 		GSETERROR(err, "Invalid parameter");
 		return NULL;
 	}
-	return meta2_maintenance_arrays_unmarshall_buffer(encoded->data, encoded->len, err);
+	return meta2_maintenance_arrays_unmarshall_buffer(encoded->data,
+		encoded->len, err);
 }
 
 
 GSList *
-meta2_maintenance_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, GError ** err)
+meta2_maintenance_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len,
+	GError ** err)
 {
 	int i;
 	asn_dec_rval_t decRet;
@@ -294,16 +298,18 @@ meta2_maintenance_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, GError *
 
 	/*decode the sequence */
 	codecCtx.max_stack_size = 0;
-	decRet = ber_decode(&codecCtx, &asn_DEF_ArrayList, (void *) &result_asn, buf, buf_len);
+	decRet =
+		ber_decode(&codecCtx, &asn_DEF_ArrayList, (void *) &result_asn, buf,
+		buf_len);
 	switch (decRet.code) {
-	case RC_OK:
-		break;
-	case RC_FAIL:
-		GSETERROR(err, "Cannot deserialize: %s", "invalid content");
-		goto error_decode;
-	case RC_WMORE:
-		GSETERROR(err, "Cannot deserialize: %s", "uncomplete content");
-		goto error_decode;
+		case RC_OK:
+			break;
+		case RC_FAIL:
+			GSETERROR(err, "Cannot deserialize: %s", "invalid content");
+			goto error_decode;
+		case RC_WMORE:
+			GSETERROR(err, "Cannot deserialize: %s", "uncomplete content");
+			goto error_decode;
 	}
 	if (!result_asn)
 		goto error_decode;
@@ -327,8 +333,8 @@ meta2_maintenance_arrays_unmarshall_buffer(guint8 * buf, gsize buf_len, GError *
 	result_asn->list.free = free_OCTET_STRING;
 	ASN_STRUCT_FREE(asn_DEF_ArrayList, result_asn);
 	return result;
-      error_decode:
-      error_params:
+error_decode:
+error_params:
 	return NULL;
 }
 
@@ -341,7 +347,8 @@ meta2_maintenance_arrays_marshall(GSList * arrays, GError ** err)
 	asn_enc_rval_t encRet;
 	GByteArray *result = NULL;
 
-	int write_f(const void *b, gsize bSize, void *key) {
+	int write_f(const void *b, gsize bSize, void *key)
+	{
 		(void) key;
 		g_byte_array_append(result, b, bSize);
 		return 0;
@@ -362,7 +369,8 @@ meta2_maintenance_arrays_marshall(GSList * arrays, GError ** err)
 
 		if (!gba)
 			continue;
-		os = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING, (const char*)gba->data, gba->len);
+		os = OCTET_STRING_new_fromBuf(&asn_DEF_OCTET_STRING,
+			(const char *) gba->data, gba->len);
 		if (!os)
 			continue;
 		asn_set_add(&(list_asn.list), os);
@@ -378,7 +386,7 @@ meta2_maintenance_arrays_marshall(GSList * arrays, GError ** err)
 	ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_ArrayList, &list_asn);
 	return result;
 
-      error_encode:
+error_encode:
 	GSETERROR(err, "Failed to encode arrays");
 	return NULL;
 }
@@ -388,16 +396,19 @@ meta2_maintenance_arrays_marshall(GSList * arrays, GError ** err)
 
 
 GSList *
-meta2_maintenance_names_unmarshall_bytearray(GByteArray * encoded, GError ** err)
+meta2_maintenance_names_unmarshall_bytearray(GByteArray * encoded,
+	GError ** err)
 {
 	if (!encoded)
 		return NULL;
-	return meta2_maintenance_names_unmarshall_buffer(encoded->data, encoded->len, err);
+	return meta2_maintenance_names_unmarshall_buffer(encoded->data,
+		encoded->len, err);
 }
 
 
 GSList *
-meta2_maintenance_names_unmarshall_buffer(const guint8 * buf, gsize buf_len, GError ** err)
+meta2_maintenance_names_unmarshall_buffer(const guint8 * buf, gsize buf_len,
+	GError ** err)
 {
 	int i;
 	asn_dec_rval_t decRet;
@@ -411,16 +422,18 @@ meta2_maintenance_names_unmarshall_buffer(const guint8 * buf, gsize buf_len, GEr
 
 	/*decode the sequence */
 	codecCtx.max_stack_size = 0;
-	decRet = ber_decode(&codecCtx, &asn_DEF_ContentList, (void *) &result_asn, buf, buf_len);
+	decRet =
+		ber_decode(&codecCtx, &asn_DEF_ContentList, (void *) &result_asn, buf,
+		buf_len);
 	switch (decRet.code) {
-	case RC_OK:
-		break;
-	case RC_FAIL:
-		GSETERROR(err, "Cannot deserialize: %s", "invalid content");
-		goto error_decode;
-	case RC_WMORE:
-		GSETERROR(err, "Cannot deserialize: %s", "uncomplete content");
-		goto error_decode;
+		case RC_OK:
+			break;
+		case RC_FAIL:
+			GSETERROR(err, "Cannot deserialize: %s", "invalid content");
+			goto error_decode;
+		case RC_WMORE:
+			GSETERROR(err, "Cannot deserialize: %s", "uncomplete content");
+			goto error_decode;
 	}
 	if (!result_asn)
 		goto error_decode;
@@ -451,8 +464,8 @@ meta2_maintenance_names_unmarshall_buffer(const guint8 * buf, gsize buf_len, GEr
 	result_asn->list.free = free_OCTET_STRING;
 	ASN_STRUCT_FREE(asn_DEF_ContentList, result_asn);
 	return result;
-      error_decode:
-      error_params:
+error_decode:
+error_params:
 	return NULL;
 }
 
@@ -487,7 +500,8 @@ meta2_maintenance_names_marshall(GSList * contents, GError ** err)
 	asn_enc_rval_t encRet;
 	GByteArray *result = NULL;
 
-	int write_f(const void *b, gsize bSize, void *key) {
+	int write_f(const void *b, gsize bSize, void *key)
+	{
 		(void) key;
 		g_byte_array_append(result, b, bSize);
 		return 0;
@@ -524,7 +538,7 @@ meta2_maintenance_names_marshall(GSList * contents, GError ** err)
 	ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_ContentList, &list_asn);
 	return result;
 
-      error_encode:
+error_encode:
 	GSETERROR(err, "Failed to encode arrays");
 	return NULL;
 }
@@ -534,11 +548,13 @@ meta2_maintenance_names_marshall(GSList * contents, GError ** err)
 
 
 GByteArray *
-meta2_maintenance_marshall_content(struct meta2_raw_content_s * content, GError ** err)
+meta2_maintenance_marshall_content(struct meta2_raw_content_s * content,
+	GError ** err)
 {
 	asn_enc_rval_t encRet;
 	GByteArray *result = NULL;
 	Meta2RawContent_t asn1_content;
+
 	int write_f(const void *b, gsize bSize, void *key)
 	{
 		(void) key;
@@ -578,18 +594,19 @@ meta2_maintenance_marshall_content(struct meta2_raw_content_s * content, GError 
 	meta2_raw_content_cleanASN(&asn1_content, TRUE);
 	return result;
 
-      error_mapping:
-      error_encode:
+error_mapping:
+error_encode:
 	g_byte_array_free(result, 1);
-      error_byte_array:
+error_byte_array:
 	meta2_raw_content_cleanASN(&asn1_content, TRUE);
-      error_params:
+error_params:
 	return NULL;
 }
 
 
 struct meta2_raw_content_s *
-meta2_maintenance_content_unmarshall_buffer(guint8 * buf, gsize buf_size, GError ** err)
+meta2_maintenance_content_unmarshall_buffer(guint8 * buf, gsize buf_size,
+	GError ** err)
 {
 	asn_dec_rval_t decRet;
 	asn_codec_ctx_t codecCtx;
@@ -607,16 +624,18 @@ meta2_maintenance_content_unmarshall_buffer(guint8 * buf, gsize buf_size, GError
 
 	/*deserialize the encoded form */
 	codecCtx.max_stack_size = 0;
-	decRet = ber_decode(&codecCtx, &asn_DEF_Meta2RawContent, (void *) &asn1_content, buf, buf_size);
+	decRet =
+		ber_decode(&codecCtx, &asn_DEF_Meta2RawContent, (void *) &asn1_content,
+		buf, buf_size);
 	switch (decRet.code) {
-	case RC_OK:
-		break;
-	case RC_FAIL:
-		GSETERROR(err, "Cannot deserialize: %s", "invalid content");
-		goto error_decode;
-	case RC_WMORE:
-		GSETERROR(err, "Cannot deserialize: %s", "uncomplete content");
-		goto error_decode;
+		case RC_OK:
+			break;
+		case RC_FAIL:
+			GSETERROR(err, "Cannot deserialize: %s", "invalid content");
+			goto error_decode;
+		case RC_WMORE:
+			GSETERROR(err, "Cannot deserialize: %s", "uncomplete content");
+			goto error_decode;
 	}
 
 	/*map the ASN.1 in a common structure */
@@ -629,29 +648,32 @@ meta2_maintenance_content_unmarshall_buffer(guint8 * buf, gsize buf_size, GError
 	meta2_raw_content_cleanASN(asn1_content, FALSE);
 	return result;
 
-      error_mapping:
-      error_decode:
+error_mapping:
+error_decode:
 	meta2_raw_content_cleanASN(asn1_content, FALSE);
-      error_content:
-      error_params:
+error_content:
+error_params:
 	return NULL;
 }
 
 struct meta2_raw_content_s *
-meta2_maintenance_content_unmarshall_bytearray(GByteArray * encoded_content, GError ** err)
+meta2_maintenance_content_unmarshall_bytearray(GByteArray * encoded_content,
+	GError ** err)
 {
 	if (!encoded_content || !encoded_content->data || encoded_content->len <= 0) {
 		return NULL;
 	}
 
-	return meta2_maintenance_content_unmarshall_buffer(encoded_content->data, encoded_content->len, err);
+	return meta2_maintenance_content_unmarshall_buffer(encoded_content->data,
+		encoded_content->len, err);
 }
 
 
 /* ------------------------------------------------------------------------- */
 
 gboolean
-strings_concat(GError ** err, gpointer udata, gint code, guint8 * body, gsize bodySize)
+strings_concat(GError ** err, gpointer udata, gint code, guint8 * body,
+	gsize bodySize)
 {
 	(void) code;
 	GSList **resL, *list;
@@ -672,4 +694,3 @@ strings_concat(GError ** err, gpointer udata, gint code, guint8 * body, gsize bo
 	*resL = g_slist_concat(*resL, list);
 	return TRUE;
 }
-

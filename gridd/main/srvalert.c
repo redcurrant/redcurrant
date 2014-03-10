@@ -1,36 +1,20 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef __SRV_ALERT_HANDLER_H__
-# define __SRV_ALERT_HANDLER_H__
+#define __SRV_ALERT_HANDLER_H__
 
 #include <stdlib.h>
 #include <string.h>
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
 #include "./message_handler.h"
 #include "./srvalert.h"
 
 /*dummy alert handler*/
 
 static int
-srv_dumy_alert_handler(void *user_data, const char *id, const char *criticity, const char *msg)
+srv_dumy_alert_handler(void *user_data, const char *id, const char *criticity,
+	const char *msg)
 {
-	(void)user_data;
+	(void) user_data;
 	ALERT_DOMAIN((id ? id : "alert"), "%s:%s", criticity, msg);
 	return 1;
 }
@@ -74,7 +58,8 @@ srv_send_alert(const char *id, const char *criticity, const char *msg)
 }
 
 int
-srv_send_valert(const char *id, const char *criticity, const char *fmt, va_list args)
+srv_send_valert(const char *id, const char *criticity, const char *fmt,
+	va_list args)
 {
 	char formatted_msg[8192];
 

@@ -1,27 +1,14 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef __SERVER_INTERNALS_H__
-# define __SERVER_INTERNALS_H__
+#define __SERVER_INTERNALS_H__
 
 #include <glib.h>
+#include <gridd/main/message_handler.h>
+#include <gridd/main/sock.h>
+
 
 #define NAME_GENERAL "General"
 #define NAME_SERVICE "Service"
+#define NAME_SERVICETAGS "ServiceTags"
 #define NAME_SRV_TYPE "type"
 #define NAME_NAMESPACE "namespace"
 #define NAME_REGISTER "register"
@@ -56,10 +43,8 @@
 
 #define GET_NS_INFO_RETRY_DELAY 10
 
-#include "./message_handler.h"
-#include "./sock.h"
-
-struct buffer_s {
+struct buffer_s
+{
 	guint8 *buf;
 	gsize size;
 	gsize offset;
@@ -67,13 +52,14 @@ struct buffer_s {
 
 
 /*message handlers, loaded from plugins*/
-struct message_handler_s {
-	gchar                     name[SIZE_MSGHANDLERNAME];
-	message_matcher_f         matcher;
-	message_handler_f         handler;
-	gpointer                  udata;
+struct message_handler_s
+{
+	gchar name[SIZE_MSGHANDLERNAME];
+	message_matcher_f matcher;
+	message_handler_f handler;
+	gpointer udata;
 	struct message_handler_s *next;
-	message_handler_v2_f	  handler_v2;
+	message_handler_v2_f handler_v2;
 };
 
 #define CHECK_WORKER_COUNTERS(Min,Max,MinSpare,MaxSpare) do {\
@@ -86,48 +72,49 @@ struct message_handler_s {
 } while (0)
 
 
-struct thread_monitoring_s {
-	gint nb_workers;        /* gauge */
-	gint used_workers;      /* gauge */
-	gint max_workers;       /* gauge */
-	gint max_spare_workers; /* gauge */
-	gint min_spare_workers; /* gauge */
-	gint min_workers;       /* gauge */
+struct thread_monitoring_s
+{
+	gint nb_workers;			/* gauge */
+	gint used_workers;			/* gauge */
+	gint max_workers;			/* gauge */
+	gint max_spare_workers;		/* gauge */
+	gint min_spare_workers;		/* gauge */
+	gint min_workers;			/* gauge */
 
 	/* for stats purposes */
-	guint64 max_reached;       /* counter */
-	guint64 wake;              /* counter */
-	guint64 creation;          /* counter */
-	guint64 destruction;       /* counter */
+	guint64 max_reached;		/* counter */
+	guint64 wake;				/* counter */
+	guint64 creation;			/* counter */
+	guint64 destruction;		/* counter */
 };
 
 
-struct alert_cfg_s {
+struct alert_cfg_s
+{
 	time_t last_sent;
 	time_t frequency;
 };
 
 
 /*servers and the message handlers used by them*/
-typedef struct server_s {
-	/*used to chain the servers*/
+typedef struct server_s
+{
+	/*used to chain the servers */
 	struct server_s *next;
-	/**/
-	GStaticRecMutex recMutex;
+	         /**/ GStaticRecMutex recMutex;
 	struct thread_monitoring_s mon;
 	struct thread_monitoring_s mon0;
-	/**/
-	gchar name[SIZE_SRVNAME];
+	                    /**/ gchar name[SIZE_SRVNAME];
 	ACCEPT_POOL ap;
 	gint to_connection;
 	gint to_operation;
 	struct message_handler_s **handlers;
 	gint nbHandlers;
-	/**/
-	struct alert_cfg_s alert_cfg;
-} *SERVER;
+	     /**/ struct alert_cfg_s alert_cfg;
+}       *SERVER;
 
-struct server_stats_s {
+struct server_stats_s
+{
 	guint64 total;
 	guint64 created;
 	guint64 stopped;
@@ -137,9 +124,6 @@ struct server_stats_s {
 extern char *config_file;
 extern char *log4c_file;
 extern char *pid_file;
-
-extern volatile gboolean may_continue;
-extern volatile gboolean must_daemonize;
 
 extern gsize default_to_operation;
 extern gsize default_to_connection;
@@ -152,7 +136,7 @@ extern struct server_s BEACON_SRV;
 
 /* NEW WAY INFORMATION */
 extern gboolean old_style;
-extern gchar* service_type;
+extern gchar *service_type;
 extern gboolean rec_service;
 extern gboolean load_ns_info;
 extern namespace_info_t *ns_info;

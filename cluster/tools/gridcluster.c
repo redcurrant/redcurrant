@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "gridcluster.tools"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gridcluster.tools"
 #endif
 
 #define _GNU_SOURCE
@@ -30,10 +10,9 @@
 #include <getopt.h>
 #include <unistd.h>
 
-#include "../../metautils/lib/metautils.h"
-#include "../../metautils/lib/svc_policy.h"
-#include "../lib/gridcluster.h"
-#include "../remote/gridcluster_remote.h"
+#include <metautils/lib/metautils.h>
+#include <cluster/lib/gridcluster.h>
+#include <cluster/remote/gridcluster_remote.h>
 
 #ifdef HAVE_DEBUG
 static void
@@ -47,16 +26,16 @@ prompt(void)
 #endif
 
 static void
-gba_write(int fd, GByteArray *gba)
+gba_write(int fd, GByteArray * gba)
 {
 	gsize written;
 	gssize w;
 
-	for (written=0; written < gba->len ;written+=w) {
-		w = write(fd, gba->data+written, gba->len-written);
-		if (w==0)
+	for (written = 0; written < gba->len; written += w) {
+		w = write(fd, gba->data + written, gba->len - written);
+		if (w == 0)
 			break;
-		if (w<0) {
+		if (w < 0) {
 			g_printerr("write error : errno=%d (%s)", errno, strerror(errno));
 			return;
 		}
@@ -68,24 +47,42 @@ static void
 usage(void)
 {
 	g_printerr("Usage: gridcluster [OPTION]... <NAMESPACE>...\n\n");
-	g_printerr("  %-20s\t%s\n", "--errors,                 -e", "Shows erroneous container identifiers");
-	g_printerr("  %-20s\t%s\n", "--clear-services SERVICE    ", "Clear all local RAWX reference in cluster.");
-	g_printerr("  %-20s\t%s\n", "--clear-errors              ", "Clear all local erroneous containers references in the cluster");
-	g_printerr("  %-20s\t%s\n", "--config,                 -c", "Dump the event management configuration for the given namespace");
-	g_printerr("  %-20s\t%s\n", "--full,                     ", "Show full services.");
-	g_printerr("  %-20s\t%s\n", "--lb-config SRVTYPE,        ", "Prints to stdout the namespace LB configuration ");
-	g_printerr("  %-20s\t%s\n", "--local-cfg,              -A", "Prints to stdout the namespaces configuration values locally configured");
-	g_printerr("  %-20s\t%s\n", "--local-ns,               -L", "Prints to stdout the namespaces locally configured");
-	g_printerr("  %-20s\t%s\n", "--local-srv               -l", "List local services monitored on this server.");
-	g_printerr("  %-20s\t%s\n", "--local-tasks,            -t", "List internal tasks scheduled on this server.");
-	g_printerr("  %-20s\t%s\n", "--raw,                    -r", "Output in parsable mode.");
-	g_printerr("  %-20s\t%s\n", "--rules,                  -R", "Dump the logic rules path for the given namespace");
-	g_printerr("  %-20s\t%s\n", "--rules-path,             -P", "Dump the logic rules for the given namespace");
-	g_printerr("  %-20s\t%s\n", "--service <service desc>, -S", "Select service described by desc.");
-	g_printerr("  %-20s\t%s\n", "--set-score <[0..100]>      ", "Set and lock score for the service specified by -S.");
-	g_printerr("  %-20s\t%s\n", "--show,                   -s", "Show elements of the cluster.");
-	g_printerr("  %-20s\t%s\n", "--unlock-score              ", "Unlock score for the service specified by -S.");
-	g_printerr("  %-20s\t%s\n", "--verbose,                -v", "Activate log4c logging");
+	g_printerr("  %-20s\t%s\n", "--errors,                 -e",
+		"Shows erroneous container identifiers");
+	g_printerr("  %-20s\t%s\n", "--clear-services SERVICE    ",
+		"Clear all local RAWX reference in cluster.");
+	g_printerr("  %-20s\t%s\n", "--clear-errors              ",
+		"Clear all local erroneous containers references in the cluster");
+	g_printerr("  %-20s\t%s\n", "--config,                 -c",
+		"Dump the event management configuration for the given namespace");
+	g_printerr("  %-20s\t%s\n", "--full,                     ",
+		"Show full services.");
+	g_printerr("  %-20s\t%s\n", "--lb-config SRVTYPE,        ",
+		"Prints to stdout the namespace LB configuration ");
+	g_printerr("  %-20s\t%s\n", "--local-cfg,              -A",
+		"Prints to stdout the namespaces configuration values locally configured");
+	g_printerr("  %-20s\t%s\n", "--local-ns,               -L",
+		"Prints to stdout the namespaces locally configured");
+	g_printerr("  %-20s\t%s\n", "--local-srv               -l",
+		"List local services monitored on this server.");
+	g_printerr("  %-20s\t%s\n", "--local-tasks,            -t",
+		"List internal tasks scheduled on this server.");
+	g_printerr("  %-20s\t%s\n", "--raw,                    -r",
+		"Output in parsable mode.");
+	g_printerr("  %-20s\t%s\n", "--rules,                  -R",
+		"Dump the logic rules path for the given namespace");
+	g_printerr("  %-20s\t%s\n", "--rules-path,             -P",
+		"Dump the logic rules for the given namespace");
+	g_printerr("  %-20s\t%s\n", "--service <service desc>, -S",
+		"Select service described by desc.");
+	g_printerr("  %-20s\t%s\n", "--set-score <[0..100]>      ",
+		"Set and lock score for the service specified by -S.");
+	g_printerr("  %-20s\t%s\n", "--show,                   -s",
+		"Show elements of the cluster.");
+	g_printerr("  %-20s\t%s\n", "--unlock-score              ",
+		"Unlock score for the service specified by -S.");
+	g_printerr("  %-20s\t%s\n", "--verbose,                -v",
+		"Activate log4c logging");
 }
 
 static void
@@ -115,7 +112,7 @@ print_formated_errors(GSList * l)
 }
 
 static void
-print_formatted_hashtable(GHashTable *ht, const gchar *name)
+print_formatted_hashtable(GHashTable * ht, const gchar * name)
 {
 	GHashTableIter iterator;
 	gpointer k, v;
@@ -125,8 +122,26 @@ print_formatted_hashtable(GHashTable *ht, const gchar *name)
 
 	g_hash_table_iter_init(&iterator, ht);
 	while (g_hash_table_iter_next(&iterator, &k, &v))
-		g_print("%20s : %s = %.*s\n", name, (gchar*)k, ((GByteArray*)v)->len,
-				(gchar*)(((GByteArray*)v)->data));
+		g_print("%20s : %s = %.*s\n", name, (gchar *) k,
+			((GByteArray *) v)->len, (gchar *) (((GByteArray *) v)->data));
+}
+
+static void
+print_formatted_slist(GSList * slist, const gchar * name)
+{
+	guint n_elements = g_slist_length(slist);
+	guint i;
+	gchar *list_elements[n_elements + 1];
+	gchar *result_string;
+
+	if (n_elements > 0) {
+		for (i = 0; i < n_elements; i++)
+			list_elements[i] = (gchar *) (g_slist_nth(slist, i)->data);
+		list_elements[n_elements] = NULL;
+		result_string = g_strjoinv(",", list_elements);
+		g_print("%20s : %s\n", name, result_string);
+		g_free(result_string);
+	}
 }
 
 static void
@@ -136,12 +151,14 @@ print_formated_namespace(namespace_info_t * ns)
 	g_print("NAMESPACE INFORMATION\n");
 	g_print("\n");
 	g_print("%20s : %s\n", "Name", ns->name);
-	g_print("%20s : %"G_GINT64_FORMAT" bytes\n", "Chunk size", ns->chunk_size);
+	g_print("%20s : %" G_GINT64_FORMAT " bytes\n", "Chunk size",
+		ns->chunk_size);
 
 	print_formatted_hashtable(ns->options, "Option");
 	print_formatted_hashtable(ns->storage_policy, "Storage Policy");
 	print_formatted_hashtable(ns->data_security, "Data Security");
 	print_formatted_hashtable(ns->data_treatments, "Data Treatments");
+	print_formatted_slist(ns->writable_vns, "Writable VNS");
 
 	g_print("\n");
 }
@@ -149,17 +166,18 @@ print_formated_namespace(namespace_info_t * ns)
 static void
 raw_print_namespace(namespace_info_t * ns)
 {
-	g_print("NAMESPACE|%s|%"G_GINT64_FORMAT"\n", ns->name, ns->chunk_size);
+	g_print("NAMESPACE|%s|%" G_GINT64_FORMAT "\n", ns->name, ns->chunk_size);
 }
 
 static void
 print_formated_services(const gchar * ns, const gchar * type, GSList * services)
 {
-	(void)ns;
+	(void) ns;
 	g_print("\n-- %s --\n", type);
 
 	if (services) {
 		GSList *l;
+
 		for (l = services; l; l = l->next) {
 			struct service_info_s *si;
 			char str_score[32];
@@ -191,7 +209,8 @@ print_raw_services(const gchar * ns, const gchar * type, GSList * services)
 			continue;
 		addr_info_to_string(&(si->addr), str_addr, sizeof(str_addr));
 		g_snprintf(str_score, sizeof(str_score), "%d", si->score.value);
-		g_print("%s|%s|%s|score=%d", ns ? ns : si->ns_name, type ? type : si->type, str_addr, si->score.value);
+		g_print("%s|%s|%s|score=%d", ns ? ns : si->ns_name,
+			type ? type : si->type, str_addr, si->score.value);
 		if (si->tags) {
 			int i, max;
 			struct service_tag_s *tag;
@@ -199,7 +218,8 @@ print_raw_services(const gchar * ns, const gchar * type, GSList * services)
 
 			for (i = 0, max = si->tags->len; i < max; i++) {
 				tag = g_ptr_array_index(si->tags, i);
-				service_tag_to_string(tag, str_tag_value, sizeof(str_tag_value));
+				service_tag_to_string(tag, str_tag_value,
+					sizeof(str_tag_value));
 				g_print("|%s=%s", tag->name, str_tag_value);
 			}
 		}
@@ -216,14 +236,15 @@ raw_print_list_task(GSList * tasks)
 	for (le = tasks; le && le->data; le = le->next) {
 		task = (struct task_s *) le->data;
 
-		g_print("%s|%li|%s\n", task->id, task->next_schedule, task->busy ? "running" : "waiting");
+		g_print("%s|%li|%s\n", task->id, task->next_schedule,
+			task->busy ? "running" : "waiting");
 	}
 }
 
 static int
 set_service_score(const char *service_desc, int score, GError ** error)
 {
-	int rc=0, nb_match;
+	int rc = 0, nb_match;
 	struct service_info_s *si = NULL;
 	char *ns_name = NULL;
 	char *service_type = NULL;
@@ -234,9 +255,13 @@ set_service_score(const char *service_desc, int score, GError ** error)
 	GSList *list = NULL;
 	GHashTable *ns_hash = NULL;
 
-	nb_match = sscanf(service_desc, "%a[^|]|%a[^|]|%a[^:]:%i|%as", &ns_name, &service_type, &service_ip, &service_port, &remaining);
+	nb_match =
+		sscanf(service_desc, "%a[^|]|%a[^|]|%a[^:]:%i|%as", &ns_name,
+		&service_type, &service_ip, &service_port, &remaining);
 	if (nb_match < 4) {
-		GSETERROR(error, "Failed to scan service desc in string [%s] : only %d patterns", service_desc, nb_match);
+		GSETERROR(error,
+			"Failed to scan service desc in string [%s] : only %d patterns",
+			service_desc, nb_match);
 		goto exit_label;
 	}
 
@@ -248,7 +273,8 @@ set_service_score(const char *service_desc, int score, GError ** error)
 
 	cluster_addr = g_hash_table_lookup(ns_hash, ns_name);
 	if (!cluster_addr) {
-		GSETERROR(error, "Could not find a cluster addr for namespace [%s]", ns_name);
+		GSETERROR(error, "Could not find a cluster addr for namespace [%s]",
+			ns_name);
 		goto exit_label;
 	}
 
@@ -259,7 +285,8 @@ set_service_score(const char *service_desc, int score, GError ** error)
 	}
 
 	if (!service_info_set_address(si, service_ip, service_port, error)) {
-		GSETERROR(error, "Invalid service address ip=%s port=%i", service_ip, service_port);
+		GSETERROR(error, "Invalid service address ip=%s port=%i", service_ip,
+			service_port);
 		goto exit_label;
 	}
 
@@ -276,7 +303,7 @@ set_service_score(const char *service_desc, int score, GError ** error)
 
 	if (!rc)
 		GSETERROR(error, "Failed to lock the service");
-      exit_label:
+exit_label:
 	if (remaining)
 		free(remaining);
 	if (ns_name)
@@ -286,7 +313,7 @@ set_service_score(const char *service_desc, int score, GError ** error)
 	if (service_ip)
 		free(service_ip);
 	if (si)
-		g_free(si);
+		service_info_clean(si);
 	if (ns_hash)
 		g_hash_table_destroy(ns_hash);
 	return rc;
@@ -302,7 +329,8 @@ enable_debug(void)
 		return;
 
 	if (log4c_init())
-		g_printerr("GS_DEBUG_ENABLE environment variable is set but Log4c init failed\n");
+		g_printerr
+			("GS_DEBUG_ENABLE environment variable is set but Log4c init failed\n");
 }
 
 int
@@ -334,42 +362,39 @@ main(int argc, char **argv)
 	char service_desc[512], cid_str[128];
 	namespace_info_t *ns = NULL;
 	GError *error = NULL;
+
 	static struct option long_options[] = {
-		{"config",         0, 0, 'c'},
-		{"rules-path",     0, 0, 'P'},
-		{"rules",          0, 0, 'R'},
+		{"config", 0, 0, 'c'},
+		{"rules-path", 0, 0, 'P'},
+		{"rules", 0, 0, 'R'},
 		{"clear-services", 1, 0, 'C'},
-		{"set-score",      1, 0, 4},
-		{"unlock-score",   0, 0, 5},
-		{"clear-errors",   0, 0, 6},
-		{"service",        1, 0, 'S'},
-		{"local-cfg",      0, 0, 'A'},
-		{"local-ns",       0, 0, 'L'},
-		{"local-srv",      0, 0, 'l'},
-		{"local-tasks",    0, 0, 't'},
-		{"show",           0, 0, 's'},
-		{"raw",            0, 0, 'r'},
-		{"full",           0, 0, 7},
-		{"help",           0, 0, 'h'},
-		{"errors",         0, 0, 'e'},
-		{"verbose",        0, 0, 'v'},
-		{"lb-config",      1, 0, 'B'},
+		{"set-score", 1, 0, 4},
+		{"unlock-score", 0, 0, 5},
+		{"clear-errors", 0, 0, 6},
+		{"service", 1, 0, 'S'},
+		{"local-cfg", 0, 0, 'A'},
+		{"local-ns", 0, 0, 'L'},
+		{"local-srv", 0, 0, 'l'},
+		{"local-tasks", 0, 0, 't'},
+		{"show", 0, 0, 's'},
+		{"raw", 0, 0, 'r'},
+		{"full", 0, 0, 7},
+		{"help", 0, 0, 'h'},
+		{"errors", 0, 0, 'e'},
+		{"verbose", 0, 0, 'v'},
+		{"lb-config", 1, 0, 'B'},
 		{0, 0, 0, 0}
 	};
 
-	/* TODO refactor with grid_common_main */
-	if (!g_thread_supported ())
-		g_thread_init (NULL);
-	g_log_set_default_handler(logger_stderr, NULL);
-	g_set_prgname(argv[0]);
-	logger_init_level(GRID_LOGLVL_INFO);
-	logger_reset_level();
+	HC_PROC_INIT(argv, GRID_LOGLVL_INFO);
 
 	memset(service_desc, '\0', sizeof(service_desc));
 	memset(cid_str, 0x00, sizeof(cid_str));
 	enable_debug();
 
-	while ((c = getopt_long(argc, argv, "ALsveltrcP:B:R:C:S:h?", long_options, &option_index)) > -1) {
+	while ((c =
+			getopt_long(argc, argv, "ALsveltrcP:B:R:C:S:h?", long_options,
+				&option_index)) > -1) {
 
 		switch (c) {
 			case 'A':
@@ -377,25 +402,29 @@ main(int argc, char **argv)
 				break;
 			case 'B':
 				has_lbconfig = TRUE;
-				g_strlcpy(service_desc, optarg, sizeof(service_desc)-1);
+				g_strlcpy(service_desc, optarg, sizeof(service_desc) - 1);
 				break;
 			case 'L':
 				has_nslist = TRUE;
 				break;
 			case 'P':
 				if (!optarg) {
-					g_printerr("The option '-P' requires an argument. Try %s -h\n", argv[0]);
+					g_printerr
+						("The option '-P' requires an argument. Try %s -h\n",
+						argv[0]);
 					abort();
 				}
-				g_strlcpy(service_desc, optarg, sizeof(service_desc)-1);
+				g_strlcpy(service_desc, optarg, sizeof(service_desc) - 1);
 				has_rules_path = TRUE;
 				break;
 			case 'R':
 				if (!optarg) {
-					g_printerr("The option '-R' requires an argument. Try %s -h\n", argv[0]);
+					g_printerr
+						("The option '-R' requires an argument. Try %s -h\n",
+						argv[0]);
 					abort();
 				}
-				g_strlcpy(service_desc, optarg, sizeof(service_desc)-1);
+				g_strlcpy(service_desc, optarg, sizeof(service_desc) - 1);
 				has_rules = TRUE;
 				break;
 			case 'c':
@@ -403,10 +432,12 @@ main(int argc, char **argv)
 				break;
 			case 'C':
 				if (!optarg) {
-					g_printerr("The option '-C' requires an argument. Try %s -h\n", argv[0]);
+					g_printerr
+						("The option '-C' requires an argument. Try %s -h\n",
+						argv[0]);
 					abort();
 				}
-				g_strlcpy(service_desc, optarg, sizeof(service_desc)-1);
+				g_strlcpy(service_desc, optarg, sizeof(service_desc) - 1);
 				has_clear_services = TRUE;
 				break;
 			case 4:
@@ -426,10 +457,12 @@ main(int argc, char **argv)
 			case 'S':
 				has_service = TRUE;
 				if (!optarg) {
-					g_printerr("The option '-S' requires an argument. Try %s -h\n", argv[0]);
+					g_printerr
+						("The option '-S' requires an argument. Try %s -h\n",
+						argv[0]);
 					abort();
 				}
-				g_strlcpy(service_desc, optarg, sizeof(service_desc)-1);
+				g_strlcpy(service_desc, optarg, sizeof(service_desc) - 1);
 				break;
 			case 'e':
 				has_erroneous_containers = TRUE;
@@ -465,18 +498,20 @@ main(int argc, char **argv)
 		GHashTable *ht_cfg = gridcluster_parse_config();
 		GHashTableIter iter;
 		gpointer k, v;
+
 		g_hash_table_iter_init(&iter, ht_cfg);
 		while (g_hash_table_iter_next(&iter, &k, &v))
-			g_print("%s=%s\n", (gchar*)k, (gchar*)v);
+			g_print("%s=%s\n", (gchar *) k, (gchar *) v);
 		g_hash_table_destroy(ht_cfg);
 		goto exit_label;
 	}
 
 	if (has_nslist) {
 		gchar **pns, **allns;
+
 		allns = gridcluster_list_ns();
-		for (pns=allns; *pns ;pns++)
-			g_print("%s\n",*pns);
+		for (pns = allns; *pns; pns++)
+			g_print("%s\n", *pns);
 		g_strfreev(allns);
 		goto exit_label;
 	}
@@ -500,32 +535,35 @@ main(int argc, char **argv)
 	if (has_lbconfig) {
 		GError *err = NULL;
 		struct service_update_policies_s *pol;
-		gchar *cfg;
-
-		cfg = gridcluster_get_service_update_policy(ns, service_desc);
+		GHashTable *cfg =
+			gridcluster_get_service_update_policy(ns, service_desc);
 		if (!cfg) {
 			g_printerr("Invalid NSINFO/SRVTYPE\n");
 			goto exit_label;
 		}
 
 		pol = service_update_policies_create();
-		err = service_update_reconfigure(pol, cfg);
-		g_free(cfg);
+		err =
+			service_update_reconfigure(pol, g_hash_table_lookup(cfg,
+				namespace));
+		g_hash_table_destroy(cfg);
 		if (err) {
 			g_printerr("Invalid namespace configuration : (%d) %s\n",
-					err->code, err->message);
+				err->code, err->message);
 			service_update_policies_destroy(pol);
 			g_clear_error(&err);
 			goto exit_label;
 		}
+		char *tmp = NULL;
 
-		cfg = service_update_policies_dump(pol);
-		g_print("%s\n", cfg);
-		g_free(cfg);
+		tmp = service_update_policies_dump(pol);
+		g_print("%s\n", tmp);
+		g_free(tmp);
 		service_update_policies_destroy(pol);
 	}
 	else if (has_rules_path) {
 		gchar *path = NULL;
+
 		if (!namespace_get_rules_path(namespace, service_desc, &path, &error)) {
 			g_printerr("Failed to get namespace rules :\n");
 			g_printerr("%s\n", error->message);
@@ -537,7 +575,8 @@ main(int argc, char **argv)
 		}
 	}
 	else if (has_rules) {
-		GByteArray *gba_rules = namespace_get_rules(namespace, service_desc, &error);
+		GByteArray *gba_rules =
+			namespace_get_rules(namespace, service_desc, &error);
 		if (!gba_rules) {
 			g_printerr("Failed to get namespace rules :\n");
 			g_printerr("%s\n", error->message);
@@ -548,8 +587,10 @@ main(int argc, char **argv)
 	}
 	else if (has_config) {
 		GByteArray *gba_config = event_get_configuration(namespace, &error);
+
 		if (!gba_config) {
-			g_printerr("No event configuration found for namespace '%s'", namespace);
+			g_printerr("No event configuration found for namespace '%s'",
+				namespace);
 			goto exit_label;
 		}
 		gba_write(1, gba_config);
@@ -558,25 +599,29 @@ main(int argc, char **argv)
 	else if (has_clear_services) {
 
 		if (!clear_namespace_services(namespace, service_desc, &error)) {
-			g_printerr("Failed to send clear order to cluster for ns='%s' and service='%s' :\n", namespace,
-					service_desc);
+			g_printerr
+				("Failed to send clear order to cluster for ns='%s' and service='%s' :\n",
+				namespace, service_desc);
 			g_printerr("%s\n", error->message);
 			goto exit_label;
 		}
 		else {
-			g_print("CLEAR order successfully sent to cluster for ns='%s' and service='%s'.\n", namespace,
-					service_desc);
+			g_print
+				("CLEAR order successfully sent to cluster for ns='%s' and service='%s'.\n",
+				namespace, service_desc);
 		}
 
 	}
 	else if (has_clear_errors) {
 
 		if (!flush_erroneous_elements(namespace, &error)) {
-			g_printerr("Failed to clear the erroneous conntainers :\n%s\n", error->message);
+			g_printerr("Failed to clear the erroneous conntainers :\n%s\n",
+				error->message);
 			goto exit_label;
 		}
 		else {
-			g_print("CLEAR ERRONEOUS CONTAINERS order successfully sent to cluster.\n");
+			g_print
+				("CLEAR ERRONEOUS CONTAINERS order successfully sent to cluster.\n");
 		}
 
 	}
@@ -614,16 +659,20 @@ main(int argc, char **argv)
 			goto exit_label;
 		}
 
-		if (!set_service_score(service_desc, has_unlock_score ? -1 : score, &error)) {
+		if (!set_service_score(service_desc, has_unlock_score ? -1 : score,
+				&error)) {
 			g_printerr("Failed to set score of service [%s] :\n", service_desc);
 			g_printerr("%s\n", error->message);
 			goto exit_label;
 		}
 
 		if (has_unlock_score)
-			g_print("Service [%s] score has been successfully unlocked\n", service_desc);
+			g_print("Service [%s] score has been successfully unlocked\n",
+				service_desc);
 		else
-			g_print("Score of service [%s] has been successfully locked to %d\n", service_desc, score);
+			g_print
+				("Score of service [%s] has been successfully locked to %d\n",
+				service_desc, score);
 
 	}
 	else if (has_erroneous_containers) {
@@ -632,8 +681,10 @@ main(int argc, char **argv)
 		errCID = fetch_erroneous_containers(namespace, &error);
 		if (!errCID) {
 			if (error) {
-				g_printerr("Failed to get the list of the erroneous containers\n");
-				g_printerr("Cause: %s\n", error->message ? error->message : error->message);
+				g_printerr
+					("Failed to get the list of the erroneous containers\n");
+				g_printerr("Cause: %s\n",
+					error->message ? error->message : error->message);
 				goto exit_label;
 			}
 		}
@@ -653,17 +704,20 @@ main(int argc, char **argv)
 		else
 			print_formated_namespace(ns);
 
-		gchar *csurl = gridcluster_get_config(namespace, "conscience", GCLUSTER_CFG_LOCAL);
+		gchar *csurl =
+			gridcluster_get_config(namespace, "conscience", GCLUSTER_CFG_LOCAL);
 
 		if (!csurl) {
 			g_printerr("No conscience address known for [%s]\n", namespace);
 			goto exit_label;
 		}
-		GSList *services_types = list_namespace_service_types(namespace, &error);
+		GSList *services_types =
+			list_namespace_service_types(namespace, &error);
 
 		if (!services_types) {
 			if (error) {
-				g_printerr("Failed to get the services list: %s\n", gerror_get_message(error));
+				g_printerr("Failed to get the services list: %s\n",
+					gerror_get_message(error));
 				goto exit_label;
 			}
 			else {
@@ -673,23 +727,23 @@ main(int argc, char **argv)
 		else {
 			GSList *st;
 
-			/* DEBUG("[%d] service types found", g_slist_length(services_types)); */
-
 			for (st = services_types; st; st = st->next) {
 				GSList *list_services = NULL;
 				gchar *str_type = st->data;
 
 				/* Generate the list */
 				if (!has_flag_full || !has_raw) {
-					list_services = list_namespace_services(namespace, str_type, &error);
+					list_services =
+						list_namespace_services(namespace, str_type, &error);
 				}
 				else {
 					struct metacnx_ctx_s cnx;
+
 					metacnx_clear(&cnx);
 					if (metacnx_init_with_url(&cnx, csurl, &error)) {
 						if (metacnx_open(&cnx, &error)) {
 							list_services = gcluster_get_services_full(&cnx,
-									str_type, &error);
+								str_type, &error);
 							metacnx_close(&cnx);
 						}
 					}
@@ -697,17 +751,16 @@ main(int argc, char **argv)
 
 				/* Dump the list */
 				if (error && !list_services) {
-					g_printerr("No service known for namespace %s and service type %s : %s\n",
-							namespace, str_type, gerror_get_message(error));
+					g_printerr
+						("No service known for namespace %s and service type %s : %s\n",
+						namespace, str_type, gerror_get_message(error));
 				}
 				else {
-					/* DEBUG("[%d] services found for type [%s] in namespace [%s]",
-							g_slist_length(list_services), str_type, namespace); */
-
 					if (has_raw)
 						print_raw_services(namespace, str_type, list_services);
 					else
-						print_formated_services(namespace, str_type, list_services);
+						print_formated_services(namespace, str_type,
+							list_services);
 				}
 
 				if (error)

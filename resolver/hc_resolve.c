@@ -1,59 +1,61 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "grid.sqlx.resolve"
+#define G_LOG_DOMAIN "grid.sqlx.resolve"
 #endif
 
-#include <glib.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-#include "../metautils/lib/hc_url.h"
-#include "../metautils/lib/loggers.h"
-#include "../metautils/lib/hashstr.h"
-#include "../metautils/lib/common_main.h"
-#include "./hc_resolver.h"
+#include <resolver/hc_resolver_internals.h>
+#include <metautils/lib/metautils.h>
 #include "./hc_resolver_internals.h"
 
 static GSList *url_list = NULL;
 
 static void
-hcres_action(void)
+_action(struct hc_resolver_s *resolver)
 {
-	GSList *l;
-	struct hc_resolver_s *resolver;
-
-	resolver = hc_resolver_create();
-
-	for (l=url_list; l ;l=l->next) {
+	for (GSList * l = url_list; l; l = l->next) {
 		struct hc_url_s *url = l->data;
 		gchar **u, **urlv = NULL;
 		GError *err;
 
-		err = hc_resolve_reference_service(resolver, url, "meta1", &urlv);
+		err = hc_resolve_reference_service(resolver, url, "meta2", &urlv);
 		if (err) {
 			g_printerr("Resolution error : (%d) %s\n", err->code, err->message);
 			g_error_free(err);
 			return;
 		}
 
-		for (u=urlv; *u ;u++)
+		for (u = urlv; *u; u++)
 			g_print("%s\n", *u);
 		g_strfreev(urlv);
-	} while (0);
+	}
+}
+
+static void
+hcres_action(void)
+{
+	struct hc_resolver_s *resolver = hc_resolver_create1(0);
+
+	hc_resolver_set_ttl_csm0(resolver, 0);
+	hc_resolver_set_ttl_services(resolver, 1);
+
+	hc_resolver_set_now(resolver, 0);
+	_action(resolver);			// M0 + M1 loaded
+	_action(resolver);			// everything is cached
+
+	hc_resolver_set_now(resolver, 2);
+	_action(resolver);			// everything is cached, expire not called, noatime not set
+	hc_resolver_expire(resolver);	// M0 kept, M1 kept (no noatime)
+	_action(resolver);			// everything is cached
+
+	hc_resolver_set_now(resolver, 4);
+	hc_resolver_expire(resolver);	// M0 kept, M1 dropped
+	_action(resolver);			// M1 reloaded
+	_action(resolver);			// everything is cached
+
+	// you should notice 1 call to meta0 and 2 calls to meta1
 
 	hc_resolver_destroy(resolver);
 }
@@ -62,7 +64,7 @@ static struct grid_main_option_s *
 hcres_get_options(void)
 {
 	static struct grid_main_option_s hcres_options[] = {
-		{NULL, 0, {.i=0}, NULL}
+		{NULL, 0, {.i = 0}, NULL}
 	};
 
 	return hcres_options;
@@ -107,8 +109,9 @@ hcres_configure(int argc, char **argv)
 		return FALSE;
 	}
 
-	for (; argc>0 && *argv ;argv++,argc--) {
+	for (; argc > 0 && *argv; argv++, argc--) {
 		struct hc_url_s *url = hc_url_init(*argv);
+
 		if (!url) {
 			g_printerr("Invalid reference name, expected VNS/REFNAME");
 			return FALSE;
@@ -119,8 +122,7 @@ hcres_configure(int argc, char **argv)
 	return TRUE;
 }
 
-static struct grid_main_callbacks hcres_callbacks =
-{
+static struct grid_main_callbacks hcres_callbacks = {
 	.options = hcres_get_options,
 	.action = hcres_action,
 	.set_defaults = hcres_set_defaults,
@@ -136,4 +138,3 @@ main(int argc, char **args)
 	g_setenv("GS_DEBUG_GLIB2", "1", TRUE);
 	return grid_main_cli(argc, args, &hcres_callbacks);
 }
-

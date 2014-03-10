@@ -1,22 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "grid.tools.ls"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "grid.tools.ls"
 #endif
 
 #include <stdlib.h>
@@ -24,19 +7,19 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/wait.h>
-#include <glib.h>
 
-#include "loggers.h"
+#include <metautils/lib/metautils.h>
 #include "gs_tools.h"
 
 char *optarg;
-int flag_verbose = 0; // must be defined because of IGNORE_ARG macro
+int flag_verbose = 0;			// must be defined because of IGNORE_ARG macro
 
 /**
  * Creates a new t_gs_tools_options initialized to zeroes.
  * @return a new t_gs_tools_options
  */
-static t_gs_tools_options* _new_gs_tools_options()
+static t_gs_tools_options *
+_new_gs_tools_options()
 {
 	return g_malloc0(sizeof(t_gs_tools_options));
 }
@@ -45,7 +28,8 @@ static t_gs_tools_options* _new_gs_tools_options()
  * Frees the given t_gs_tools_options.
  * @param options the t_gs_tools_options to be freed
  */
-static void _free_gs_tools_options(t_gs_tools_options* options)
+static void
+_free_gs_tools_options(t_gs_tools_options * options)
 {
 	g_free(options->meta0_url);
 	g_free(options->container_name);
@@ -65,10 +49,12 @@ static void _free_gs_tools_options(t_gs_tools_options* options)
  * Frees the given argument array.
  * @param hc_arg argument array to be freed
  */
-static void _free_hc_arg(gchar **hc_arg)
+static void
+_free_hc_arg(gchar ** hc_arg)
 {
 	g_strfreev(hc_arg);
 }
+
 /**
  * This function generates the argument list suitable for hc command, from the
  * original arguments passed to gs_* command.
@@ -81,9 +67,11 @@ static void _free_hc_arg(gchar **hc_arg)
  * @param argc argument count
  * @param args argument array
  */
-static void _make_hcdir_arg(gchar ***p_hc_arg, const char *cmd, t_gs_tools_options *options, int argc, char **args)
+static void
+_make_hcdir_arg(gchar *** p_hc_arg, const char *cmd,
+	t_gs_tools_options * options, int argc, char **args)
 {
-	gchar tmparg[128]; // holds NAMESPACE/CONTAINER
+	gchar tmparg[128];			// holds NAMESPACE/CONTAINER
 	gchar *cursor = &(tmparg[0]);
 	gchar **hc_arg;
 	gint i = 0, j = 0;
@@ -91,7 +79,7 @@ static void _make_hcdir_arg(gchar ***p_hc_arg, const char *cmd, t_gs_tools_optio
 
 	memset(tmparg, 0, sizeof(tmparg));
 
-	hc_arg = g_malloc0((argc + 2 ) * sizeof(gchar*));
+	hc_arg = g_malloc0((argc + 2) * sizeof(gchar *));
 
 	hc_arg[i++] = g_strdup("hcdir");
 
@@ -153,20 +141,22 @@ static void _make_hcdir_arg(gchar ***p_hc_arg, const char *cmd, t_gs_tools_optio
  * @param argc argument count
  * @param args argument array
  */
-static void _make_hc_arg(gchar ***p_hc_arg, const char *cmd, t_gs_tools_options *options, int argc, char **args)
+static void
+_make_hc_arg(gchar *** p_hc_arg, const char *cmd, t_gs_tools_options * options,
+	int argc, char **args)
 {
-	gchar tmparg[128]; // holds NAMESPACE/CONTAINER
+	gchar tmparg[128];			// holds NAMESPACE/CONTAINER
 	gchar *cursor = &(tmparg[0]);
 	gint i = 0, j = 0;
 	gchar **hc_arg;
-	const int nb_O_options = 10; // number of -O options available
+	const int nb_O_options = 10;	// number of -O options available
 
 	memset(tmparg, 0, sizeof(tmparg));
 
 	// Allocate argc+nb_O_options+2 pointers in order to hold the trailing NULL and
 	// the beginning "hc", and optionally the -O options (2 tokens: -O and OptionName, hence
 	// we need 1 more element for each -O option).
-	hc_arg = g_malloc0((argc + nb_O_options + 2) * sizeof(gchar*));
+	hc_arg = g_malloc0((argc + nb_O_options + 2) * sizeof(gchar *));
 
 	// "hc" has to be the first element
 	hc_arg[i++] = g_strdup("hc");
@@ -191,7 +181,9 @@ static void _make_hc_arg(gchar ***p_hc_arg, const char *cmd, t_gs_tools_options 
 	}
 	if (options->flag_activate_versioning) {
 		hc_arg[i++] = g_strdup("-O");
-		hc_arg[i++] = g_strdup_printf("ActivateVersioning=%"G_GINT64_FORMAT, options->versioning);
+		hc_arg[i++] =
+			g_strdup_printf("ActivateVersioning=%" G_GINT64_FORMAT,
+			options->versioning);
 	}
 	if (options->flag_force) {
 		hc_arg[i++] = g_strdup("-O");
@@ -211,7 +203,8 @@ static void _make_hc_arg(gchar ***p_hc_arg, const char *cmd, t_gs_tools_options 
 	}
 	if (options->storage_policy) {
 		hc_arg[i++] = g_strdup("-O");
-		hc_arg[i++] = g_strconcat("StoragePolicy=", options->storage_policy, NULL);
+		hc_arg[i++] =
+			g_strconcat("StoragePolicy=", options->storage_policy, NULL);
 	}
 
 	// if -m NAMESPACE -d CONTAINER -c CONTENT options are supplied,
@@ -264,147 +257,150 @@ static void _make_hc_arg(gchar ***p_hc_arg, const char *cmd, t_gs_tools_options 
  * @param options stores options values
  * @return 1
  */
-static gint parse_opt_generic(int argc, char **args, t_gs_tools_options *options)
+static gint
+parse_opt_generic(int argc, char **args, t_gs_tools_options * options)
 {
 	int opt;
 
 	g_assert(options);
 
-	while ((opt = getopt(argc, args, "hfvqsXalFW:V:C:m:c:p:d:o:S:t:u:k:r:")) != -1) {
+	while ((opt =
+			getopt(argc, args, "hfvqsXalFW:V:C:m:c:p:d:o:S:t:u:k:r:")) != -1) {
 		switch (opt) {
 
-		case 'h':
-			options->flag_help = ~0;
-			break;
+			case 'h':
+				options->flag_help = ~0;
+				break;
 
-		case 'f':
-			options->flag_force = ~0;
-			break;
+			case 'f':
+				options->flag_force = ~0;
+				break;
 
-		case 'v':
-			options->flag_verbose++;
-			flag_verbose++;
-			break;
+			case 'v':
+				options->flag_verbose++;
+				flag_verbose++;
+				break;
 
-		case 'q':
-			options->flag_quiet = ~0;
-			break;
+			case 'q':
+				options->flag_quiet = ~0;
+				break;
 
-		case 'l':
-			options->flag_info = ~0;
-			break;
+			case 'l':
+				options->flag_info = ~0;
+				break;
 
-		case 'X':
-			options->flag_cache = ~0;
-			break;
+			case 'X':
+				options->flag_cache = ~0;
+				break;
 
-		case 'a':
-			options->flag_auto_create = ~0;
-			break;
+			case 'a':
+				options->flag_auto_create = ~0;
+				break;
 
-		case 'F':
-			options->flag_full_chunks = ~0;
-			break;
+			case 'F':
+				options->flag_full_chunks = ~0;
+				break;
 
-		case 'W':
-			options->flag_activate_versioning = ~0;
-			options->versioning = g_ascii_strtoll(optarg, NULL, 10);
-			break;
+			case 'W':
+				options->flag_activate_versioning = ~0;
+				options->versioning = g_ascii_strtoll(optarg, NULL, 10);
+				break;
 
-		case 'V':
-			/* version */
-			IGNORE_ARG('V');
-			g_free(options->version);
-			options->version = g_strdup(optarg);
-			break;
+			case 'V':
+				/* version */
+				IGNORE_ARG('V');
+				g_free(options->version);
+				options->version = g_strdup(optarg);
+				break;
 
-		case 'C':
-			/* base directory */
-			IGNORE_ARG('C');
-			g_free(options->base_dir);
-			options->base_dir = strdup(optarg);
-			break;
+			case 'C':
+				/* base directory */
+				IGNORE_ARG('C');
+				g_free(options->base_dir);
+				options->base_dir = strdup(optarg);
+				break;
 
-		case 'm':
-			/* meta0 url */
-			IGNORE_ARG('m');
-			g_free(options->meta0_url);
-			options->meta0_url = g_strdup(optarg);
-			break;
+			case 'm':
+				/* meta0 url */
+				IGNORE_ARG('m');
+				g_free(options->meta0_url);
+				options->meta0_url = g_strdup(optarg);
+				break;
 
-		case 'c':
-			/* remote source path */
-			IGNORE_ARG('c');
-			g_free(options->remote_path);
-			options->remote_path = strdup(optarg);
-			break;
+			case 'c':
+				/* remote source path */
+				IGNORE_ARG('c');
+				g_free(options->remote_path);
+				options->remote_path = strdup(optarg);
+				break;
 
-		case 'p':
-			/* local output path */
-			IGNORE_ARG('p');
-			g_free(options->local_path);
-			options->local_path = strdup(optarg);
-			break;
+			case 'p':
+				/* local output path */
+				IGNORE_ARG('p');
+				g_free(options->local_path);
+				options->local_path = strdup(optarg);
+				break;
 
-		case 'd':
-			/* container info */
-			IGNORE_ARG('d');
-			g_free(options->container_name);
-			options->container_name = g_strdup(optarg);
-			break;
+			case 'd':
+				/* container info */
+				IGNORE_ARG('d');
+				g_free(options->container_name);
+				options->container_name = g_strdup(optarg);
+				break;
 
-		case 'o':
-			options->offset = atoi(optarg);
-			break;
+			case 'o':
+				options->offset = atoi(optarg);
+				break;
 
-		case 'k':
-			/* property name */
-			IGNORE_ARG('k');
-			options->propkey = g_strdup(optarg);
-			break;
-		case 'r':
-			/* property value */
-			IGNORE_ARG('r');
-			options->propvalue = g_strdup(optarg);
-			break;
+			case 'k':
+				/* property name */
+				IGNORE_ARG('k');
+				options->propkey = g_strdup(optarg);
+				break;
+			case 'r':
+				/* property value */
+				IGNORE_ARG('r');
+				options->propvalue = g_strdup(optarg);
+				break;
 
-		case 'S':
-			/* storage policy*/
-			IGNORE_ARG('S');
-			g_free (options->storage_policy);
-			options->storage_policy = strdup (optarg);
-			break;
+			case 'S':
+				/* storage policy */
+				IGNORE_ARG('S');
+				g_free(options->storage_policy);
+				options->storage_policy = strdup(optarg);
+				break;
 
-		case 't':
-			/* mime type */
-			IGNORE_ARG('t');
-			if (!options->sys_metadata)
-				options->sys_metadata = g_string_new("");
-			g_string_append_printf(options->sys_metadata, "mime-type=%s;", optarg);
-			break;
+			case 't':
+				/* mime type */
+				IGNORE_ARG('t');
+				if (!options->sys_metadata)
+					options->sys_metadata = g_string_new("");
+				g_string_append_printf(options->sys_metadata, "mime-type=%s;",
+					optarg);
+				break;
 
-		case 'u':
-			/* user metadata */
-			IGNORE_ARG('u');
-			g_free(options->user_metadata);
-			options->user_metadata = strdup(optarg);
-			break;
+			case 'u':
+				/* user metadata */
+				IGNORE_ARG('u');
+				g_free(options->user_metadata);
+				options->user_metadata = strdup(optarg);
+				break;
 
-		case '?':
-		default:
-			/*      PRINT_ERROR("unexpected option %c (%s)\n", optopt, strerror(opterr));
-			   return 0;  */
-			break;
+			case '?':
+			default:
+				break;
 		}
 	}
 	return 1;
 }
 
 
-static gboolean is_propcmd(const gchar *cmd) {
-	if ( g_ascii_strcasecmp(cmd,"propget") == 0 ||
-		g_ascii_strcasecmp(cmd,"propset") == 0 ||
-		g_ascii_strcasecmp(cmd,"propdel") == 0 ) {
+static gboolean
+is_propcmd(const gchar * cmd)
+{
+	if (g_ascii_strcasecmp(cmd, "propget") == 0 ||
+		g_ascii_strcasecmp(cmd, "propset") == 0 ||
+		g_ascii_strcasecmp(cmd, "propdel") == 0) {
 		return TRUE;
 	}
 	return FALSE;
@@ -418,19 +414,23 @@ static gboolean is_propcmd(const gchar *cmd) {
  * @param args argument array
  * @return 0 if no error is encountered, 1 if there is an error with generated arguments, -1 otherwise.
  */
-static gint call_hc_command(const gchar *cmd, t_gs_tools_options *options, int argc, gchar **args)
+static gint
+call_hc_command(const gchar * cmd, t_gs_tools_options * options, int argc,
+	gchar ** args)
 {
 	int rc = 0, status;
 	pid_t pid;
 	gchar **hc_arg = NULL;
+
 	errno = 0;
 
-	if ( is_propcmd(cmd) ) {
-		if ( is_content_specified(options,args ) )
+	if (is_propcmd(cmd)) {
+		if (is_content_specified(options, args))
 			_make_hc_arg(&hc_arg, cmd, options, argc, args);
 		else
 			_make_hcdir_arg(&hc_arg, cmd, options, argc, args);
-	} else {
+	}
+	else {
 		_make_hc_arg(&hc_arg, cmd, options, argc, args);
 	}
 
@@ -442,12 +442,15 @@ static gint call_hc_command(const gchar *cmd, t_gs_tools_options *options, int a
 		// in which case the returned value is -1.
 		rc = execvp(*hc_arg, hc_arg);
 		GRID_ERROR("Error executing command: %s", strerror(errno));
-	} else if (pid < 0) {
+	}
+	else if (pid < 0) {
 		GRID_ERROR("Error creating fork: %s", strerror(errno));
 		rc = -1;
-	} else {
+	}
+	else {
 		if (waitpid(pid, &status, 0) != pid) {
-			GRID_ERROR("Error while waiting for child: [status %i] %s", status, strerror(errno));
+			GRID_ERROR("Error while waiting for child: [status %i] %s", status,
+				strerror(errno));
 			rc = -1;
 		}
 	}
@@ -464,10 +467,12 @@ static gint call_hc_command(const gchar *cmd, t_gs_tools_options *options, int a
  * @param extra_args non-option arguments
  * @return TRUE if content name is specified
  */
-extern gboolean is_content_specified(t_gs_tools_options *gto, gchar **extra_args)
+extern gboolean
+is_content_specified(t_gs_tools_options * gto, gchar ** extra_args)
 {
 	gboolean has_content_in_url = (NULL != get_content_name(*extra_args));
 	gboolean has_content_in_options = gto && gto->remote_path;
+
 	return has_content_in_options || has_content_in_url;
 }
 
@@ -478,16 +483,19 @@ extern gboolean is_content_specified(t_gs_tools_options *gto, gchar **extra_args
  * @param url the url to parse
  * @return a copy of the content name
  */
-extern gchar* get_content_name(gchar *url)
+extern gchar *
+get_content_name(gchar * url)
 {
 	gchar *next_slash, *question_mark;
+
 	if (url && *url) {
 		next_slash = strchr(url, '/');
 		if (next_slash && *(next_slash + 1)) {
 			next_slash = strchr(next_slash + 1, '/');
 			if (next_slash && *(next_slash + 1)) {
 				if (NULL != (question_mark = strchr(next_slash, '?')))
-					return g_strndup(next_slash + 1, question_mark - next_slash - 1);
+					return g_strndup(next_slash + 1,
+						question_mark - next_slash - 1);
 				else
 					return g_strdup(next_slash + 1);
 			}
@@ -506,7 +514,8 @@ extern gchar* get_content_name(gchar *url)
  * @param helpcb help callback
  * @return 0 if no error is encountered, -1 otherwise.
  */
-extern gint gs_tools_main(int argc, gchar **argv, const gchar *cmd, void (*helpcb)(void))
+extern gint
+gs_tools_main(int argc, gchar ** argv, const gchar * cmd, void (*helpcb) (void))
 {
 	return gs_tools_main_with_argument_check(argc, argv, cmd, helpcb, NULL);
 }
@@ -523,19 +532,22 @@ extern gint gs_tools_main(int argc, gchar **argv, const gchar *cmd, void (*helpc
  * @param check_args callback used to check generated arguments (NULL if not needed).
  * @return 0 if no error is encountered, -1 otherwise.
  */
-extern gint gs_tools_main_with_argument_check(int argc, gchar **argv, const gchar *cmd,
-		void (*helpcb)(void), gboolean (*check_args)(t_gs_tools_options*, gchar**))
+extern gint
+gs_tools_main_with_argument_check(int argc, gchar ** argv, const gchar * cmd,
+	void (*helpcb) (void), gboolean(*check_args) (t_gs_tools_options *,
+		gchar **))
 {
 	int rc = 0;
 
 	/* TODO refactor with grid_common_main */
-	if (!g_thread_supported ())
-		g_thread_init (NULL);
+	if (!g_thread_supported())
+		g_thread_init(NULL);
 	g_log_set_default_handler(logger_stderr, NULL);
 	g_set_prgname(argv[0]);
 	logger_init_level(GRID_LOGLVL_INFO);
 	logger_reset_level();
 
+	client_gscstat_init();
 	t_gs_tools_options *gs_tools_options = _new_gs_tools_options();
 
 	if (!parse_opt_generic(argc, argv, gs_tools_options)) {
@@ -544,7 +556,8 @@ extern gint gs_tools_main_with_argument_check(int argc, gchar **argv, const gcha
 		goto gto_main_error;
 	}
 
-	if (argc == 1 || gs_tools_options->flag_help || (check_args && !check_args(gs_tools_options, argv + optind))) {
+	if (argc == 1 || gs_tools_options->flag_help || (check_args
+			&& !check_args(gs_tools_options, argv + optind))) {
 		if (helpcb)
 			helpcb();
 		rc = -1;
@@ -555,6 +568,34 @@ extern gint gs_tools_main_with_argument_check(int argc, gchar **argv, const gcha
 
 gto_main_error:
 	_free_gs_tools_options(gs_tools_options);
-
+	client_gscstat_close();
 	return rc;
+}
+
+void
+client_gscstat_init(void)
+{
+	GError *e = NULL;
+
+	if (0 == gscstat_initAndConfigureALLServices(&e))
+		gscstat_tags_start(GSCSTAT_SERVICE_ALL, GSCSTAT_TAGS_REQPROCTIME);
+	else {
+		g_assert(e != NULL);
+		GRID_ERROR("Statistics support not initiated : (%d) %s",
+			e->code, e->message);
+		g_clear_error(&e);
+	}
+}
+
+void
+client_gscstat_close(void)
+{
+	gscstat_tags_end(GSCSTAT_SERVICE_ALL, GSCSTAT_TAGS_REQPROCTIME);
+	char *str = gscstat_dumpAllServices();
+
+	if (str != NULL) {
+		PRINT_DEBUG("processTimeService: \n%s", str);
+		free(str);
+	}
+	gscstat_free();
 }

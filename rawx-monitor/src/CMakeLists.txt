@@ -1,10 +1,14 @@
-include_directories(BEFORE .
-		../../metautils/lib
-		../../cluster/lib ../../cluster/agent ../../cluster/events)
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
 
-include_directories(AFTER ${GRIDINIT_INCDIR})
+include_directories(BEFORE . ../..)
 
-link_directories(${GRIDINIT_LIBDIR})
+include_directories(AFTER
+		${GRIDINIT_INCDIR}
+		${ONTAP_INCDIR})
+
+link_directories(
+		${GRIDINIT_LIBDIR}
+		${ONTAP_LIBDIR})
 
 add_executable(rawx-monitor
 	filer_monitor.h

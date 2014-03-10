@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file scanner_thread.h
  * Thread managing volume scanning checkers
@@ -23,8 +6,8 @@
 #ifndef SCANNER_THREAD_H
 #define SCANNER_THREAD_H
 
-#include "../lib/volume_scanner.h"
-#include "config.h"
+#include <integrity/lib/volume_scanner.h>
+#include <integrity/main/config.h>
 
 /**
  * @defgroup integrity_loop_main_scanner_thread Scanner Thread
@@ -42,16 +25,17 @@
  *
  * @return TRUE or FALSE if an error occured (error is set)
  */
-typedef gboolean(*scanning_info_filler_f) (struct volume_scanning_info_s * scanning_info, service_info_t * service_info,
-    struct integrity_loop_config_s * config, GError ** error);
+typedef gboolean(*scanning_info_filler_f) (struct volume_scanning_info_s *
+	scanning_info, service_info_t * service_info,
+	struct integrity_loop_config_s * config, GError ** error);
 
 /**
  * struct to store a filesystem scanner definition
  */
 struct scanner_s
 {
-	gchar *matching_glob;	/*!< The glob the scanned files must match */
-	GSList *workers;	/*!< The list of scan_worker_s to execute on each scanned files */
+	gchar *matching_glob;		/*!< The glob the scanned files must match */
+	GSList *workers;			/*!< The list of scan_worker_s to execute on each scanned files */
 };
 
 /**
@@ -76,7 +60,8 @@ void init_scanning_thread();
  *
  * @return TRUE or FALSE if an error occured (error is set)
  */
-gboolean register_scanning_callback(const gchar * service_type, struct scan_worker_s *worker, GError ** error);
+gboolean register_scanning_callback(const gchar * service_type,
+	struct scan_worker_s *worker, GError ** error);
 
 /**
  * Start the volume scanner thread
@@ -86,7 +71,8 @@ gboolean register_scanning_callback(const gchar * service_type, struct scan_work
  *
  * @return TRUE or FALSE if an error occured (error is set)
  */
-gboolean start_scanner_thread(struct integrity_loop_config_s *config, GError ** error);
+gboolean start_scanner_thread(struct integrity_loop_config_s *config,
+	GError ** error);
 
 /** @} */
 #endif /* SCANNER_THREAD_H */

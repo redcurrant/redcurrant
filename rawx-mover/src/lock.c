@@ -1,19 +1,7 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+// TODO FIXME should be removed and replaced by volume_service_lock() from metautils
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "rawx.lock"
+#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -23,14 +11,12 @@
 #include <signal.h>
 #include <attr/xattr.h>
 
-#include <glib.h>
+#include <metautils/lib/metautils.h>
 
-#include <metautils.h>
-
-#include "./lock.h"
+#include "lock.h"
 
 int
-volume_lock_get(const gchar *path, const gchar *xattr_name)
+volume_lock_get(const gchar * path, const gchar * xattr_name)
 {
 	gint64 i64_pid_found;
 	int rc, pid;
@@ -47,7 +33,8 @@ volume_lock_get(const gchar *path, const gchar *xattr_name)
 
 	if (errno == EEXIST) {
 
-		rc = getxattr(path, xattr_name, str_pid_found, sizeof(str_pid_found)-1);
+		rc = getxattr(path, xattr_name, str_pid_found,
+			sizeof(str_pid_found) - 1);
 		if (rc == -1)
 			return -1;
 
@@ -61,20 +48,21 @@ volume_lock_get(const gchar *path, const gchar *xattr_name)
 }
 
 void
-volume_lock_release(const gchar *path, const gchar *xattr_name)
+volume_lock_release(const gchar * path, const gchar * xattr_name)
 {
 	if (-1 == removexattr(path, xattr_name)) {
 		WARN("Volume lock not removed : %s", strerror(errno));
-		return;	
+		return;
 	}
 	NOTICE("Volume lock released");
 }
 
-int 
-volume_lock_set(const gchar *path, const gchar *xattr_name)
+int
+volume_lock_set(const gchar * path, const gchar * xattr_name)
 {
 	pid_t pid_lock;
 	guint lock_attempts = 3;
+
 retry:
 	pid_lock = volume_lock_get(path, xattr_name);
 	if (pid_lock < 0) {
@@ -98,4 +86,3 @@ retry:
 
 	return 1;
 }
-

@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef __GRID_CLIENT_H__
 #define __GRID_CLIENT_H__
 
@@ -38,6 +21,8 @@
 #define GS_ENVKEY_MAXSPARE "GS_MAX_SPARE"
 #define GS_DEFAULT_MAXSPARE "5"
 
+#define GS_SNAPSHOT_MAXLENGTH 256
+
 /**
  * The hidden type that represents the connection to a Grid Storage platform
  */
@@ -48,14 +33,15 @@ typedef struct gs_grid_storage_s gs_grid_storage_t;
  * The public information about a remote container on a grid storage
  * platform.
  */
-typedef struct {
+typedef struct
+{
 	gs_grid_storage_t *gs; /**< the grid storage platform the current container
 	                            belongs to */
-	char               name [1024]; /**< the name of this container ( a NULL
+	char name[1024];				/**< the name of this container ( a NULL
 	                                     terminated character array that should
 					     only contain ASCII characters (altough
 					     this is not mandatory). */
-} gs_container_info_t ;
+} gs_container_info_t;
 
 
 /**
@@ -69,10 +55,11 @@ typedef struct gs_container_s gs_container_t;
 /**
  * The public information about 
  */
-typedef struct {
+typedef struct
+{
 	gs_container_t *container; /**< the remote container the content belongs to*/
-	char            path[1024]; /**< the path of the content in this container */
-	int64_t         size;
+	char path[1024];			/**< the path of the content in this container */
+	int64_t size;
 } gs_content_info_t;
 
 
@@ -82,7 +69,6 @@ typedef struct {
  * to a gs_content_t might be cast into a pointer to a gs_content_info_t
  */
 typedef struct gs_content_s gs_content_t;
-
 
 /**
  * A simple type for functions returning simple return codes.
@@ -94,7 +80,8 @@ typedef int gs_status_t;
  * A structure set by functions in case of failure, with the reason of the
  * failure.
  */
-typedef struct {
+typedef struct
+{
 	int code; /**<  */
 	char *msg; /**<  */
 } gs_error_t;
@@ -119,7 +106,7 @@ typedef struct {
  *
  * @param container the container to be destroyed
  */
-void gs_container_free (gs_container_t *container);
+void gs_container_free(gs_container_t * container);
 
 
 /**
@@ -128,7 +115,7 @@ void gs_container_free (gs_container_t *container);
  *
  * @param content a pointer to th structure to be destroyed. 
  */
-void gs_content_free (gs_content_t *content);
+void gs_content_free(gs_content_t * content);
 
 
 /**
@@ -138,7 +125,7 @@ void gs_content_free (gs_content_t *content);
  * @param gs a pointer to a gs_grid_storage_t, initiated by a
  *           call to gs_init_grid_storage().
  */
-void gs_grid_storage_free (gs_grid_storage_t *gs);
+void gs_grid_storage_free(gs_grid_storage_t * gs);
 
 
 /**
@@ -149,8 +136,8 @@ void gs_grid_storage_free (gs_grid_storage_t *gs);
  * @param err
  * @return
  */
-gs_status_t gs_container_get_info (const gs_container_t *container,
-	gs_container_info_t *info, gs_error_t **err);
+gs_status_t gs_container_get_info(const gs_container_t * container,
+	gs_container_info_t * info, gs_error_t ** err);
 
 
 /**
@@ -167,8 +154,8 @@ gs_status_t gs_container_get_info (const gs_container_t *container,
  *            if the function fails.
  * @return 1 in case of success, 0 in case of failure
  */
-gs_status_t gs_content_get_info (const gs_content_t *content,
-	gs_content_info_t *info, gs_error_t **err);
+gs_status_t gs_content_get_info(const gs_content_t * content,
+	gs_content_info_t * info, gs_error_t ** err);
 
 /**
  * Fills the pointed buffer with the metadata available for this content.
@@ -180,18 +167,21 @@ gs_status_t gs_content_get_info (const gs_content_t *content,
  * the content and might trigger a (network) call to the distant meta2
  * if the targeted info is unavailable.
  */
-gs_status_t gs_content_get_metadata(gs_content_t *content, uint8_t *dst, size_t *dst_size, gs_error_t **err);
+gs_status_t gs_content_get_metadata(gs_content_t * content, uint8_t * dst,
+	size_t * dst_size, gs_error_t ** err);
 
 /**
  * @see gs_content_get_metadata()
  */
-gs_status_t gs_content_get_system_metadata(gs_content_t *content, uint8_t *dst, size_t *dst_size, gs_error_t **err);
+gs_status_t gs_content_get_system_metadata(gs_content_t * content,
+	uint8_t * dst, size_t * dst_size, gs_error_t ** err);
 
 /**
  * Change the metadata associated to the current content in the distant
  * container.
  */
-gs_status_t gs_content_set_metadata(gs_content_t *content, uint8_t *src, size_t src_size, gs_error_t **err);
+gs_status_t gs_content_set_metadata(gs_content_t * content, uint8_t * src,
+	size_t src_size, gs_error_t ** err);
 
 /**
  * A filter function type
@@ -203,7 +193,7 @@ gs_status_t gs_content_set_metadata(gs_content_t *content, uint8_t *src, size_t 
  * - 0 if the function is successful and the content cannot be kept
  * - -1 if the iteration must be stopped
  */
-typedef int (*gs_content_filter_f) (gs_content_t *content, void *user_data);
+typedef int (*gs_content_filter_f) (gs_content_t * content, void *user_data);
 
 
 /**
@@ -218,7 +208,7 @@ typedef int (*gs_content_filter_f) (gs_content_t *content, void *user_data);
  * - 0 if no more byte will be available (the end of content has been reached)
  * - -1 if an error occured and no more data are available.
  */
-typedef ssize_t (*gs_input_f) (void *uData, char *b, size_t bSize);
+typedef ssize_t(*gs_input_f) (void *uData, char *b, size_t bSize);
 
 
 /**
@@ -232,7 +222,7 @@ typedef ssize_t (*gs_input_f) (void *uData, char *b, size_t bSize);
  * @param bSize the size of the buffer
  * @return the number of written bytes or a negative number of bytes on error.
  */
-typedef ssize_t (*gs_output_f) (void *uData, const char *b, const size_t bSize);
+typedef ssize_t(*gs_output_f) (void *uData, const char *b, const size_t bSize);
 
 
 /**
@@ -241,14 +231,14 @@ typedef ssize_t (*gs_output_f) (void *uData, const char *b, const size_t bSize);
  */
 typedef struct gs_download_info_s
 {
-	int64_t      offset; /**< the offset in the file at which the download
+	int64_t offset;		 /**< the offset in the file at which the download
 	                          must start */
-	int64_t      size; /**< the number of bytes expected by the downloader */
-	gs_output_f  writer; /**< a callback function used to transmit the
+	int64_t size;	   /**< the number of bytes expected by the downloader */
+	gs_output_f writer;	 /**< a callback function used to transmit the
 	                          downloaded bytes */
-	void        *user_data; /**< an arbitrary pointer that will be fed to
+	void *user_data;		/**< an arbitrary pointer that will be fed to
 								 the writer callback */
-} gs_download_info_t ;
+} gs_download_info_t;
 
 
 /* --- Grid Storage main operations ---------------------------------------- */
@@ -272,33 +262,35 @@ typedef struct gs_download_info_s
  * @return NULL if the function fails (if the META0 refname cannot be
  *              joigned) or a pointer to a valid gs_grid_storage_t structure.
  */
-gs_grid_storage_t* gs_grid_storage_init (const char *meta0_url,
-	gs_error_t **err);
+gs_grid_storage_t *gs_grid_storage_init(const char *meta0_url,
+	gs_error_t ** err);
 
-gs_grid_storage_t* gs_grid_storage_init2 (const char *meta0_url,
-	int to_cnx, int to_req, gs_error_t **err);
+gs_grid_storage_t *gs_grid_storage_init2(const char *meta0_url,
+	int to_cnx, int to_req, gs_error_t ** err);
 
-typedef enum gs_timeout_e {
-	GS_TO_RAWX_CNX=0,
-	GS_TO_RAWX_OP=1,
-	GS_TO_M0_CNX=2,
-	GS_TO_M0_OP=3,
-	GS_TO_M1_CNX=4,
-	GS_TO_M1_OP=5,
-	GS_TO_M2_CNX=6,
-	GS_TO_M2_OP=7,
-	GS_TO_MCD_CNX=8,
-	GS_TO_MCD_OP=9
+typedef enum gs_timeout_e
+{
+	GS_TO_RAWX_CNX = 0,
+	GS_TO_RAWX_OP = 1,
+	GS_TO_M0_CNX = 2,
+	GS_TO_M0_OP = 3,
+	GS_TO_M1_CNX = 4,
+	GS_TO_M1_OP = 5,
+	GS_TO_M2_CNX = 6,
+	GS_TO_M2_OP = 7,
+	GS_TO_MCD_CNX = 8,
+	GS_TO_MCD_OP = 9
 } gs_timeout_t;
 
 
-gs_status_t gs_grid_storage_set_timeout (gs_grid_storage_t *gs,
-	gs_timeout_t to, int val, gs_error_t **err);
+gs_status_t gs_grid_storage_set_timeout(gs_grid_storage_t * gs,
+	gs_timeout_t to, int val, gs_error_t ** err);
 
 
-gs_status_t gs_grid_storage_get_timeout (gs_grid_storage_t *gs, gs_timeout_t to);
+gs_status_t gs_grid_storage_get_timeout(gs_grid_storage_t * gs,
+	gs_timeout_t to);
 
-const char* gs_get_namespace(gs_grid_storage_t *gs);
+const char *gs_get_namespace(gs_grid_storage_t * gs);
 
 /* --- Container operations ------------------------------------------------ */
 
@@ -322,8 +314,8 @@ const char* gs_get_namespace(gs_grid_storage_t *gs);
  * @return NULL in case of failure, a non-NULL pointer to a valid
  *         gs_container_t if the function succeeds
  */
-gs_container_t* gs_get_container (gs_grid_storage_t *gs,
-	const char *container_name, int auto_create, gs_error_t **err);
+gs_container_t *gs_get_container(gs_grid_storage_t * gs,
+	const char *container_name, int auto_create, gs_error_t ** err);
 
 /**
  * @param gs
@@ -331,8 +323,8 @@ gs_container_t* gs_get_container (gs_grid_storage_t *gs,
  * @param err
  * @return
  */
-gs_container_t* gs_get_container_by_hexid (gs_grid_storage_t *gs,
-	const char *hex_id, int auto_create, gs_error_t **err);
+gs_container_t *gs_get_container_by_hexid(gs_grid_storage_t * gs,
+	const char *hex_id, int auto_create, gs_error_t ** err);
 
 
 /**
@@ -346,7 +338,7 @@ gs_container_t* gs_get_container_by_hexid (gs_grid_storage_t *gs,
  *            if the function fails
  * @return 1 in case of success, 0 in case of failure
  */
-gs_status_t gs_open_container (gs_container_t *container, gs_error_t **err);
+gs_status_t gs_open_container(gs_container_t * container, gs_error_t ** err);
 
 
 /**
@@ -361,7 +353,7 @@ gs_status_t gs_open_container (gs_container_t *container, gs_error_t **err);
  *            if the function fails
  * @return 1 in case of success, 0 in case of failure
  */
-gs_status_t gs_close_container (gs_container_t *container, gs_error_t **err);
+gs_status_t gs_close_container(gs_container_t * container, gs_error_t ** err);
 
 
 /**
@@ -371,7 +363,7 @@ gs_status_t gs_close_container (gs_container_t *container, gs_error_t **err);
  *            if the function fails
  * @return 0 if the container is closed, 1 if it is opened, -1 upon error
  */
-int gs_container_is_open (gs_container_t *container, gs_error_t **err);
+int gs_container_is_open(gs_container_t * container, gs_error_t ** err);
 
 
 /**
@@ -387,14 +379,26 @@ int gs_container_is_open (gs_container_t *container, gs_error_t **err);
  * @return 1 if the destruction succeed, 0 in case of error (and the err
  *           parameter is set).
  */
-gs_status_t gs_destroy_container (gs_container_t *container,
-	gs_error_t **err);
+gs_status_t gs_destroy_container(gs_container_t * container, gs_error_t ** err);
 
+/**
+ * Same as gs_destroy_container but supports flags.
+ *
+ * @param container a not-NULL pointer to a valid gs_container_t structure
+ * @param flags one of
+ *   M2V2_DESTROY_FORCE: destroy container even if it still has contents
+ *   M2V2_DESTROY_FLUSH: remove all contents before destroying container
+ * @param err a double pointer to an error structure, that will be set
+ *            if the function fails.
+ * @return 1 if the destruction succeed, 0 in case of error (and the err
+ *           parameter is set). */
+gs_status_t gs_destroy_container_flags(gs_container_t * container,
+	unsigned int flags, gs_error_t ** err);
 
 /**
  * Destroys all the online contents in the given remote container.
  */
-gs_status_t gs_flush_container (gs_container_t *container, gs_error_t **err);
+gs_status_t gs_flush_container(gs_container_t * container, gs_error_t ** err);
 
 
 /* ------------------------------------------------------------------------- */
@@ -427,9 +431,18 @@ gs_status_t gs_flush_container (gs_container_t *container, gs_error_t **err);
  *            if the function fails.
  * @return 1 if the function succeeded, 0 in case of failure
  */
-gs_status_t gs_list_container (gs_container_t *container, gs_content_t*** result, 
-	gs_content_filter_f filter, void *user_data, gs_error_t **err);
+gs_status_t gs_list_container(gs_container_t * container,
+	gs_content_t *** result, gs_content_filter_f filter, void *user_data,
+	gs_error_t ** err);
 
+/**
+ * Same as gs_list_container but takes a snapshot parameter.
+ *
+ * @param snapshot List only contents belonging to this snapshot
+ */
+gs_status_t gs_list_container_snapshot(gs_container_t * container,
+	gs_content_t *** result, gs_content_filter_f filter, void *user_data,
+	const char *snapshot, gs_error_t ** err);
 
 /**
  * Puts a new content in the given remote container
@@ -447,9 +460,9 @@ gs_status_t gs_list_container (gs_container_t *container, gs_content_t*** result
  *            if the function fails.
  * @return 1 if the function succeeded, 0 in case of failure
  */
-gs_status_t gs_upload_content (gs_container_t *container,
+gs_status_t gs_upload_content(gs_container_t * container,
 	const char *name, const int64_t size,
-	gs_input_f feeder, void *user_data, gs_error_t **err); 
+	gs_input_f feeder, void *user_data, gs_error_t ** err);
 
 /**
  * Puts a new content in the given remote container
@@ -471,10 +484,10 @@ gs_status_t gs_upload_content (gs_container_t *container,
  *            if the function fails.
  * @return 1 if the function succeeded, 0 in case of failure
  */
-gs_status_t gs_upload_content_v2 (gs_container_t *container,
-		const char *content_name, const int64_t content_size,
-		gs_input_f feeder, void *user_data, const char *user_metadata,
-		const char *sys_metadata, gs_error_t **err);
+gs_status_t gs_upload_content_v2(gs_container_t * container,
+	const char *content_name, const int64_t content_size,
+	gs_input_f feeder, void *user_data, const char *user_metadata,
+	const char *sys_metadata, gs_error_t ** err);
 
 /**
  * Puts a new content in the given remote container
@@ -497,10 +510,10 @@ gs_status_t gs_upload_content_v2 (gs_container_t *container,
  *            if the function fails.
  * @return 1 if the function succeeded, 0 in case of failure
  */
-gs_status_t gs_upload_content_v2_with_version (gs_container_t *container,
-		const char *content_name, const int64_t content_size, const char *content_version,
-		gs_input_f feeder, void *user_data, const char *user_metadata,
-		const char *sys_metadata, gs_error_t **err);
+gs_status_t gs_upload_content_v2_with_version(gs_container_t * container,
+	const char *content_name, const int64_t content_size,
+	const char *content_version, gs_input_f feeder, void *user_data,
+	const char *user_metadata, const char *sys_metadata, gs_error_t ** err);
 
 /**
  * Append data to an existing content in the given container
@@ -512,9 +525,9 @@ gs_status_t gs_upload_content_v2_with_version (gs_container_t *container,
  * @param err
  * @return
  */
-gs_status_t gs_append_content (gs_container_t *container,
+gs_status_t gs_append_content(gs_container_t * container,
 	const char *name, const int64_t size,
-	gs_input_f feeder, void *user_data, gs_error_t **err); 
+	gs_input_f feeder, void *user_data, gs_error_t ** err);
 
 /**
  * Get a portion of the remote content.
@@ -526,8 +539,8 @@ gs_status_t gs_append_content (gs_container_t *container,
  *            if the function fails.
  * @return 1 if the download succeeded, 0 in case of failure (err is set)
  */
-gs_status_t gs_download_content_by_name(gs_container_t *container,
-	const char *name, gs_download_info_t *dl_info, gs_error_t **err);
+gs_status_t gs_download_content_by_name(gs_container_t * container,
+	const char *name, gs_download_info_t * dl_info, gs_error_t ** err);
 
 /**
  * Get a portion of the remote content with a specified version.
@@ -540,8 +553,25 @@ gs_status_t gs_download_content_by_name(gs_container_t *container,
  *            if the function fails.
  * @return 1 if the download succeeded, 0 in case of failure (err is set)
  */
-gs_status_t gs_download_content_by_name_and_version(gs_container_t *container,
-	const char *name, const char *version, gs_download_info_t *dl_info, gs_error_t **err);
+gs_status_t gs_download_content_by_name_and_version(gs_container_t * container,
+	const char *name, const char *version, gs_download_info_t * dl_info,
+	gs_error_t ** err);
+
+/**
+ * Get a portion of the remote content with a specified version.
+ *
+ * @param container the remote container
+ * @param name the name of the content in the distant container
+ * @param version the version of the content
+ * @param stgpol content storage policy
+ * @param dl_info a non-NULL pointer to the callback information
+ * @param err a double pointer to an error structure, that will be set
+ *            if the function fails.
+ * @return 1 if the download succeeded, 0 in case of failure (err is set)
+ */
+gs_status_t gs_download_content_by_name_full(gs_container_t * container,
+	const char *name, const char *version, const char *stgpol,
+	gs_download_info_t * dl_info, gs_error_t ** err);
 
 /**
  * Destroys the remote content
@@ -554,8 +584,8 @@ gs_status_t gs_download_content_by_name_and_version(gs_container_t *container,
  *            if the function fails.
  * @return 1 in case of success, 0 in case of failure.
  */
-gs_status_t gs_delete_content_by_name(gs_container_t *container,
-	const char *name, gs_error_t **err);
+gs_status_t gs_delete_content_by_name(gs_container_t * container,
+	const char *name, gs_error_t ** err);
 
 
 /* --- Content operations -------------------------------------------------- */
@@ -577,8 +607,8 @@ gs_status_t gs_delete_content_by_name(gs_container_t *container,
  * @return NULL if the function fails, or a properly allocated remote
  *         content structure.
  */
-gs_content_t* gs_get_content_from_path (gs_container_t *container,
-	const char *name, gs_error_t **err);
+gs_content_t *gs_get_content_from_path(gs_container_t * container,
+	const char *name, gs_error_t ** err);
 
 /**
  * Looks up in the given remote container for a content with the given
@@ -592,27 +622,68 @@ gs_content_t* gs_get_content_from_path (gs_container_t *container,
  * @param name a NULL terminated ASCII character string, the name of
  *             the targeted content
  * @param version	a NULL terminated ASCII character string, the version of
- 	 * 				the targeted content.
+ * 				the targeted content.
+ * @param p_filtered a pointer to a GSList* that will hold filtered out beans
+ * 				(eg parity chunks for RAIN). Can be NULL if not needed.
+ * @param p_beans a pointer to a GSList* that will hold all beans.  Can be NULL if not needed.
  * @param err a double pointer to an error structure, that will be set
  *            if the function fails.
  * @return NULL if the function fails, or a properly allocated remote
  *         content structure.
  */
-gs_content_t* gs_get_content_from_path_and_version (gs_container_t *container,
-		const char *name, const char *version, gs_error_t **err);
+gs_content_t *gs_get_content_from_path_full(gs_container_t * container,
+	const char *name, const char *version, void *p_filtered, void *p_beans,
+	gs_error_t ** err);
+
+/**
+ * Looks up in the given remote container for a content with the given
+ * name and version.
+ *
+ * If the content is found a new gs_content_t structure is initiated and
+ * returned.
+ *
+ * @param container a pointer to a rmeote container structure, returned
+ *                  by a previous call to gs_get_container()
+ * @param name a NULL terminated ASCII character string, the name of
+ *             the targeted content
+ * @param version	a NULL terminated ASCII character string, the version of
+ * 				the targeted content.
+ * @param err a double pointer to an error structure, that will be set
+ *            if the function fails.
+ * @return NULL if the function fails, or a properly allocated remote
+ *         content structure.
+ */
+gs_content_t *gs_get_content_from_path_and_version(gs_container_t * container,
+	const char *name, const char *version, gs_error_t ** err);
 
 /**
  * Get a portion of the remote content.
  *
  * @param content the remote content to be downloaded
  * @param dl_info
+ * @param stgpol storage policy
+ * @param filtered a list of filtered out beans
+ * @param beans the list of all beans
  * @param err a double pointer to an error structure, that will be set
  *            if the function fails.
  * @return 1 if the download succeeded, 0 in case of failure (err is set)
  */
-gs_status_t gs_download_content (gs_content_t *content,
-	gs_download_info_t *dl_info, gs_error_t **err);
+gs_status_t gs_download_content_full(gs_content_t * content,
+	gs_download_info_t * dl_info, const char *stgpol, void *filtered,
+	void *beans, gs_error_t ** err);
 
+/**
+ * Get a portion of the remote content.
+ *
+ * @param content the remote content to be downloaded
+ * @param dl_info
+ * @param stgpol storage policy
+ * @param err a double pointer to an error structure, that will be set
+ *            if the function fails.
+ * @return 1 if the download succeeded, 0 in case of failure (err is set)
+ */
+gs_status_t gs_download_content(gs_content_t * content,
+	gs_download_info_t * dl_info, gs_error_t ** err);
 
 /**
  * Destroys the remote content
@@ -625,15 +696,15 @@ gs_status_t gs_download_content (gs_content_t *content,
  *            if the function fails.
  * @return 1 in case of success, 0 in case of failure.
  */
-gs_status_t gs_destroy_content (gs_content_t *content, gs_error_t **err);
+gs_status_t gs_destroy_content(gs_content_t * content, gs_error_t ** err);
 
-int64_t gs_content_get_size(gs_content_t *content);
+int64_t gs_content_get_size(gs_content_t * content);
 
 /**
  * Destroys the given error structure.
  * The given pointer may be NULL.
  */
-void gs_error_free (gs_error_t *err);
+void gs_error_free(gs_error_t * err);
 
 
 /**
@@ -645,7 +716,7 @@ void gs_error_free (gs_error_t *err);
  * @return a never-NULL pointer to a valid printable string that cannot be
  * directly freed.
  */
-const char* gs_error_get_message (gs_error_t *err);
+const char *gs_error_get_message(gs_error_t * err);
 
 /**
  * Returns the integer error code stored in the error structure.
@@ -655,7 +726,7 @@ const char* gs_error_get_message (gs_error_t *err);
  * @returns >=0 if a valid error code has been found, -1 if the error
  *          structure is not set.
  */
-int gs_error_get_code (gs_error_t *err);
+int gs_error_get_code(gs_error_t * err);
 
 /* ------------------------------------------------------------------------- */
 
@@ -674,9 +745,11 @@ typedef struct gs_service_s gs_service_t;
  * @param dst_size
  * @return 
  */
-size_t gs_service_get_url(const gs_service_t *service, char *dst, size_t dst_size);
+size_t gs_service_get_url(const gs_service_t * service, char *dst,
+	size_t dst_size);
 
-socklen_t gs_service_get_address(const gs_service_t *service, struct sockaddr *sa, socklen_t sa_size);
+socklen_t gs_service_get_address(const gs_service_t * service,
+	struct sockaddr *sa, socklen_t sa_size);
 
 /**
  * Returns a textual representation of the service-type name.
@@ -688,19 +761,19 @@ socklen_t gs_service_get_address(const gs_service_t *service, struct sockaddr *s
  * @param service
  * @return
  */
-const char* gs_service_get_type(const gs_service_t *service);
+const char *gs_service_get_type(const gs_service_t * service);
 
 /**
  * Free the structure and all its components.
  *
  * @param service
  */
-void gs_free_service( gs_service_t *service );
+void gs_free_service(gs_service_t * service);
 
 /**
  * @param services
  */
-void gs_service_free_array( gs_service_t **services);
+void gs_service_free_array(gs_service_t ** services);
 
 /* ------------------------------------------------------------------------- */
 
@@ -724,7 +797,8 @@ void gs_service_free_array( gs_service_t **services);
  *            if the function fails. err may be NULL.
  * @return
  */
-gs_service_t** gs_get_services_for_paths( gs_container_t *container, const char *srvtype, char **paths, gs_error_t **err);
+gs_service_t **gs_get_services_for_paths(gs_container_t * container,
+	const char *srvtype, char **paths, gs_error_t ** err);
 
 /**
  * Returns a single service refname to store all the object paths provided.
@@ -735,7 +809,8 @@ gs_service_t** gs_get_services_for_paths( gs_container_t *container, const char 
  * @param err
  * @return
  */
-gs_service_t* gs_choose_service_for_paths( gs_container_t *container, const char *srvtype, char **paths, gs_error_t **err);
+gs_service_t *gs_choose_service_for_paths(gs_container_t * container,
+	const char *srvtype, char **paths, gs_error_t ** err);
 
 /**
  * There is no need to {in,}validate the change made to the service, this
@@ -750,8 +825,9 @@ gs_service_t* gs_choose_service_for_paths( gs_container_t *container, const char
  *            if the function fails. err may be NULL.
  * @return FALSE if no error occured (no path failed)
  */
-gs_status_t gs_delete_services_for_paths( gs_container_t *container, const char *srvtype, char **paths,
-	char ***removed, gs_service_t ***services, gs_error_t **err);
+gs_status_t gs_delete_services_for_paths(gs_container_t * container,
+	const char *srvtype, char **paths, char ***removed,
+	gs_service_t *** services, gs_error_t ** err);
 
 /**
  * @param container
@@ -759,7 +835,8 @@ gs_status_t gs_delete_services_for_paths( gs_container_t *container, const char 
  * @param err
  * @return
  */
-gs_service_t ** gs_service_flush(gs_container_t *container, const char *srvtype, gs_error_t **err);
+gs_service_t **gs_service_flush(gs_container_t * container, const char *srvtype,
+	gs_error_t ** err);
 
 /**
  * Commit the changes made on the given contents.
@@ -772,7 +849,8 @@ gs_service_t ** gs_service_flush(gs_container_t *container, const char *srvtype,
  *            if the function fails. err may be NULL.
  * @return NULL if validate succeeded, the list of failed path otherwise
  */
-char** gs_validate_changes_on_paths( gs_container_t *container, const char *srvtype, char **paths, gs_error_t **err);
+char **gs_validate_changes_on_paths(gs_container_t * container,
+	const char *srvtype, char **paths, gs_error_t ** err);
 
 /**
  * Rollback the changes made on the given list on contents.
@@ -784,7 +862,8 @@ char** gs_validate_changes_on_paths( gs_container_t *container, const char *srvt
  *            if the function fails. err may be NULL.
  * @return
  */
-char** gs_invalidate_changes_on_paths( gs_container_t *container, const char *srvtype, char **paths, gs_error_t **err);
+char **gs_invalidate_changes_on_paths(gs_container_t * container,
+	const char *srvtype, char **paths, gs_error_t ** err);
 
 /** 
  * Get all services used by commited contents in a container
@@ -794,7 +873,8 @@ char** gs_invalidate_changes_on_paths( gs_container_t *container, const char *sr
  * @param err set on error if not NULL
  * @return NULL on error, a (maybe empty) service array (free it with gs_service_free_array())
  */
-gs_service_t** gs_get_all_services_used( gs_container_t *container, const char *srvtype, gs_error_t **err);
+gs_service_t **gs_get_all_services_used(gs_container_t * container,
+	const char *srvtype, gs_error_t ** err);
 
 /* ------------------------------------------------------------------------- */
 
@@ -817,7 +897,8 @@ gs_service_t** gs_get_all_services_used( gs_container_t *container, const char *
  *            if the function fails. err may be NULL.
  * @return
  */
-gs_service_t** gs_index_get_services_for_paths( gs_container_t *container, char **paths, gs_error_t **err);
+gs_service_t **gs_index_get_services_for_paths(gs_container_t * container,
+	char **paths, gs_error_t ** err);
 
 /**
  * Returns a single service refname to store all the object paths provided.
@@ -828,7 +909,8 @@ gs_service_t** gs_index_get_services_for_paths( gs_container_t *container, char 
  *            if the function fails. err may be NULL.
  * @return
  */
-gs_service_t* gs_index_choose_service_for_paths( gs_container_t *container, char **paths, gs_error_t **err);
+gs_service_t *gs_index_choose_service_for_paths(gs_container_t * container,
+	char **paths, gs_error_t ** err);
 
 /**
  * There is no need to {in,}validate the change made to the service, this
@@ -842,16 +924,16 @@ gs_service_t* gs_index_choose_service_for_paths( gs_container_t *container, char
  *            if the function fails. err may be NULL.
  * @return FALSE if no error occured (no path failed)
  */
-gs_status_t gs_index_delete_services_for_paths( gs_container_t *container,
-		char **paths, char ***removed, gs_service_t ***services,
-		gs_error_t **err);
+gs_status_t gs_index_delete_services_for_paths(gs_container_t * container,
+	char **paths, char ***removed, gs_service_t *** services,
+	gs_error_t ** err);
 
 /**
  * @param container
  * @param err
  * @return
  */
-gs_service_t ** gs_index_flush(gs_container_t *container, gs_error_t **err);
+gs_service_t **gs_index_flush(gs_container_t * container, gs_error_t ** err);
 
 /**
  * Commit the changes made on the given contents.
@@ -862,8 +944,8 @@ gs_service_t ** gs_index_flush(gs_container_t *container, gs_error_t **err);
  *            if the function fails. err may be NULL.
  * @return NULL if validate succeeded, the list of failed path otherwise
  */
-char** gs_index_validate_changes_on_paths( gs_container_t *container,
-		char **paths, gs_error_t **err);
+char **gs_index_validate_changes_on_paths(gs_container_t * container,
+	char **paths, gs_error_t ** err);
 
 /**
  * Rollback the changes made on the given list on contents.
@@ -874,8 +956,8 @@ char** gs_index_validate_changes_on_paths( gs_container_t *container,
  *            if the function fails. err may be NULL.
  * @return
  */
-char** gs_index_invalidate_changes_on_paths( gs_container_t *container,
-		char **paths, gs_error_t **err);
+char **gs_index_invalidate_changes_on_paths(gs_container_t * container,
+	char **paths, gs_error_t ** err);
 
 /** 
  * Get all services used by commited contents in a container
@@ -884,8 +966,8 @@ char** gs_index_invalidate_changes_on_paths( gs_container_t *container,
  * @param err set on error if not NULL
  * @return NULL on error, a (maybe empty) service array (free it with gs_service_free_array())
  */
-gs_service_t** gs_index_get_all_services_used( gs_container_t *container,
-		gs_error_t **err);
+gs_service_t **gs_index_get_all_services_used(gs_container_t * container,
+	gs_error_t ** err);
 
 /**
  * @param container
@@ -893,8 +975,8 @@ gs_service_t** gs_index_get_all_services_used( gs_container_t *container,
  * @param err
  * @return
  */
-gs_service_t** gs_container_service_get_available(gs_container_t *container,
-		const char *srvtype, gs_error_t **err);
+gs_service_t **gs_container_service_get_available(gs_container_t * container,
+	const char *srvtype, gs_error_t ** err);
 
 /**
  * @param container
@@ -902,8 +984,8 @@ gs_service_t** gs_container_service_get_available(gs_container_t *container,
  * @param err
  * @return
  */
-gs_service_t** gs_container_service_get_all(gs_container_t *container,
-		const char *srvtype, gs_error_t **err);
+gs_service_t **gs_container_service_get_all(gs_container_t * container,
+	const char *srvtype, gs_error_t ** err);
 
 /* ------------------------------------------------------------------------- */
 
@@ -912,7 +994,8 @@ gs_service_t** gs_container_service_get_all(gs_container_t *container,
  * free all the member allocated strings with free(), free the m2_url pointed
  * strings with free and m2_url itself with free().
  */
-struct gs_container_location_s {
+struct gs_container_location_s
+{
 	char *m0_url;
 	char **m1_url;/**< NULL terminated array of strings*/
 	char **m2_url;/**< NULL terminated array of strings*/
@@ -925,8 +1008,8 @@ struct gs_container_location_s {
  * @param gserr
  * @return
  */
-struct gs_container_location_s * gs_locate_container(gs_container_t *container,
-	gs_error_t **gserr);
+struct gs_container_location_s *gs_locate_container(gs_container_t * container,
+	gs_error_t ** gserr);
 
 /**
  * @param client
@@ -934,8 +1017,22 @@ struct gs_container_location_s * gs_locate_container(gs_container_t *container,
  * @param gserr
  * @return
  */
-struct gs_container_location_s * gs_locate_container_by_hexid(gs_grid_storage_t *client,
-	const char *hexid, gs_error_t **gserr);
+struct gs_container_location_s *gs_locate_container_by_hexid(gs_grid_storage_t *
+	client, const char *hexid, gs_error_t ** gserr);
+
+
+/**
+ *  * @param client
+ *   * @param hexid
+ *    * @param gserr
+ *     * @return
+ *      */
+struct gs_container_location_s
+	*gs_locate_container_by_hexid_v2(gs_grid_storage_t * client,
+	const char *hexid, char **out_nsname_on_m1, gs_error_t ** gserr);
+
+
+
 
 /**
  * @param client
@@ -943,8 +1040,8 @@ struct gs_container_location_s * gs_locate_container_by_hexid(gs_grid_storage_t 
  * @param gserr
  * @return
  */
-struct gs_container_location_s * gs_locate_container_by_name(gs_grid_storage_t *client,
-	const char *name, gs_error_t **gserr);
+struct gs_container_location_s *gs_locate_container_by_name(gs_grid_storage_t *
+	client, const char *name, gs_error_t ** gserr);
 
 /**
  * @param location
@@ -958,8 +1055,8 @@ void gs_container_location_free(struct gs_container_location_s *location);
  * @param gs_err
  * @return
  */
-gs_container_t* hc_resolve_meta2_entry(gs_grid_storage_t *gs,
-		const char *container_name, int auto_create, gs_error_t **gs_err);
+gs_container_t *hc_resolve_meta2_entry(gs_grid_storage_t * gs,
+	const char *container_name, int auto_create, gs_error_t ** gs_err);
 
 /**
  * @param gs
@@ -968,8 +1065,17 @@ gs_container_t* hc_resolve_meta2_entry(gs_grid_storage_t *gs,
  * @param gs_err
  * @return
  */
-gs_container_t* gs_get_storage_container(gs_grid_storage_t *gs,
-		const char *container_name, const char *stgpol, int auto_create, gs_error_t **gs_err);
+gs_container_t *gs_get_storage_container(gs_grid_storage_t * gs,
+	const char *container_name, const char *stgpol, int auto_create,
+	gs_error_t ** gs_err);
+
+
+gs_container_t *gs_get_storage_container_v2(gs_grid_storage_t * gs,
+	const char *container_name, const char *stgpol, const char *verspol,
+	int auto_create, gs_error_t ** gs_err);
+
+
+
 
 /* V2 functions */
 
@@ -978,21 +1084,21 @@ gs_container_t* gs_get_storage_container(gs_grid_storage_t *gs,
  * @param reference
  * @return
  */
-gs_error_t* hc_create_reference(gs_grid_storage_t *hc, const char *reference);
+gs_error_t *hc_create_reference(gs_grid_storage_t * hc, const char *reference);
 
 /**
  * @param hc
  * @param reference
  * @return
  */
-gs_error_t* hc_has_reference(gs_grid_storage_t *hc, const char *reference);
+gs_error_t *hc_has_reference(gs_grid_storage_t * hc, const char *reference);
 
 /**
  * @param hc
  * @param reference
  * @return
  */
-gs_error_t* hc_delete_reference(gs_grid_storage_t *hc, const char *reference);
+gs_error_t *hc_delete_reference(gs_grid_storage_t * hc, const char *reference);
 
 
 /* Services ---------------------------------------------------------------- */
@@ -1004,7 +1110,8 @@ gs_error_t* hc_delete_reference(gs_grid_storage_t *hc, const char *reference);
  * @param result
  * @return
  */
-gs_error_t* hc_link_service_to_reference(gs_grid_storage_t *hc, const char *reference, const char *srv_type, char ***result);
+gs_error_t *hc_link_service_to_reference(gs_grid_storage_t * hc,
+	const char *reference, const char *srv_type, char ***result);
 
 /**
  * @param hc
@@ -1013,7 +1120,8 @@ gs_error_t* hc_link_service_to_reference(gs_grid_storage_t *hc, const char *refe
  * @param result
  * @return
  */
-gs_error_t* hc_list_reference_services(gs_grid_storage_t *hc, const char *reference, const char *srv_type, char ***result);
+gs_error_t *hc_list_reference_services(gs_grid_storage_t * hc,
+	const char *reference, const char *srv_type, char ***result);
 
 /**
  * @param hc
@@ -1021,7 +1129,8 @@ gs_error_t* hc_list_reference_services(gs_grid_storage_t *hc, const char *refere
  * @param srv_type
  * @return
  */
-gs_error_t* hc_unlink_reference_service(gs_grid_storage_t *hc, const char *reference, const char *srv_type);
+gs_error_t *hc_unlink_reference_service(gs_grid_storage_t * hc,
+	const char *reference, const char *srv_type);
 
 /**
  * Inserts the service, even if a service is already up and in use.
@@ -1031,8 +1140,8 @@ gs_error_t* hc_unlink_reference_service(gs_grid_storage_t *hc, const char *refer
  * @param url
  * @return
  */
-gs_error_t* hc_force_service(gs_grid_storage_t *hc, const char *ref,
-		const char *url);
+gs_error_t *hc_force_service(gs_grid_storage_t * hc, const char *ref,
+	const char *url);
 
 /**
  * Poll a service and fills srv with the newly affected service url.
@@ -1043,8 +1152,8 @@ gs_error_t* hc_force_service(gs_grid_storage_t *hc, const char *ref,
  * @param srv output variable
  * @return
  */
-gs_error_t* hc_poll_service(gs_grid_storage_t *hc, const char *ref,
-		const char *srvtype, char **srv);
+gs_error_t *hc_poll_service(gs_grid_storage_t * hc, const char *ref,
+	const char *srvtype, char **srv);
 
 /**
  * Contacts the dorectory and modifies the arguments part of the URL
@@ -1054,8 +1163,8 @@ gs_error_t* hc_poll_service(gs_grid_storage_t *hc, const char *ref,
  * @param url
  * @return
  */
-gs_error_t* hc_configure_service(gs_grid_storage_t *hc, const char *ref,
-		const char *url);
+gs_error_t *hc_configure_service(gs_grid_storage_t * hc, const char *ref,
+	const char *url);
 
 /* Properties -------------------------------------------------------------- */
 
@@ -1066,8 +1175,8 @@ gs_error_t* hc_configure_service(gs_grid_storage_t *hc, const char *ref,
  * @param value
  * @return
  */
-gs_error_t* hc_set_reference_property(gs_grid_storage_t *hc,
-		const char *ref, const char *key, const char *value);
+gs_error_t *hc_set_reference_property(gs_grid_storage_t * hc,
+	const char *ref, const char *key, const char *value);
 
 /**
  * @param hc
@@ -1076,8 +1185,8 @@ gs_error_t* hc_set_reference_property(gs_grid_storage_t *hc,
  * @param result
  * @return
  */
-gs_error_t* hc_get_reference_property(gs_grid_storage_t *hc,
-		const char *ref, char **keys, char ***result);
+gs_error_t *hc_get_reference_property(gs_grid_storage_t * hc,
+	const char *ref, char **keys, char ***result);
 
 /**
  * @param hc
@@ -1085,29 +1194,32 @@ gs_error_t* hc_get_reference_property(gs_grid_storage_t *hc,
  * @param keys
  * @return
  */
-gs_error_t* hc_delete_reference_property(gs_grid_storage_t *hc,
-		const char *ref, char **keys);
+gs_error_t *hc_delete_reference_property(gs_grid_storage_t * hc,
+	const char *ref, char **keys);
 
 /**
  * @param container
  * @param gs_err
  * @return
  */
-char** hc_get_container_admin_entries(gs_container_t *container, gs_error_t **gs_err);
+char **hc_get_container_admin_entries(gs_container_t * container,
+	gs_error_t ** gs_err);
 
 /**
  * @param container the targeted container
  * @param storage_policy the storage policy to set to the container
  * @return an error their is an issue while setting the storage policy
  */
-gs_error_t* hc_set_container_storage_policy(gs_container_t *container, const char *storage_policy);
+gs_error_t *hc_set_container_storage_policy(gs_container_t * container,
+	const char *storage_policy);
 
 /**
  * @param container the targeted container
  * @param storage_policy the storage policy to set to the container
  * @return an error their is an issue while setting the storage policy
  */
-gs_error_t* hc_set_container_quota(gs_container_t *container, const char *storage_policy);
+gs_error_t *hc_set_container_quota(gs_container_t * container,
+	const char *storage_policy);
 
 /**
  * Sets the given versioning to the given container.
@@ -1115,14 +1227,24 @@ gs_error_t* hc_set_container_quota(gs_container_t *container, const char *storag
  * @param versioning the versioning to set to the container
  * @return an error their is an issue while setting the versioning
  */
-gs_error_t* hc_set_container_versioning(gs_container_t *container, const char *versioning);
+gs_error_t *hc_set_container_versioning(gs_container_t * container,
+	const char *versioning);
+
+/**
+ * Deletes the versioning of this given container.
+ * @param container the targeted container
+ * @return an error there is an issue while deleting the versioning
+ */
+gs_error_t *hc_del_container_versioning(gs_container_t * container);
+
 /**
  * @param container the targeted container 
  * @param path the content to set the policy
  * @param storage_policy the storage policy to set to the container
  * @return an error their is an issue while setting the storage policy
  */
-gs_status_t hc_set_content_storage_policy(gs_container_t *c, const char *path, const char *stgpol, gs_error_t **e);
+gs_status_t hc_set_content_storage_policy(gs_container_t * c, const char *path,
+	const char *stgpol, gs_error_t ** e);
 
 /**
  * add or update content properties
@@ -1130,7 +1252,8 @@ gs_status_t hc_set_content_storage_policy(gs_container_t *c, const char *path, c
  * @param props the properites key=value 
  * @return an error their is an issue while setting the property
  */
-gs_status_t hc_set_content_property(gs_content_t *content, char **props,gs_error_t **e);
+gs_status_t hc_set_content_property(gs_content_t * content, char **props,
+	gs_error_t ** e);
 
 /**
  * get content properties
@@ -1139,7 +1262,8 @@ gs_status_t hc_set_content_property(gs_content_t *content, char **props,gs_error
  * @return an error their is an issue while getting the property
  */
 
-gs_status_t hc_get_content_properties(gs_content_t *content, char ***result, gs_error_t **e);
+gs_status_t hc_get_content_properties(gs_content_t * content, char ***result,
+	gs_error_t ** e);
 
 /**
  * delete a property to content
@@ -1147,7 +1271,97 @@ gs_status_t hc_get_content_properties(gs_content_t *content, char ***result, gs_
  * @param keys the list of properties keys  
  * @return an error their is an issue while deleting the property
  */
-gs_status_t hc_delete_content_property(gs_content_t *content, char ** keys, gs_error_t **e);
+gs_status_t hc_delete_content_property(gs_content_t * content, char **keys,
+	gs_error_t ** e);
+
+/**
+ * Create a copy of a content 
+ * @param c
+ * @param src  
+ * @param dst  
+ * @return an error their is an issue while deleting the property
+ */
+gs_status_t hc_copy_content(gs_container_t * c, const char *src,
+	const char *dst, gs_error_t ** e);
+
+
+/* Snapshots --------------------------------------------------------------- */
+
+/**
+ * The hidden type that represents a snapshot.
+ */
+typedef struct redc_snapshot_s redc_snapshot_t;
+
+/**
+ * Take a snapshot of a container.
+ *
+ * @param container The targeted container
+ * @param snapshot_name A name for the snapshot (must not start with a digit)
+ * @return An error if there is an issue while taking the snapshot, NULL otherwise
+ */
+gs_error_t *redc_take_snapshot(gs_container_t * container,
+	const char *snapshot_name);
+
+/**
+ * Delete a snapshot.
+ *
+ * @param container The targeted container
+ * @param snapshot_name The name of the snapshot to delete
+ * @return An error if there is an issue while deleting the snapshot, NULL otherwise
+ */
+gs_error_t *redc_delete_snapshot(gs_container_t * container,
+	const char *snapshot_name);
+
+/**
+ * Restore a snapshot.
+ *
+ * @param container The targeted container
+ * @param snapshot_name The name of the snapshot to restore
+ * @param hard_restore If true, erase all contents and snapshots more recent
+ *   than the specified snapshot (instead of just making contents reappear)
+ * @return An error if there is an issue while restoring the snapshot, NULL otherwise
+ */
+gs_error_t *redc_restore_snapshot(gs_container_t * container,
+	const char *snapshot_name, int hard_restore);
+
+/**
+ * Restore a content from snapshot.
+ *
+ * @param container The targeted container
+ * @param content The name of the content to restore
+ * @param snapshot_name The name of the snapshot to restore from
+ * @return An error if there is an issue while restoring the snapshot, NULL otherwise
+ */
+gs_error_t *redc_restore_snapshot_alias(gs_container_t * container,
+	const char *content, const char *snapshot_name);
+
+/**
+ * Get the list of snapshots of a container.
+ *
+ * @param container The targeted container
+ * @param[out] snapshots A pointer where to store the snapshots
+ * @return An error if there is an issue while listing snapshots, NULL otherwise
+ *
+ * @note The snapshots array is NULL-terminated,
+ *   and should be freed by redc_snapshot_array_clean
+ */
+gs_error_t *redc_list_snapshots(gs_container_t * container,
+	redc_snapshot_t *** snapshots);
+
+/**
+ * Get the name of a snapshot.
+ *
+ * @param snapshot The snapshot to get name of
+ * @return The name of the snapshot
+ */
+const char *redc_snapshot_get_name(redc_snapshot_t * snapshot);
+
+/**
+ * Clean an array of snapshots.
+ *
+ * @param snapshots The array of snapshots to clean.
+ */
+void redc_snapshot_array_clean(redc_snapshot_t ** snapshots);
 
 /** @} */
 

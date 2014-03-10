@@ -1,54 +1,36 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "grid.client.download"
-#endif
 #ifndef G_LOG_DOMAIN
-# define G_LOG_DOMAIN "grid.client.download"
+#define G_LOG_DOMAIN "grid.client.download"
 #endif
 
 #include "./gs_internals.h"
-#include "./rawx.h"
 
 static void
-download_debug(struct dl_status_s *status, gs_content_t *content, const gchar *msg)
+download_debug(struct dl_status_s *status, gs_content_t * content,
+	const gchar * msg)
 {
 #if 1
 	if (!DEBUG_ENABLED())
 		return;
 
 	DEBUG("GRID download : %s [%s/%s]"
-		" content{offset=%"G_GINT64_FORMAT";size=%"G_GINT64_FORMAT";already=%"G_GINT64_FORMAT"}"
-		" chunk{start=%"G_GINT64_FORMAT";dl_offset=%"G_GINT64_FORMAT";dl_size=%"G_GINT64_FORMAT";total=%"G_GINT64_FORMAT"}"
-		" retry{pos=%d;attempts=%d}",
-			msg, C1_NAME(content), C1_PATH(content),
-			status->dl_info.offset, status->dl_info.size, status->content_dl, 
-			status->chunk_start_offset, status->chunk_dl_offset, status->chunk_dl_size, status->chunk_dl,
-			status->last_position, status->last_position_attempts);
+		" content{offset=%" G_GINT64_FORMAT ";size=%" G_GINT64_FORMAT
+		";already=%" G_GINT64_FORMAT "}" " chunk{start=%" G_GINT64_FORMAT
+		";dl_offset=%" G_GINT64_FORMAT ";dl_size=%" G_GINT64_FORMAT ";total=%"
+		G_GINT64_FORMAT "}" " retry{pos=%d;attempts=%d}", msg, C1_NAME(content),
+		C1_PATH(content), status->dl_info.offset, status->dl_info.size,
+		status->content_dl, status->chunk_start_offset, status->chunk_dl_offset,
+		status->chunk_dl_size, status->chunk_dl, status->last_position,
+		status->last_position_attempts);
 #else
 	syslog(LOG_DEBUG, "GRID download : %s [%s/%s]"
-		" content{offset=%"G_GINT64_FORMAT";size=%"G_GINT64_FORMAT";already=%"G_GINT64_FORMAT"}"
-		" chunk{start=%"G_GINT64_FORMAT";dl_offset=%"G_GINT64_FORMAT";dl_size=%"G_GINT64_FORMAT";total=%"G_GINT64_FORMAT"}"
-		" retry{pos=%d;attempts=%d}",
-			msg, C1_NAME(content), C1_PATH(content),
-			status->dl_info.offset, status->dl_info.size, status->content_dl, 
-			status->chunk_start_offset, status->chunk_dl_offset, status->chunk_dl_size, status->chunk_dl,
-			status->last_position, status->last_position_attempts);
+		" content{offset=%" G_GINT64_FORMAT ";size=%" G_GINT64_FORMAT
+		";already=%" G_GINT64_FORMAT "}" " chunk{start=%" G_GINT64_FORMAT
+		";dl_offset=%" G_GINT64_FORMAT ";dl_size=%" G_GINT64_FORMAT ";total=%"
+		G_GINT64_FORMAT "}" " retry{pos=%d;attempts=%d}", msg, C1_NAME(content),
+		C1_PATH(content), status->dl_info.offset, status->dl_info.size,
+		status->content_dl, status->chunk_start_offset, status->chunk_dl_offset,
+		status->chunk_dl_size, status->chunk_dl, status->last_position,
+		status->last_position_attempts);
 #endif
 }
 
@@ -70,74 +52,104 @@ download_debug(struct dl_status_s *status, gs_content_t *content, const gchar *m
  * 
  * @return
  */
-static gboolean
-download_agregate(gs_content_t *content, GSList *agregate, struct dl_status_s *status, gboolean *may_reload, GError **gerr)
+static chunk_info_t *
+download_agregate(gs_content_t * content, GSList * agregate,
+	struct dl_status_s *status, gboolean * may_reload,
+	GSList ** p_broken_rawx_list, GError ** gerr)
 {
 	GSList *l;
 	GError *local_gerr = NULL;
+	struct dl_status_s statusTmp;
 
 	*may_reload = FALSE;
 
 	gboolean previousError = FALSE;
 
-	for (l=agregate; l ;l=l->next) {
+	memcpy(&statusTmp, status, sizeof(struct dl_status_s));
+
+	for (l = agregate; l; l = l->next) {
 		gs_chunk_t dummy_chunk;
+
 		dummy_chunk.content = content;
 		dummy_chunk.ci = l->data;
 
-		if (rawx_download(&dummy_chunk, &local_gerr, status)) {
+/* init val defaut if re-load */
+		memcpy(status, &statusTmp, sizeof(struct dl_status_s));
+
+		if (rawx_download(&dummy_chunk, &local_gerr, status,
+				p_broken_rawx_list)) {
 			download_debug(status, content, "chunk download succeeded");
 			*may_reload = FALSE;
 			if (local_gerr)
-                                g_clear_error(&local_gerr);
-			return TRUE;
+				g_clear_error(&local_gerr);
+
+			return l->data;
 		}
+
+
 		if (status->caller_error) {
-			download_debug(status, content, "chunk download error due to caller");
+			download_debug(status, content,
+				"chunk download error due to caller");
 			*may_reload = FALSE;
 			if (local_gerr)
-                                g_clear_error(&local_gerr);
-			return FALSE;
+				g_clear_error(&local_gerr);
+
+			return NULL;
 		}
+
+
+		if (status->content_dl > statusTmp.content_dl) {
+			ftruncate(*((int *) status->dl_info.user_data),
+				statusTmp.content_dl);
+			lseek(*((int *) status->dl_info.user_data), statusTmp.content_dl,
+				SEEK_SET);
+		}
+
 		/* then an error with the rawx happened, retry is possible */
-		//switch ((*gerr)->code) {
 		switch (local_gerr->code) {
-	
+
 			case CODE_CONTENT_CORRUPTED:
 				/* some bad bytes have been served to the client calback,
 				 * we cannot continue and think it is OK! */
-				GSETCODE(gerr, CODE_CONTENT_CORRUPTED, "corruption detected");
-				return FALSE;
-			case CODE_NETWORK_ERROR:
-				if ( previousError && (*gerr)->code != local_gerr->code) {
-					GSETCODE(gerr,CODE_PLATFORM_ERROR,"chunk download error, platform error");
-				} else {
-					GSETCODE(gerr,CODE_NETWORK_ERROR, "service unavailable");
-				}
-		
+				GSETCODE(gerr, CODE_CONTENT_CORRUPTED,
+					"corruption detected: %s", local_gerr->message);
 				break;
-			case 1404:/* NOT FOUND */
-			case 1410:/* GONE */
-			case 1416:/* RANGE NOT SATISFIABLE */
-				if ( previousError && (*gerr)->code != local_gerr->code) {
-                                        GSETCODE(gerr,CODE_PLATFORM_ERROR,"chunk download error, platform error");
-                                } else {
-					GSETCODE(gerr,CODE_CONTENT_UNCOMPLETE, "Missing chunk");
+			case CODE_NETWORK_ERROR:
+				if (previousError && (*gerr)->code != local_gerr->code) {
+					GSETCODE(gerr, CODE_PLATFORM_ERROR,
+						"chunk download error, platform error");
+				}
+				else {
+					GSETCODE(gerr, CODE_NETWORK_ERROR, "service unavailable");
+				}
+
+				break;
+			case 1404:			/* NOT FOUND */
+			case 1410:			/* GONE */
+			case 1416:			/* RANGE NOT SATISFIABLE */
+				if (previousError && (*gerr)->code != local_gerr->code) {
+					GSETCODE(gerr, CODE_PLATFORM_ERROR,
+						"chunk download error, platform error");
+				}
+				else {
+					GSETCODE(gerr, CODE_CONTENT_UNCOMPLETE, "Missing chunk");
 				}
 				*may_reload = TRUE;
-				download_debug(status, content, "chunk download error, reload possible");
+				download_debug(status, content,
+					"chunk download error, reload possible");
 				break;
 			default:
 				download_debug(status, content, "chunk download error");
 				break;
 		}
+
 		previousError = TRUE;
 	}
 
 	if (local_gerr)
-                g_clear_error(&local_gerr);
+		g_clear_error(&local_gerr);
 	GSETERROR(gerr, "Chunk agregate not/partially downloaded");
-	return FALSE;
+	return NULL;
 }
 
 /**
@@ -146,12 +158,13 @@ download_agregate(gs_content_t *content, GSList *agregate, struct dl_status_s *s
  * @return an element of the 'agregates' list
  */
 static GSList *
-download_jump_to_target(GSList *agregates, struct dl_status_s *status, gs_error_t **gserr)
+download_jump_to_target(GSList * agregates, struct dl_status_s *status,
+	chunk_info_t ** p_failed_ci, gs_error_t ** gserr)
 {
 	GSList *ag, *chunks;
 	chunk_info_t *ci = NULL;
 	int64_t wanted_offset, remaining_size;
-	
+
 	status->caller_error = FALSE;
 	status->chunk_start_offset = 0LL;
 	status->chunk_dl_offset = 0LL;
@@ -162,7 +175,9 @@ download_jump_to_target(GSList *agregates, struct dl_status_s *status, gs_error_
 	chunks = agregates->data;
 	ci = chunks->data;
 
-	for (ag=agregates; ag ; ag=ag->next, status->chunk_start_offset += ci->size) {
+
+	for (ag = agregates; ag;
+		ag = ag->next, status->chunk_start_offset += ci->size) {
 		chunks = ag->data;
 		ci = chunks->data;
 
@@ -176,20 +191,26 @@ download_jump_to_target(GSList *agregates, struct dl_status_s *status, gs_error_
 				status->last_position = ci->position;
 			}
 
-			status->last_position_attempts ++;
+			status->last_position_attempts++;
 
 			if (status->last_position_attempts > NB_DOWNLOADS_GET) {
-				GSERRORSET(gserr, "Too many DL attempts on agregate %d", ci->position);
+				GSERRORSET(gserr, "Too many DL attempts on agregate %d",
+					ci->position);
+				if (p_failed_ci)
+					*p_failed_ci = ci;
 				return NULL;
 			}
 
 			/* We found the right and it is not used to much, try it */
-			status->chunk_dl_offset = wanted_offset - status->chunk_start_offset;
+			status->chunk_dl_offset =
+				wanted_offset - status->chunk_start_offset;
 			status->chunk_dl_size = ci->size - status->chunk_dl_offset;
 			status->chunk_dl_size = MIN(status->chunk_dl_size, remaining_size);
+
 			return ag;
 		}
 	}
+
 
 	GSERRORSET(gserr, "Offset/Size pair not satisfiable");
 	return NULL;
@@ -198,18 +219,21 @@ download_jump_to_target(GSList *agregates, struct dl_status_s *status, gs_error_
 static gboolean
 download_terminated(struct dl_status_s *status)
 {
-	return status->caller_stopped || status->caller_error
+	return /*status->caller_stopped || */ status->caller_error
 		|| (status->content_dl >= status->dl_info.size);
 }
 
 static gboolean
-agregate_chunks(GSList **result, gs_content_t *content, gs_error_t **err)
+agregate_chunks(GSList ** result, gs_content_t * content, gs_error_t ** err)
 {
 	GSList *list;
 
-	list = g_slist_reverse(g_slist_agregate(content->chunk_list, chunkinfo_sort_position_DESC));
+	list =
+		g_slist_reverse(g_slist_agregate(content->chunk_list,
+			chunkinfo_sort_position_DESC));
 
-	DEBUG("%u chunks in %u agregates", g_slist_length(content->chunk_list), g_slist_length(list));
+	DEBUG("%u chunks in %u agregates", g_slist_length(content->chunk_list),
+		g_slist_length(list));
 
 	if (GS_OK != gs_check_chunk_agregate(list, err)) {
 		g_slist_free_agregated(list);
@@ -224,7 +248,8 @@ agregate_chunks(GSList **result, gs_content_t *content, gs_error_t **err)
 }
 
 static gboolean
-reload_and_agregate_chunks(GSList **result, gs_content_t *content, gs_error_t **err)
+reload_and_agregate_chunks(GSList ** result, gs_content_t * content,
+	gs_error_t ** err)
 {
 	if (*result) {
 		g_slist_free_agregated(*result);
@@ -241,13 +266,35 @@ reload_and_agregate_chunks(GSList **result, gs_content_t *content, gs_error_t **
 }
 
 gs_status_t
-gs_download_content (gs_content_t *content, gs_download_info_t *dl_info, gs_error_t **err)
+gs_download_content(gs_content_t * content, gs_download_info_t * dl_info,
+	gs_error_t ** err)
 {
-	struct dl_status_s status;
+	return gs_download_content_full(content, dl_info, NULL, NULL, NULL, err);
+}
+
+gs_status_t
+gs_download_content_full(gs_content_t * content, gs_download_info_t * dl_info,
+	const char *stgpol, void *_filtered, void *_beans, gs_error_t ** err)
+{
+	struct dl_status_s status, status_copy, status_at_first_error;
 	GSList *agregated_chunks;
 	int remaining_reloads = NB_RELOADS_GET;
+	gboolean is_rainx = FALSE, is_last_subchunk = TRUE;
+	GError *local_gerr = NULL;
+	GSList *broken_rawx_list = NULL, *local_filtered = NULL, *local_beans =
+		NULL;
+	GHashTable *failed_chunks = NULL;
+	chunk_info_t *cur_chunk = NULL, *failed_ci = NULL;
+	gboolean may_reload = FALSE;
+	GSList *next_agregate = NULL;
+	gs_status_t ret = GS_ERROR;
+	GSList *filtered = _filtered;
+	GSList *beans = _beans;
+	guint k = 0, m = 0;
+	gint64 k_signed, m_signed;
+	chunk_info_t *ci = NULL;
 
-	/*check the parameters*/
+	/*check the parameters */
 	if (!content || !dl_info) {
 		GSERRORSET(err, "Invalid parameter");
 		return GS_ERROR;
@@ -268,20 +315,28 @@ gs_download_content (gs_content_t *content, gs_download_info_t *dl_info, gs_erro
 
 	/* (lazy) reload of the content's chunks */
 	if (!content->chunk_list) {
-		if (!gs_content_reload(content, TRUE, TRUE, err)) {
-			GSERRORSET(err,"Cannot get the chunks of '%s'", content->info.path);
+		if (!gs_content_reload_with_filtered(content, TRUE, TRUE,
+				&local_filtered, &local_beans, err)) {
+			GSERRORSET(err, "Cannot get the chunks of '%s'",
+				content->info.path);
 			return GS_ERROR;
 		}
 	}
+
+	/* Overwrite storage policy by the real one */
+	stgpol = content->policy;
+	is_rainx =
+		stg_pol_is_rainx(&(content->info.container->info.gs->ni), stgpol);
 
 	/* Sanity checks on the data boundaries. These checks must be performed
 	 * after the (lazy) chunks reload because the content's size might be
 	 * unknown */
 	if (status.dl_info.size == 0LL) {
-		if (status.dl_info.offset == 0LL) {/* download everything */
+		if (status.dl_info.offset == 0LL) {	/* download everything */
 			status.dl_info.size = content->info.size;
 			status.dl_info.offset = 0LL;
-		} else { /* Download everything between the offset and the end */
+		}
+		else {					/* Download everything between the offset and the end */
 			status.dl_info.size = content->info.size - status.dl_info.offset;
 		}
 	}
@@ -289,12 +344,12 @@ gs_download_content (gs_content_t *content, gs_download_info_t *dl_info, gs_erro
 		if (status.dl_info.offset == 0LL)
 			status.dl_info.offset = 0LL;
 	}
-	if ((status.dl_info.offset > content->info.size) 
-			|| (status.dl_info.offset + status.dl_info.size > content->info.size)) {
+	if ((status.dl_info.offset > content->info.size)
+		|| (status.dl_info.offset + status.dl_info.size > content->info.size)) {
 		GSERRORCODE(err, 400, "Byte range not satisfiable "
-			"asked=[%"G_GINT64_FORMAT",%"G_GINT64_FORMAT"] allowed=[0,%"G_GINT64_FORMAT"]",
-			status.dl_info.offset, status.dl_info.offset + status.dl_info.size,
-			content->info.size);
+			"asked=[%" G_GINT64_FORMAT ",%" G_GINT64_FORMAT "] allowed=[0,%"
+			G_GINT64_FORMAT "]", status.dl_info.offset,
+			status.dl_info.offset + status.dl_info.size, content->info.size);
 		return GS_ERROR;
 	}
 
@@ -306,85 +361,178 @@ gs_download_content (gs_content_t *content, gs_download_info_t *dl_info, gs_erro
 	}
 
 	download_debug(&status, content, "downloading content");
+	failed_chunks =
+		g_hash_table_new_full(g_int_hash, g_int_equal, g_free, NULL);
 
-	
-	GError *local_gerr = NULL;
+	if (is_rainx) {
+		if (stg_pol_rainx_get_param(&(content->info.container->info.gs->ni),
+				stgpol, DS_KEY_K, &k_signed))
+			k = k_signed;
+		if (stg_pol_rainx_get_param(&(content->info.container->info.gs->ni),
+				stgpol, DS_KEY_M, &m_signed))
+			m = m_signed;
+	}
+	else {
+		struct storage_policy_s *sp =
+			storage_policy_init(&(content->info.container->info.gs->ni),
+			stgpol);
+		const gchar *nb_copy =
+			data_security_get_param(storage_policy_get_data_security(sp),
+			"nb_copy");
+		// In case of duplication, we have one base chunk
+		k = 1;
+		// and (nb_copy - 1) backups
+		m = nb_copy != NULL ? strtoll(nb_copy, NULL, 10) - 1 : 0;
+		storage_policy_clean(sp);
+	}
+
 	while (!download_terminated(&status)) {
-		gboolean may_reload = FALSE;
-		GSList *next_agregate = NULL;
+		may_reload = FALSE;
+		next_agregate = NULL;
+		failed_ci = NULL;
 
 		/* Find the first, chunks agregate that match our current offset.
 		 * Be careful, this call will change the download status */
-		next_agregate = download_jump_to_target(agregated_chunks, &status, err);
+		next_agregate =
+			download_jump_to_target(agregated_chunks, &status, &failed_ci, err);
 		if (!next_agregate) {
-			if ( local_gerr ) {
-				GSERRORCODE(err,local_gerr->code,local_gerr->message);
+			if (local_gerr) {
+				GSERRORCODE(err, local_gerr->code, local_gerr->message);
 				g_clear_error(&local_gerr);
-			} else {
+			}
+			else {
 				GSERRORCODE(err, CODE_CONTENT_UNCOMPLETE, "No chunk matches");
 			}
-			goto error_label;
-		} else {
+			if (is_rainx) {
+				if (ci) {
+					int64_t nbW64 = ci->size;
+
+					status.content_dl = status.content_dl + nbW64;
+					status.chunk_dl = status.content_dl + nbW64;
+				}
+				remaining_reloads = NB_RELOADS_GET;
+				status.caller_stopped = TRUE;
+				if (status.content_dl < status.dl_info.size)
+					continue;
+				// else go on with this iteration, to see if we need reconstruction
+			}
+			else {
+				goto error_label;
+			}
+		}
+		else {
 			g_clear_error(&local_gerr);
 		}
 
 		download_debug(&status, content, "downloading chunk");
+		if (next_agregate) {
+			ci = g_slist_nth_data(next_agregate->data, 0);
+			is_last_subchunk = ((ci->position + 1) % k) == 0;
+			if (is_rainx && remaining_reloads == -1
+				&& g_hash_table_size(failed_chunks) > 0)
+				status.caller_stopped = TRUE;
+			cur_chunk = download_agregate(content, next_agregate->data, &status,
+				&may_reload, &broken_rawx_list, &local_gerr);
+			if (NULL == cur_chunk) {
 
-		if (GS_OK != download_agregate(content, next_agregate->data, &status, &may_reload, &local_gerr)) {
-
-			if (status.caller_error) {/* no need to continue if the caller had problems */
-				GSERRORCAUSE(err, local_gerr, "Caller error");
-				g_clear_error(&local_gerr);
-				goto error_label;
-			}
-			
-			if (local_gerr && local_gerr->code == CODE_CONTENT_CORRUPTED) {
-				// no retry
-				GSERRORCAUSE(err, local_gerr, "Corruption detected");
-				g_clear_error(&local_gerr);
-				goto error_label;
-			}
-			if (local_gerr && local_gerr->code == CODE_NETWORK_ERROR) {
-				// waiting before retry
-				usleep(100000);
-			}
-
-			if (may_reload) {
-				if (remaining_reloads-- <= 0) {
-					GSERRORCAUSE(err, local_gerr, "Download error");
-					GSERRORSET(err, "Too many reload attempts");
+				if (status.caller_error) {	/* no need to continue if the caller had problems */
+					GSERRORCAUSE(err, local_gerr, "Caller error");
 					g_clear_error(&local_gerr);
 					goto error_label;
 				}
-				else if (!reload_and_agregate_chunks(&agregated_chunks, content, err)) {
-					GSERRORCAUSE(err, local_gerr, "Download failed and reload error");
+
+				if (local_gerr && local_gerr->code == CODE_CONTENT_CORRUPTED) {
+					// no retry
+					GSERRORCAUSE(err, local_gerr, "Corruption detected.");
 					g_clear_error(&local_gerr);
 					goto error_label;
 				}
-				download_debug(&status, content, "content reloaded");
 
-				
-				//if (local_gerr)
-				//	g_clear_error(&local_gerr);
+				if (local_gerr && local_gerr->code == CODE_NETWORK_ERROR) {
+					// waiting before retry
+					usleep(100000);
+				}
+
+				if (may_reload) {
+					if (remaining_reloads-- >= 0) {
+						if (is_rainx) {
+							if (g_hash_table_size(failed_chunks) > m) {
+								GSERRORCAUSE(err, local_gerr,
+									"Too many errors on same metachunk, reconstruction is impossible");
+								g_clear_error(&local_gerr);
+								goto error_label;
+							}
+							if (g_hash_table_size(failed_chunks) == 0) {
+								memcpy(&status_at_first_error, &status,
+									sizeof(struct dl_status_s));
+							}
+							g_hash_table_insert(failed_chunks,
+								g_memdup(&(ci->position),
+									sizeof(chunk_position_t)), ci);
+							continue;
+						}
+						else {
+							GSERRORCAUSE(err, local_gerr, "Download error");
+							GSERRORSET(err, "Too many reload attempts");
+							g_clear_error(&local_gerr);
+							goto error_label;
+						}
+					}
+					else {
+						goto error_label;
+					}
+				}
 			}
-			/* else {
-			 *   // No need to reload, just retry on the same chunk agregate
-			 * } */
-
-			/* no need to print */
-			WARN("Retrying after : %s", (local_gerr?local_gerr->message:"unknown error"));
 		}
-	}
-	g_clear_error(&local_gerr);
-	
+
+		remaining_reloads = NB_RELOADS_GET;
+		if (is_rainx && g_hash_table_size(failed_chunks) > 0
+			&& is_last_subchunk) {
+			status.caller_stopped = FALSE;
+			DEBUG("Corruption detected, Reconstruction started...");
+			memcpy(&status_copy, &status, sizeof(struct dl_status_s));
+			memcpy(&status, &status_at_first_error, sizeof(struct dl_status_s));
+			if (FALSE == rainx_ask_reconstruct(&status, content,
+					agregated_chunks,
+					local_filtered ? local_filtered : filtered,
+					local_beans ? local_beans : beans, broken_rawx_list,
+					failed_chunks, stgpol, err)) {
+				GSERRORCAUSE(err, local_gerr,
+					"Corruption detected, and reconstruct failed.");
+				GSERRORSET(err, "Too many reload attempts");
+				g_clear_error(&local_gerr);
+
+				if (!reload_and_agregate_chunks(&agregated_chunks, content,
+						err)) {
+					GSERRORCAUSE(err, local_gerr,
+						"Download failed and reload error");
+					g_clear_error(&local_gerr);
+					goto error_label;
+				}
+				DEBUG("Reconstruction failed, reload and restarted...");
+			}
+			else {
+				INFO("Reconstruction finished with success.");
+				g_clear_error(&local_gerr);
+				gs_error_clear(err);
+			}
+			g_hash_table_remove_all(failed_chunks);
+			memcpy(&status, &status_copy, sizeof(struct dl_status_s));
+		}
+		download_debug(&status, content, "content reloaded");
+	}							// end while
+
 	download_debug(&status, content, "content downloaded");
-	if (agregated_chunks)
-		g_slist_free_agregated(agregated_chunks);
-	return GS_OK;
+	ret = GS_OK;
 
 error_label:
+	g_clear_error(&local_gerr);
 	if (agregated_chunks)
 		g_slist_free_agregated(agregated_chunks);
-	return GS_ERROR;
+	g_hash_table_destroy(failed_chunks);
+	if (local_filtered)
+		g_slist_free(local_filtered);
+	if (local_beans)
+		_bean_cleanl2(local_beans);
+	return ret;
 }
-

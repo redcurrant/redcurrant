@@ -1,37 +1,20 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /**
  * @file meta1_backend.h
  */
 
 #ifndef GRIDSTORAGE__META1_BACKEND_H
-# define GRIDSTORAGE__META1_BACKEND_H 1
+#define GRIDSTORAGE__META1_BACKEND_H 1
 
 /**
  * @addtogroup meta1v2_backend
  * @{
  */
 
-# ifndef  META1_TYPE_NAME
-#  define META1_TYPE_NAME "meta1"
-# endif
+#ifndef  META1_TYPE_NAME
+#define META1_TYPE_NAME "meta1"
+#endif
 
-# define META1_SCHEMA \
+#define META1_SCHEMA \
 	"CREATE TABLE IF NOT EXISTS containers ( "\
 		"cid BLOB NOT NULL PRIMARY KEY, "\
 		"vns TEXT NOT NULL, "\
@@ -60,21 +43,31 @@
 		"VALUES (\"version:main.properties\",\"1:0\");" \
 	"VACUUM"
 
-# include <glib.h>
-# include <metatypes.h>
+#include <glib.h>
+#include <metautils/lib/metatypes.h>
 
 enum m1v2_open_type_e
 {
-	M1V2_OPENBASE_LOCAL,
-	M1V2_OPENBASE_MASTERONLY,
-	M1V2_OPENBASE_MASTERSLAVE,
-	M1V2_OPENBASE_SLAVEONLY,
+	M1V2_OPENBASE_LOCAL = 0x000,
+	M1V2_OPENBASE_MASTERONLY = 0x001,
+	M1V2_OPENBASE_SLAVEONLY = 0x002,
+	M1V2_OPENBASE_MASTERSLAVE = 0x003,
+};
+
+enum m1v2_getsrv_e
+{
+	M1V2_GETSRV_RENEW = 0x00,
+	M1V2_GETSRV_REUSE = 0x01,
+	M1V2_GETSRV_DRYRUN = 0x02,
 };
 
 /* Avoids an include */
 struct grid_lb_iterator_s;
 struct meta1_prefixes_set_s;
 struct sqlx_repository_s;
+struct sqlx_sqlite3_s;
+struct grid_lbpool_s;
+struct hc_url_s;
 
 /* Hidden type */
 struct meta1_backend_s;
@@ -88,27 +81,8 @@ struct meta1_backend_s;
  * @param basedir
  * @return
  */
-GError* meta1_backend_init(struct meta1_backend_s **result,
-		const gchar *ns, const gchar *id, const gchar *basedir);
-
-/**
- * @param m1
- * @param type
- * @param iter
- */
-void meta1_configure_type(struct meta1_backend_s *m1,
-		const gchar *type, struct grid_lb_iterator_s *iter);
-
-/** Returns the SQLX repository created at meta1_backend_init().
- *
- * Please do not free the SQLX repository, this is acheived by
- * meta1_backend_clean().
- *
- * @param m1
- * @return a pointer the internal sqlx repository of the given meta1
- */
-struct sqlx_repository_s* meta1_backend_get_repository(
-		struct meta1_backend_s *m1);
+struct meta1_backend_s *meta1_backend_init(const gchar * ns,
+	struct sqlx_repository_s *repo, struct grid_lbpool_s *glp);
 
 /** Returns the set of prefixes internally managed
  *
@@ -116,10 +90,10 @@ struct sqlx_repository_s* meta1_backend_get_repository(
  * in the meta1_backend_clean() function.
  *
  * @param m1
- * @return a pointer 
+ * @return a pointer
  */
-struct meta1_prefixes_set_s* meta1_backend_get_prefixes(
-		struct meta1_backend_s *m1);
+struct meta1_prefixes_set_s *meta1_backend_get_prefixes(struct meta1_backend_s
+	*m1);
 
 /** Returns the holder of LB update policy.
  *
@@ -129,8 +103,8 @@ struct meta1_prefixes_set_s* meta1_backend_get_prefixes(
  * @param m1
  * @return a pointer
  */
-struct service_update_policies_s* meta1_backend_get_svcupdate(
-		struct meta1_backend_s *m1);
+struct service_update_policies_s *meta1_backend_get_svcupdate(struct
+	meta1_backend_s *m1, const char *ns_name);
 
 /** Backend destructor.
  *
@@ -149,8 +123,8 @@ void meta1_backend_clean(struct meta1_backend_s *m1);
  * @param cid
  * @return
  */
-GError* meta1_backend_create_container(struct meta1_backend_s *m1,
-		const gchar *vns, const gchar *cname, container_id_t *cid);
+GError *meta1_backend_create_container(struct meta1_backend_s *m1,
+	const gchar * vns, const gchar * cname, container_id_t * cid);
 
 /**
  * @param m1
@@ -158,16 +132,16 @@ GError* meta1_backend_create_container(struct meta1_backend_s *m1,
  * @param flush
  * @return
  */
-GError* meta1_backend_destroy_container(struct meta1_backend_s *m1,
-		const container_id_t cid, gboolean flush);
+GError *meta1_backend_destroy_container(struct meta1_backend_s *m1,
+	const container_id_t cid, gboolean flush);
 
 /**
  * @param m1
  * @param cid
  * @param result
  */
-GError* meta1_backend_info_container(struct meta1_backend_s *m1,
-		const container_id_t cid, gchar ***result);
+GError *meta1_backend_info_container(struct meta1_backend_s *m1,
+	const container_id_t cid, gchar *** result);
 
 /**
  * @param m1
@@ -176,9 +150,9 @@ GError* meta1_backend_info_container(struct meta1_backend_s *m1,
  * @param result
  * @return
  */
-GError* meta1_backend_get_container_service_available(
-		struct meta1_backend_s *m1, const container_id_t cid,
-		const gchar *srvtype, gchar ***result);
+GError *meta1_backend_get_container_service_available(struct meta1_backend_s
+	*m1, struct hc_url_s *url, const gchar * srvtype, gboolean dryrun,
+	gchar *** result);
 
 /**
  * @param m1
@@ -187,9 +161,19 @@ GError* meta1_backend_get_container_service_available(
  * @parem result
  * @return
  */
-GError* meta1_backend_get_container_new_service(
-		struct meta1_backend_s *m1, const container_id_t cid,
-		const gchar *srvtype, gchar ***result);
+GError *meta1_backend_get_container_new_service(struct meta1_backend_s *m1,
+	struct hc_url_s *url, const gchar * srvtype, gboolean dryrun,
+	gchar *** result);
+
+/**
+ * @param m1
+ * @param url
+ * @param result
+ * @return
+ */
+GError *meta1_backend_get_all_services(struct meta1_backend_s *m1,
+	const container_id_t cid, gchar *** result);
+
 
 /**
  * @param m1
@@ -198,8 +182,8 @@ GError* meta1_backend_get_container_new_service(
  * @param result
  * @return
  */
-GError* meta1_backend_get_container_all_services(struct meta1_backend_s *m1,
-		const container_id_t cid, const gchar *srvtype, gchar ***result);
+GError *meta1_backend_get_container_all_services(struct meta1_backend_s *m1,
+	const container_id_t cid, const gchar * srvtype, gchar *** result);
 
 /**
  * @param m1
@@ -207,9 +191,9 @@ GError* meta1_backend_get_container_all_services(struct meta1_backend_s *m1,
  * @param srvtype
  * @param urlv
  * @return
- */ 
-GError* meta1_backend_del_container_services(struct meta1_backend_s *m1,
-		const container_id_t cid, const gchar *srvtype, gchar **urlv);
+ */
+GError *meta1_backend_del_container_services(struct meta1_backend_s *m1,
+	const container_id_t cid, const gchar * srvtype, gchar ** urlv);
 
 /**
  * @param m1
@@ -217,17 +201,18 @@ GError* meta1_backend_del_container_services(struct meta1_backend_s *m1,
  * @param props
  * @return
  */
-GError* meta1_backend_set_container_properties(struct meta1_backend_s *m1,
-		const container_id_t cid, gchar **props);
+GError *meta1_backend_set_container_properties(struct meta1_backend_s *m1,
+	const container_id_t cid, gchar ** props);
 
 /**
  * @param m1
  * @param cid
  * @param names
  * @return
- */ 
-GError* meta1_backend_del_container_properties(struct meta1_backend_s *m1,
-		const container_id_t cid, gchar **names);
+ */
+GError *meta1_backend_del_container_properties(struct meta1_backend_s *m1,
+	const container_id_t cid, gchar ** names);
+
 
 /**
  * @param m1
@@ -236,8 +221,8 @@ GError* meta1_backend_del_container_properties(struct meta1_backend_s *m1,
  * @param result
  * @return
  */
-GError* meta1_backend_get_container_properties(struct meta1_backend_s *m1,
-		const container_id_t cid, gchar **names, gchar ***result);
+GError *meta1_backend_get_container_properties(struct meta1_backend_s *m1,
+	const container_id_t cid, gchar ** names, gchar *** result);
 
 /**
  * @param m1
@@ -245,8 +230,8 @@ GError* meta1_backend_get_container_properties(struct meta1_backend_s *m1,
  * @param packedurl formatted as 'SEQ|TYPE|IP:PORT|ARGS'
  * @return
  */
-GError* meta1_backend_set_service_arguments(struct meta1_backend_s *m1,
-		const container_id_t cid, const gchar *packedurl);
+GError *meta1_backend_set_service_arguments(struct meta1_backend_s *m1,
+	const container_id_t cid, const gchar * packedurl);
 
 /**
  * @param m1
@@ -254,16 +239,16 @@ GError* meta1_backend_set_service_arguments(struct meta1_backend_s *m1,
  * @param packedurl formatted as 'SEQ|TYPE|IP:PORT|ARGS'
  * @return
  */
-GError* meta1_backend_force_service(struct meta1_backend_s *m1,
-		const container_id_t cid, const gchar *packedurl);
+GError *meta1_backend_force_service(struct meta1_backend_s *m1,
+	const container_id_t cid, const gchar * packedurl);
 
 /**
  * @param m1
  * @param cid key member, not touched
  * @return
  */
-GError* meta1_backend_destroy_m2_container(struct meta1_backend_s *m1,
-		const container_id_t cid);
+GError *meta1_backend_destroy_m2_container(struct meta1_backend_s *m1,
+	const container_id_t cid);
 
 /**
  * Ugly quirk
@@ -274,16 +259,29 @@ GError* meta1_backend_destroy_m2_container(struct meta1_backend_s *m1,
  * @param sq3
  * @return
  */
-GError* meta1_backend_open_base(struct meta1_backend_s *m1,
-		const container_id_t cid, enum m1v2_open_type_e how,
-		struct sqlx_sqlite3_s **sq3);
+GError *meta1_backend_open_base(struct meta1_backend_s *m1,
+	const container_id_t cid, enum m1v2_open_type_e how,
+	struct sqlx_sqlite3_s **sq3);
+
+/**
+ * Returns whether the base associated to prefix was already created.
+ * @param m1
+ * @param prefix
+ * @return
+ */
+gboolean
+ 
+ 
+ 
+meta1_backend_base_already_created(struct meta1_backend_s *m1,
+	const guint8 * prefix);
 
 /**
  * @param p
  * @param ns
  * @param ref
  */
-typedef void (*m1b_ref_hook) (gpointer p, const gchar *ns, const gchar *ref);
+typedef void (*m1b_ref_hook) (gpointer p, const gchar * ns, const gchar * ref);
 
 /**
  * @param m1
@@ -294,9 +292,9 @@ typedef void (*m1b_ref_hook) (gpointer p, const gchar *ns, const gchar *ref);
  * @param ref_hook_data
  * @return
  */
-GError* meta1_backend_list_references_by_service(struct meta1_backend_s *m1,
-		const container_id_t cid, const gchar *srvtype, const gchar *url,
-		m1b_ref_hook ref_hook, gpointer ref_hook_data);
+GError *meta1_backend_list_references_by_service(struct meta1_backend_s *m1,
+	const container_id_t cid, const gchar * srvtype, const gchar * url,
+	m1b_ref_hook ref_hook, gpointer ref_hook_data);
 
 /**
  * @param m1
@@ -305,9 +303,19 @@ GError* meta1_backend_list_references_by_service(struct meta1_backend_s *m1,
  * @param ref_hook_data
  * @return
  */
-GError* meta1_backend_list_references(struct meta1_backend_s *m1,
-		const container_id_t cid,
-		m1b_ref_hook ref_hook, gpointer ref_hook_data);
+GError *meta1_backend_list_references(struct meta1_backend_s *m1,
+	const container_id_t cid, m1b_ref_hook ref_hook, gpointer ref_hook_data);
+
+
+GError *meta1_backend_update_m1_policy(struct meta1_backend_s *m1,
+	const gchar * ns, const container_id_t prefix, const container_id_t cid,
+	const gchar * srvtype, const gchar * excludesrv, gchar * action,
+	gboolean checkonly, gchar ** result);
+
+/**
+ *
+ */
+gchar *meta1_backend_get_ns_name(const struct meta1_backend_s *m1);
 
 /** @} */
 #endif

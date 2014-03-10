@@ -1,25 +1,8 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "integrity.main.log_event_filter"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "integrity.main.log_event_filter"
 #endif
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 
 #include "log_event_filter.h"
 #include "event_filter.h"
@@ -62,8 +45,9 @@ static gchar *broken_reason_str[] = {
  * @return TRUE or FALSE if an error occured
  */
 static gboolean
-_build_chunk_path(const service_info_t * service_info, const struct broken_element_s *broken_element,
-    gchar * chunk_path, gsize chunk_path_size, GError ** error)
+_build_chunk_path(const service_info_t * service_info,
+	const struct broken_element_s *broken_element, gchar * chunk_path,
+	gsize chunk_path_size, GError ** error)
 {
 	struct service_tag_s *tag = NULL;
 	gchar str_chunk_id[2 * sizeof(hash_sha256_t) + 1];
@@ -87,32 +71,39 @@ _build_chunk_path(const service_info_t * service_info, const struct broken_eleme
 
 	tag = service_info_get_tag(service_info->tags, NAME_TAGNAME_RAWX_VOL);
 	if (tag == NULL) {
-		GSETERROR(error, "Failed to retrieve tag [%s] from service_info", NAME_TAGNAME_RAWX_VOL);
+		GSETERROR(error, "Failed to retrieve tag [%s] from service_info",
+			NAME_TAGNAME_RAWX_VOL);
 		return FALSE;
 	}
 
 	memset(str_volume_path, '\0', sizeof(str_volume_path));
 
-	if (!service_tag_get_value_string(tag, str_volume_path, LIMIT_LENGTH_VOLUMENAME - 1, error)) {
-		GSETERROR(error, "Failed to extract string value from tag [%s]", NAME_TAGNAME_RAWX_VOL);
+	if (!service_tag_get_value_string(tag, str_volume_path,
+			LIMIT_LENGTH_VOLUMENAME - 1, error)) {
+		GSETERROR(error, "Failed to extract string value from tag [%s]",
+			NAME_TAGNAME_RAWX_VOL);
 		return FALSE;
 	}
 
 	memset(str_chunk_id, '\0', sizeof(str_chunk_id));
 
-	buffer2str(broken_element->chunk_id, sizeof(broken_element->chunk_id), str_chunk_id, sizeof(str_chunk_id) - 1);
+	buffer2str(broken_element->chunk_id, sizeof(broken_element->chunk_id),
+		str_chunk_id, sizeof(str_chunk_id) - 1);
 
 	memset(str_rawx_addr, '\0', sizeof(str_rawx_addr));
 
-	addr_info_to_string(&(service_info->addr), str_rawx_addr, sizeof(str_rawx_addr) - 1);
+	addr_info_to_string(&(service_info->addr), str_rawx_addr,
+		sizeof(str_rawx_addr) - 1);
 
-	snprintf(chunk_path, chunk_path_size - 1, "%s/%s@%s", str_volume_path, str_chunk_id, str_rawx_addr);
+	snprintf(chunk_path, chunk_path_size - 1, "%s/%s@%s", str_volume_path,
+		str_chunk_id, str_rawx_addr);
 
 	return TRUE;
 }
 
 gboolean
-log_broken_event(const struct broken_event_s * broken_event, void *domain, GError ** error)
+log_broken_event(const struct broken_event_s * broken_event, void *domain,
+	GError ** error)
 {
 	GSList *l1 = NULL;
 	struct broken_element_s *broken_element = NULL;
@@ -137,21 +128,26 @@ log_broken_event(const struct broken_event_s * broken_event, void *domain, GErro
 
 		memset(str_container_id, '\0', sizeof(str_container_id));
 
-		buffer2str(broken_element->container_id, sizeof(broken_element->container_id), str_container_id,
-		    sizeof(str_container_id) - 1);
+		buffer2str(broken_element->container_id,
+			sizeof(broken_element->container_id), str_container_id,
+			sizeof(str_container_id) - 1);
 
 		if (!data_is_zeroed(broken_element->chunk_id, sizeof(hash_sha256_t))) {
 			memset(str_chunk, '\0', sizeof(str_chunk));
-			if (!_build_chunk_path(&(broken_event->service_info), broken_element, str_chunk,
-				sizeof(str_chunk), &local_error)) {
+			if (!_build_chunk_path(&(broken_event->service_info),
+					broken_element, str_chunk, sizeof(str_chunk),
+					&local_error)) {
 				ERROR("Failed to build chunk path : %s", local_error->message);
 				continue;
 			}
-			INFO_DOMAIN(domain, "The property [%s] in chunk [%s] of content [%s/%s/%s] %s %s",
-			    broken_property_str[broken_element->property], str_chunk,
-			    broken_event->service_info.ns_name, broken_element->content_name, str_container_id,
-			    broken_reason_str[broken_element->reason], broken_location_str[broken_element->location]);
-				NOTICE("log event filter info..\n");
+			INFO_DOMAIN(domain,
+				"The property [%s] in chunk [%s] of content [%s/%s/%s] %s %s",
+				broken_property_str[broken_element->property], str_chunk,
+				broken_event->service_info.ns_name,
+				broken_element->content_name, str_container_id,
+				broken_reason_str[broken_element->reason],
+				broken_location_str[broken_element->location]);
+			NOTICE("log event filter info..\n");
 		}
 	}
 
@@ -168,11 +164,13 @@ init_log_event_filter(const gchar * domain, GError ** error)
 
 	filter.location = L_ALL | L_CHUNK | L_META2;
 	filter.property =
-	    P_CONTAINER_ID | P_CONTENT_NAME | P_CONTENT_SIZE | P_CONTENT_CHUNK_NB | P_CONTENT_METADATA |
-	    P_CONTENT_SYSMETADATA | P_CHUNK_ID | P_CHUNK_SIZE | P_CHUNK_HASH | P_CHUNK_POS | P_CHUNK_METADATA;
+		P_CONTAINER_ID | P_CONTENT_NAME | P_CONTENT_SIZE | P_CONTENT_CHUNK_NB |
+		P_CONTENT_METADATA | P_CONTENT_SYSMETADATA | P_CHUNK_ID | P_CHUNK_SIZE |
+		P_CHUNK_HASH | P_CHUNK_POS | P_CHUNK_METADATA;
 	filter.reason = R_MISSING | R_MISMATCH | R_FORMAT;
 
-	if (!register_event_filter(&filter, log_broken_event, g_strdup(domain), error)) {
+	if (!register_event_filter(&filter, log_broken_event, g_strdup(domain),
+			error)) {
 		GSETERROR(error, "Failed to register filter");
 		return FALSE;
 	}

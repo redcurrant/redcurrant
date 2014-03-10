@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #include "./gs_internals.h"
 
 gint
@@ -81,22 +64,28 @@ gs_error_set_cause(gs_error_t ** err, GError * gErr, const char *format, ...)
 		return;
 	}
 
-#define ERROR_SEPARATOR "--- directory error ---"
+#ifdef HAVE_ANNOYING_DEBUG_TRACES
+#define ERROR_SEPARATOR "\r\n\t--- directory error ---\r\n\t"
+#else
+#define ERROR_SEPARATOR ""
+#endif
 
 	if (*err && (*err)->msg) {
 		if (gErr && gErr->message)
 			tmpFinal =
-			    g_strconcat(tmpCode, tmpCause, "\r\n\t", gErr->message, "\r\n\t" ERROR_SEPARATOR "\r\n\t",
-			    (*err)->msg, NULL);
+				g_strconcat(tmpCode, tmpCause, "\r\n\t", gErr->message,
+				ERROR_SEPARATOR, (*err)->msg, NULL);
 		else
-			tmpFinal = g_strconcat(tmpCode, tmpCause, "\r\n\t", (*err)->msg, NULL);
+			tmpFinal =
+				g_strconcat(tmpCode, tmpCause, "\r\n\t", (*err)->msg, NULL);
 		free((*err)->msg);
 		(*err)->msg = NULL;
 	}
 	else {
 		if (gErr && gErr->message)
 			tmpFinal =
-			    g_strconcat(tmpCode, tmpCause, "\r\n\t" ERROR_SEPARATOR "\r\n\t", gErr->message, NULL);
+				g_strconcat(tmpCode, tmpCause, ERROR_SEPARATOR, gErr->message,
+				NULL);
 		else
 			tmpFinal = g_strconcat(tmpCode, tmpCause, NULL);
 		if (*err)
@@ -262,8 +251,8 @@ gs_url_split(const gchar * url, gchar ** host, gchar ** port)
 	wrkUrl = g_strdup(url);
 	wrkUrl_len = strlen(wrkUrl);
 
-	if (*wrkUrl == '[') {	/*[IP]:PORT */
-		
+	if (*wrkUrl == '[') {		/*[IP]:PORT */
+
 		gchar *last_semicolon;
 
 		last_semicolon = g_strrstr(wrkUrl, ":");
@@ -316,6 +305,8 @@ gs_grid_storage_free(gs_grid_storage_t * gs)
 	if (gs->physical_namespace)
 		free(gs->physical_namespace);
 
+	namespace_info_clear(&(gs->ni));
+
 	free(gs);
 }
 
@@ -352,6 +343,10 @@ gs_content_free(gs_content_t * content)
 		g_free(content->version);
 		content->version = NULL;
 	}
+	if (content->policy) {
+		g_free(content->policy);
+		content->policy = NULL;
+	}
 	free(content);
 }
 
@@ -359,11 +354,8 @@ gs_content_free(gs_content_t * content)
 void
 gs_container_close_cnx(gs_container_t * container)
 {
-	if (container && container->meta2_cnx >= 0) {
-		shutdown(container->meta2_cnx, SHUT_RDWR);
-		close(container->meta2_cnx);
-		container->meta2_cnx = -1;
-	}
+	if (container && container->meta2_cnx >= 0)
+		metautils_pclose(&(container->meta2_cnx));
 }
 
 
@@ -378,7 +370,8 @@ g_error_get_message(GError * err)
 }
 
 gs_status_t
-gs_grid_storage_set_timeout(gs_grid_storage_t * gs, gs_timeout_t to, int val, gs_error_t ** err)
+gs_grid_storage_set_timeout(gs_grid_storage_t * gs, gs_timeout_t to, int val,
+	gs_error_t ** err)
 {
 	int val_s;
 
@@ -392,13 +385,14 @@ gs_grid_storage_set_timeout(gs_grid_storage_t * gs, gs_timeout_t to, int val, gs
 		return GS_ERROR;
 	}
 
-	if ((int)to < (int)GS_TO_RAWX_CNX) {
+	if ((int) to < (int) GS_TO_RAWX_CNX) {
 		int i, ok = ~0;
 
 		for (i = GS_TO_RAWX_CNX; i <= GS_TO_MCD_OP; i++) {
 			ok &= gs_grid_storage_set_timeout(gs, i, to, NULL);
 			if (!ok) {
-				GSERRORSET(err, "<%s> some timeout haven't been set", __FUNCTION__);
+				GSERRORSET(err, "<%s> some timeout haven't been set",
+					__FUNCTION__);
 				return GS_ERROR;
 			}
 			return GS_OK;
@@ -407,51 +401,54 @@ gs_grid_storage_set_timeout(gs_grid_storage_t * gs, gs_timeout_t to, int val, gs
 
 	else {
 		if (to != GS_TO_RAWX_CNX && to != GS_TO_RAWX_OP && val < 100)
-			INFO("<%s> small timer value (<100ms), use with caution", __FUNCTION__);
+			INFO("<%s> small timer value (<100ms), use with caution",
+				__FUNCTION__);
 
 		switch (to) {
-		case GS_TO_RAWX_CNX:
-			val_s = val / 1000;
-			if (!val_s || (val % 1000)) {
-				val_s++;
-				NOTICE("<%s> timeout on webdav connection rounded up to %d seconds", __FUNCTION__,
-				    val_s);
-			}
-			gs->timeout.rawx.cnx = val_s * 1000;
-			return GS_OK;
-		case GS_TO_RAWX_OP:
-			val_s = val / 1000;
-			if (!val_s || (val % 1000)) {
-				val_s++;
-				NOTICE("<%s> timeout on webdav operation rounded up to %d seconds", __FUNCTION__,
-				    val_s);
-			}
-			gs->timeout.rawx.op = val_s * 1000;
-			return GS_OK;
-		case GS_TO_M0_CNX:
-			gs->direct_resolver->timeout.m0.cnx = val;
-			return GS_OK;
-		case GS_TO_M0_OP:
-			gs->direct_resolver->timeout.m0.op = val;
-			return GS_OK;
-		case GS_TO_M1_CNX:
-			gs->direct_resolver->timeout.m1.cnx = val;
-			return GS_OK;
-		case GS_TO_M1_OP:
-			gs->direct_resolver->timeout.m1.op = val;
-			return GS_OK;
-		case GS_TO_M2_CNX:
-			gs->timeout.m2.cnx = val;
-			return GS_OK;
-		case GS_TO_M2_OP:
-			gs->timeout.m2.op = val;
-			return GS_OK;
-		case GS_TO_MCD_CNX:
-			gs->metacd_resolver->timeout.cnx = val;
-			return GS_OK;
-		case GS_TO_MCD_OP:
-			gs->metacd_resolver->timeout.op = val;
-			return GS_OK;
+			case GS_TO_RAWX_CNX:
+				val_s = val / 1000;
+				if (!val_s || (val % 1000)) {
+					val_s++;
+					NOTICE
+						("<%s> timeout on webdav connection rounded up to %d seconds",
+						__FUNCTION__, val_s);
+				}
+				gs->timeout.rawx.cnx = val_s * 1000;
+				return GS_OK;
+			case GS_TO_RAWX_OP:
+				val_s = val / 1000;
+				if (!val_s || (val % 1000)) {
+					val_s++;
+					NOTICE
+						("<%s> timeout on webdav operation rounded up to %d seconds",
+						__FUNCTION__, val_s);
+				}
+				gs->timeout.rawx.op = val_s * 1000;
+				return GS_OK;
+			case GS_TO_M0_CNX:
+				gs->direct_resolver->timeout.m0.cnx = val;
+				return GS_OK;
+			case GS_TO_M0_OP:
+				gs->direct_resolver->timeout.m0.op = val;
+				return GS_OK;
+			case GS_TO_M1_CNX:
+				gs->direct_resolver->timeout.m1.cnx = val;
+				return GS_OK;
+			case GS_TO_M1_OP:
+				gs->direct_resolver->timeout.m1.op = val;
+				return GS_OK;
+			case GS_TO_M2_CNX:
+				gs->timeout.m2.cnx = val;
+				return GS_OK;
+			case GS_TO_M2_OP:
+				gs->timeout.m2.op = val;
+				return GS_OK;
+			case GS_TO_MCD_CNX:
+				gs->metacd_resolver->timeout.cnx = val;
+				return GS_OK;
+			case GS_TO_MCD_OP:
+				gs->metacd_resolver->timeout.op = val;
+				return GS_OK;
 		}
 	}
 
@@ -467,7 +464,7 @@ gs_grid_storage_get_timeout(gs_grid_storage_t * gs, gs_timeout_t to)
 		WARN("invalid parameter (%s)", "no client");
 		return -1;
 	}
-	if ((int)to < (int)GS_TO_RAWX_CNX || to > GS_TO_MCD_OP) {
+	if ((int) to < (int) GS_TO_RAWX_CNX || to > GS_TO_MCD_OP) {
 		WARN("invalid parameter (%s)", "bad timeout");
 		return -1;
 	}
@@ -477,26 +474,26 @@ gs_grid_storage_get_timeout(gs_grid_storage_t * gs, gs_timeout_t to)
 	}
 
 	switch (to) {
-	case GS_TO_RAWX_CNX:
-		return gs->timeout.rawx.cnx;
-	case GS_TO_RAWX_OP:
-		return gs->timeout.rawx.op;
-	case GS_TO_M0_CNX:
-		return gs->direct_resolver->timeout.m0.cnx;
-	case GS_TO_M0_OP:
-		return gs->direct_resolver->timeout.m0.op;
-	case GS_TO_M1_CNX:
-		return gs->direct_resolver->timeout.m1.cnx;
-	case GS_TO_M1_OP:
-		return gs->direct_resolver->timeout.m1.op;
-	case GS_TO_M2_CNX:
-		return gs->timeout.m2.cnx;
-	case GS_TO_M2_OP:
-		return gs->timeout.m2.op;
-	case GS_TO_MCD_CNX:
-		return gs->metacd_resolver->timeout.cnx;
-	case GS_TO_MCD_OP:
-		return gs->metacd_resolver->timeout.op;
+		case GS_TO_RAWX_CNX:
+			return gs->timeout.rawx.cnx;
+		case GS_TO_RAWX_OP:
+			return gs->timeout.rawx.op;
+		case GS_TO_M0_CNX:
+			return gs->direct_resolver->timeout.m0.cnx;
+		case GS_TO_M0_OP:
+			return gs->direct_resolver->timeout.m0.op;
+		case GS_TO_M1_CNX:
+			return gs->direct_resolver->timeout.m1.cnx;
+		case GS_TO_M1_OP:
+			return gs->direct_resolver->timeout.m1.op;
+		case GS_TO_M2_CNX:
+			return gs->timeout.m2.cnx;
+		case GS_TO_M2_OP:
+			return gs->timeout.m2.op;
+		case GS_TO_MCD_CNX:
+			return gs->metacd_resolver->timeout.cnx;
+		case GS_TO_MCD_OP:
+			return gs->metacd_resolver->timeout.op;
 	}
 
 	WARN("No such timeout value '%d'", to);
@@ -504,7 +501,8 @@ gs_grid_storage_get_timeout(gs_grid_storage_t * gs, gs_timeout_t to)
 }
 
 static gs_status_t
-gs_manage_container_error_not_closed(gs_container_t * container, const char *caller, guint line, GError ** err)
+gs_manage_container_error_not_closed(gs_container_t * container,
+	const char *caller, guint line, GError ** err)
 {
 	gint code;
 
@@ -523,7 +521,8 @@ gs_manage_container_error_not_closed(gs_container_t * container, const char *cal
 	/*if it is a network error, only a container decache is necessary */
 	if (CODE_RECONNECT_CONTAINER(code)) {
 		if (!gs_container_reconnect(container, err)) {
-			GSETERROR(err, "[from %s:%d] refresh error for %s/%s", caller, line, C0_NAME(container), C0_IDSTR(container));
+			GSETERROR(err, "[from %s:%d] refresh error for %s/%s", caller, line,
+				C0_NAME(container), C0_IDSTR(container));
 			return GS_ERROR;
 		}
 		else
@@ -535,7 +534,8 @@ gs_manage_container_error_not_closed(gs_container_t * container, const char *cal
 		NOTICE("META0 REFRESH on %s", g_error_get_message(*err));
 		gs_decache_all(container->info.gs);
 		if (!gs_container_refresh(container, err)) {
-			GSETERROR(err, "[from %s:%d] refresh/reconnect error for %s/%s", caller, line, C0_NAME(container), C0_IDSTR(container));
+			GSETERROR(err, "[from %s:%d] refresh/reconnect error for %s/%s",
+				caller, line, C0_NAME(container), C0_IDSTR(container));
 			return GS_ERROR;
 		}
 		else
@@ -544,29 +544,36 @@ gs_manage_container_error_not_closed(gs_container_t * container, const char *cal
 
 	if (CODE_REFRESH_CONTAINER(code)) {
 		if (!gs_container_refresh(container, err)) {
-			GSETERROR(err, "[from %s:%d] refresh/reconnect error for %s/%s", caller, line, C0_NAME(container), C0_IDSTR(container));
+			GSETERROR(err, "[from %s:%d] refresh/reconnect error for %s/%s",
+				caller, line, C0_NAME(container), C0_IDSTR(container));
 			return GS_ERROR;
 		}
 		else
 			return GS_OK;
 	}
 
-	//GSETERROR(err, "[from %s:%d] error not manageable for %s/%s", caller, line, C0_NAME(container), C0_IDSTR(container));
-	//return GS_ERROR;
-	return GS_OK;
+#ifdef HAVE_ANNOYING_DEBUG_TRACES
+	GSETERROR(err, "[from %s:%d] error not manageable for %s/%s", caller, line,
+		C0_NAME(container), C0_IDSTR(container));
+#endif
+	return GS_ERROR;
+	//return GS_OK;
 }
 
 gs_status_t
-gs_manage_container_error(gs_container_t * container, const char *caller, guint line, GError ** err)
+gs_manage_container_error(gs_container_t * container, const char *caller,
+	guint line, GError ** err)
 {
 	if (!err || !*err) {
 		GSETERROR(err, "[from %s] unknown error on %s/%s", caller,
-			 C0_NAME(container), C0_IDSTR(container));
+			C0_NAME(container), C0_IDSTR(container));
 		return GS_ERROR;
 	}
 
-	TRACE("[from %s:%d] an error occured, %s/%s will be refreshed; cause:\r\n\t%s",
-		caller, line, C0_NAME(container), C0_IDSTR(container), g_error_get_message(*err));
+	TRACE
+		("[from %s:%d] an error occured, %s/%s will be refreshed; cause:\r\n\t%s",
+		caller, line, C0_NAME(container), C0_IDSTR(container),
+		g_error_get_message(*err));
 
 	/*if closed, we try to re-open it */
 	if ((*err)->code == CODE_CONTAINER_CLOSED)
@@ -574,4 +581,3 @@ gs_manage_container_error(gs_container_t * container, const char *caller, guint 
 
 	return gs_manage_container_error_not_closed(container, caller, line, err);
 }
-

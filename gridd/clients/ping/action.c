@@ -1,33 +1,12 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifdef HAVE_CONFIG_H
-# include "../../config.h"
-#endif
-
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <glib.h>
 
-#include <metautils.h>
-#include <metacomm.h>
-#include <common_main.h>
+#include <metautils/lib/metautils.h>
+#include <metautils/lib/metacomm.h>
 
 static gboolean flag_reuse = FALSE;
 static gboolean flag_flood = FALSE;
@@ -36,7 +15,7 @@ static gint nb_threads = 50;
 static gchar ns_name[LIMIT_LENGTH_NSNAME];
 static GArray *addresses = NULL;
 
-static const gchar*
+static const gchar *
 main_get_usage(void)
 {
 	return "IP:PORT";
@@ -50,19 +29,19 @@ main_set_defaults(void)
 	GRID_DEBUG("Defaults set!");
 }
 
-static struct grid_main_option_s*
+static struct grid_main_option_s *
 main_get_options(void)
 {
 	static struct grid_main_option_s options[] = {
-		{ "Flood",   OT_BOOL, {.b=&flag_flood},
+		{"Flood", OT_BOOL, {.b = &flag_flood},
 			"Only one address is expected but several threads are started, sending requests without any pause."},
-		{ "Threads", OT_INT,  {.i=&nb_threads},
+		{"Threads", OT_INT, {.i = &nb_threads},
 			"Number of concurrent PING threads. Ignored when Flood disabled."},
-		{ "MaxReq",  OT_INT64, {.i64=&max_packets},
+		{"MaxReq", OT_INT64, {.i64 = &max_packets},
 			"How many requests attempts will be made in each thread"},
-		{ "CnxReuse", OT_BOOL, {.b=&flag_reuse},
+		{"CnxReuse", OT_BOOL, {.b = &flag_reuse},
 			"If enabled, each connection won't be closed after each request attempt."},
-		{ NULL, 0, {.b=0}, NULL }
+		{NULL, 0, {.b = 0}, NULL}
 	};
 	return options;
 }
@@ -82,7 +61,7 @@ main_specific_fini(void)
 }
 
 static gboolean
-_config_single_address(const gchar *arg)
+_config_single_address(const gchar * arg)
 {
 	addr_info_t ai;
 	GError *err = NULL;
@@ -103,7 +82,7 @@ _config_single_address(const gchar *arg)
 }
 
 static gboolean
-_config_single_service(const gchar *arg)
+_config_single_service(const gchar * arg)
 {
 	gchar **strv = g_strsplit(arg, "|", 4);
 
@@ -137,14 +116,15 @@ main_configure(int argc, char **args)
 		GRID_ERROR("At least one argument expected");
 		return FALSE;
 	}
-	
+
 	if (flag_flood) {
-		
+
 		if (argc != 1) {
-			GRID_ERROR("Flood option is not compatible with multiple addresses");
+			GRID_ERROR
+				("Flood option is not compatible with multiple addresses");
 			return FALSE;
 		}
-		for (i=0; i < nb_threads ; i++) {
+		for (i = 0; i < nb_threads; i++) {
 			gchar *arg = args[0];
 
 			if (strchr(arg, '|')) {
@@ -158,7 +138,7 @@ main_configure(int argc, char **args)
 		}
 	}
 	else {
-		for (i=0; i<argc ;i++) {
+		for (i = 0; i < argc; i++) {
 			gchar *arg = args[i];
 
 			if (strchr(arg, '|')) {
@@ -178,18 +158,19 @@ main_configure(int argc, char **args)
 
 /* ------------------------------------------------------------------------- */
 
-struct thread_data_s {
+struct thread_data_s
+{
 	addr_info_t target;
 };
 
 static gboolean
-_send_request(struct metacnx_ctx_s *cnx, MESSAGE request, GError **err)
+_send_request(struct metacnx_ctx_s *cnx, MESSAGE request, GError ** err)
 {
-	struct code_handler_s codes [] = {
-		{ 200, REPSEQ_FINAL, NULL, NULL },
-		{ 0, 0, NULL, NULL}
+	struct code_handler_s codes[] = {
+		{200, REPSEQ_FINAL, NULL, NULL},
+		{0, 0, NULL, NULL}
 	};
-	struct reply_sequence_data_s data = { NULL , 0 , codes };
+	struct reply_sequence_data_s data = { NULL, 0, codes };
 
 	g_assert(cnx != NULL);
 	g_assert(request != NULL);
@@ -218,6 +199,7 @@ thread_worker(gpointer p)
 
 	g_assert(NULL != td);
 	addr_info_to_string(&(td->target), str_target, sizeof(str_target));
+	GRID_DEBUG("Connecting to [%s]", str_target);
 
 	request = message_create_request(&err, NULL, "PING", NULL, NULL);
 	if (!request) {
@@ -250,7 +232,7 @@ thread_worker(gpointer p)
 		else {
 			g_print("ERROR %s %f\n", str_target, elapsed);
 			GRID_ERROR("PING request error from %s after %f seconds : %s",
-					str_target, elapsed, err->message);
+				str_target, elapsed, err->message);
 		}
 
 		if (err)
@@ -283,11 +265,12 @@ thread_start_N(void)
 	GError *err = NULL;
 	GSList *threads = NULL;
 
-	for (i=0; i<addresses->len;i++) {
+	for (i = 0; i < addresses->len; i++) {
 		struct thread_data_s *p;
-		
+
 		p = g_malloc0(sizeof(struct thread_data_s));
-		memcpy(&(p->target), &g_array_index(addresses, addr_info_t, i), sizeof(addr_info_t));
+		memcpy(&(p->target), &g_array_index(addresses, addr_info_t, i),
+			sizeof(addr_info_t));
 
 		th = g_thread_create(thread_worker, p, TRUE, &err);
 		if (th != NULL)
@@ -302,13 +285,13 @@ thread_start_N(void)
 }
 
 static void
-thread_join_all(GSList *threads)
+thread_join_all(GSList * threads)
 {
 	GThread *th;
 	gpointer p;
 	GSList *l;
 
-	for (l=threads; l ;l=l->next) {
+	for (l = threads; l; l = l->next) {
 		if (!(th = l->data))
 			continue;
 		p = g_thread_join(th);
@@ -324,15 +307,14 @@ main_action(void)
 	/* Start several worker threads */
 	threads = thread_start_N();
 	GRID_INFO("Started %u worker threads", g_slist_length(threads));
-	
+
 	/* Join the threads started */
 	thread_join_all(threads);
 	g_slist_free(threads);
 	GRID_INFO("Joined all the worker threads");
 }
 
-static struct grid_main_callbacks cb =
-{
+static struct grid_main_callbacks cb = {
 	.options = main_get_options,
 	.action = main_action,
 	.set_defaults = main_set_defaults,
@@ -347,4 +329,3 @@ main(int argc, char **argv)
 {
 	return grid_main_cli(argc, argv, &cb);
 }
-

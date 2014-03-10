@@ -1,22 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-#define LOG_DOMAIN "chunk_checker.test"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "chunk_checker.test"
 #endif
 
 #include <sys/stat.h>
@@ -27,7 +10,7 @@
 
 #include <test-dept.h>
 
-#include <metautils.h>
+#include <metautils/lib/metautils.h>
 #include <rawx.h>
 
 #include "chunk_check.h"
@@ -42,15 +25,15 @@
 #define FILE_CONTENT "file file file"
 #define CONTENT_SYSMETADATA "system metadata"
 
-static gchar* str_chunk_hash;
-static gchar* str_chunk_size;
+static gchar *str_chunk_hash;
+static gchar *str_chunk_size;
 static chunk_hash_t chunk_hash;
 static gint64 chunk_size;
 
 void
 setup()
 {
-        GError *error = NULL;
+	GError *error = NULL;
 	int fd;
 	GChecksum *sum;
 	gsize len = sizeof(chunk_hash_t);
@@ -70,30 +53,34 @@ setup()
 	chunk_size = strlen(FILE_CONTENT);
 	str_chunk_size = g_strdup_printf("%lli", chunk_size);
 
-        struct chunk_textinfo_s chunk = {
-                CHUNK_ID, 
-                CONTENT_NAME,
-                str_chunk_size,
-                "2",
-                str_chunk_hash,
-                "metadata",
-                CONTAINER_ID
-        };
+	struct chunk_textinfo_s chunk = {
+		CHUNK_ID,
+		CONTENT_NAME,
+		str_chunk_size,
+		"2",
+		str_chunk_hash,
+		"metadata",
+		CONTAINER_ID
+	};
 
-        struct content_textinfo_s content = {
-                CONTAINER_ID,
-                CONTENT_NAME,
-                "4096",
-                "3",
-                "metadata",
-                "system metadata"
-        };
+	struct content_textinfo_s content = {
+		CONTAINER_ID,
+		CONTENT_NAME,
+		"4096",
+		"3",
+		"metadata",
+		"system metadata"
+	};
 
-        /* Create fake volume root */
-        mkdir(VOLUME_ROOT, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH);
+	/* Create fake volume root */
+	mkdir(VOLUME_ROOT,
+		S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH |
+		S_IWOTH | S_IXOTH);
 
-        /* Create fake chunk */
-        fd = open(CHUNK_PATH, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH);
+	/* Create fake chunk */
+	fd = open(CHUNK_PATH, O_CREAT | O_WRONLY,
+		S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH |
+		S_IWOTH | S_IXOTH);
 	if (fd == -1) {
 		ERROR("Failed to open file [%s] : %s", CHUNK_PATH, strerror(errno));
 		return;
@@ -101,18 +88,21 @@ setup()
 
 	while (bytes_written < strlen(FILE_CONTENT)) {
 		ssize_t rc;
-		rc = write(fd, FILE_CONTENT+bytes_written, strlen(FILE_CONTENT)-bytes_written);
+
+		rc = write(fd, FILE_CONTENT + bytes_written,
+			strlen(FILE_CONTENT) - bytes_written);
 		if (rc == -1) {
-			ERROR("Failed to write in chunk file [%s] (fd=%d) : %s", CHUNK_PATH, fd, strerror(errno));
+			ERROR("Failed to write in chunk file [%s] (fd=%d) : %s", CHUNK_PATH,
+				fd, strerror(errno));
 			return;
 		}
 		else
 			bytes_written += rc;
 	}
-	close(fd);
+	metautils_pclose(&fd);
 
-        if (!set_rawx_info_in_attr(CHUNK_PATH, &error, &content, &chunk))
-                ERROR(error->message);
+	if (!set_rawx_info_in_attr(CHUNK_PATH, &error, &content, &chunk))
+		ERROR(error->message);
 
 	return;
 }
@@ -120,10 +110,10 @@ setup()
 void
 teardown()
 {
-        /* Clean fake volume */
-        unlink(CHUNK_PATH);
-        unlink(CHUNK_ATTR_PATH);
-        rmdir(VOLUME_ROOT);
+	/* Clean fake volume */
+	unlink(CHUNK_PATH);
+	unlink(CHUNK_ATTR_PATH);
+	rmdir(VOLUME_ROOT);
 
 	return;
 }
@@ -135,13 +125,15 @@ test_check_chunk_integrity_args_null()
 	struct chunk_textinfo_s chunk;
 	GSList *mismatch = NULL;
 
-	test_dept_assert_false(check_chunk_integrity(NULL, &chunk, &mismatch, &error));
+	test_dept_assert_false(check_chunk_integrity(NULL, &chunk, &mismatch,
+			&error));
 	test_dept_assert_true(error);
 
 	g_clear_error(&error);
 	error = NULL;
 
-	test_dept_assert_false(check_chunk_integrity(CHUNK_PATH, NULL, &mismatch, &error));
+	test_dept_assert_false(check_chunk_integrity(CHUNK_PATH, NULL, &mismatch,
+			&error));
 	test_dept_assert_true(error);
 }
 
@@ -152,7 +144,8 @@ test_check_chunk_integrity_path_unexistant()
 	struct chunk_textinfo_s chunk;
 	GSList *mismatch = NULL;
 
-	test_dept_assert_false(check_chunk_integrity("/path/to/nowhere", &chunk, &mismatch, &error));
+	test_dept_assert_false(check_chunk_integrity("/path/to/nowhere", &chunk,
+			&mismatch, &error));
 	test_dept_assert_true(error);
 }
 
@@ -166,7 +159,8 @@ test_check_chunk_integrity()
 	chunk.hash = str_chunk_hash;
 	chunk.size = str_chunk_size;
 
-	test_dept_assert_true(check_chunk_integrity(CHUNK_PATH, &chunk, &mismatch, &error));
+	test_dept_assert_true(check_chunk_integrity(CHUNK_PATH, &chunk, &mismatch,
+			&error));
 	test_dept_assert_false(error);
 	test_dept_assert_false(mismatch);
 }
@@ -177,7 +171,7 @@ test_check_chunk_integrity_bad_hash()
 	GError *error = NULL;
 	struct chunk_textinfo_s chunk;
 	GSList *mismatch = NULL;
-	struct broken_element_s* brk_el;
+	struct broken_element_s *brk_el;
 
 	chunk.container_id = CONTAINER_ID;
 	chunk.path = CONTENT_NAME;
@@ -185,7 +179,8 @@ test_check_chunk_integrity_bad_hash()
 	chunk.hash = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
 	chunk.size = str_chunk_size;
 
-	test_dept_assert_true(check_chunk_integrity(CHUNK_PATH, &chunk, &mismatch, &error));
+	test_dept_assert_true(check_chunk_integrity(CHUNK_PATH, &chunk, &mismatch,
+			&error));
 	test_dept_assert_true(mismatch);
 	test_dept_assert_equals_int(1, g_slist_length(mismatch));
 
@@ -204,7 +199,7 @@ test_check_chunk_integrity_bad_size()
 	GError *error = NULL;
 	struct chunk_textinfo_s chunk;
 	GSList *mismatch = NULL;
-	struct broken_element_s* brk_el;
+	struct broken_element_s *brk_el;
 
 	chunk.container_id = CONTAINER_ID;
 	chunk.path = CONTENT_NAME;
@@ -212,7 +207,8 @@ test_check_chunk_integrity_bad_size()
 	chunk.hash = str_chunk_hash;
 	chunk.size = "0";
 
-	test_dept_assert_true(check_chunk_integrity(CHUNK_PATH, &chunk, &mismatch, &error));
+	test_dept_assert_true(check_chunk_integrity(CHUNK_PATH, &chunk, &mismatch,
+			&error));
 	test_dept_assert_true(mismatch);
 	test_dept_assert_equals_int(1, g_slist_length(mismatch));
 
@@ -234,19 +230,22 @@ test_check_chunk_referencing_args_null()
 	struct meta2_raw_content_s content_meta2;
 	GSList *mismatch = NULL;
 
-	test_dept_assert_false(check_chunk_referencing(NULL, &chunk_text, &content_meta2, &mismatch, &error));
+	test_dept_assert_false(check_chunk_referencing(NULL, &chunk_text,
+			&content_meta2, &mismatch, &error));
 	test_dept_assert_true(error);
 
 	g_clear_error(&error);
 	error = NULL;
 
-	test_dept_assert_false(check_chunk_referencing(&content_text, NULL, &content_meta2, &mismatch, &error));
+	test_dept_assert_false(check_chunk_referencing(&content_text, NULL,
+			&content_meta2, &mismatch, &error));
 	test_dept_assert_true(error);
 
 	g_clear_error(&error);
 	error = NULL;
 
-	test_dept_assert_false(check_chunk_referencing(&content_text, &chunk_text, NULL, &mismatch, &error));
+	test_dept_assert_false(check_chunk_referencing(&content_text, &chunk_text,
+			NULL, &mismatch, &error));
 	test_dept_assert_true(error);
 }
 
@@ -256,17 +255,24 @@ test_check_chunk_referencing()
 	GError *error = NULL;
 	struct content_textinfo_s content_text;
 	struct chunk_textinfo_s chunk_text;
-	struct meta2_raw_content_s* content_meta2;
-	struct meta2_raw_chunk_s* chunk_meta2;
+	struct meta2_raw_content_s *content_meta2;
+	struct meta2_raw_chunk_s *chunk_meta2;
 	GSList *mismatch = NULL;
 	container_id_t container_id;
 	chunk_id_t chunk_id;
 
-	test_dept_assert_true(hex2bin(CONTAINER_ID, container_id, sizeof(container_id_t), &error));
-	content_meta2 = meta2_maintenance_create_content(container_id, 4096, 3, 0, CONTENT_NAME, strlen(CONTENT_NAME));
-	content_meta2->system_metadata = g_byte_array_append(g_byte_array_new(), CONTENT_SYSMETADATA, strlen(CONTENT_SYSMETADATA)+1);
-	test_dept_assert_true(hex2bin(CHUNK_ID, chunk_id.id, sizeof(hash_sha256_t), &error));
-	chunk_meta2 = meta2_maintenance_create_chunk(&chunk_id, chunk_hash, 0, chunk_size, 0);
+	test_dept_assert_true(hex2bin(CONTAINER_ID, container_id,
+			sizeof(container_id_t), &error));
+	content_meta2 =
+		meta2_maintenance_create_content(container_id, 4096, 3, 0, CONTENT_NAME,
+		strlen(CONTENT_NAME));
+	content_meta2->system_metadata =
+		g_byte_array_append(g_byte_array_new(), CONTENT_SYSMETADATA,
+		strlen(CONTENT_SYSMETADATA) + 1);
+	test_dept_assert_true(hex2bin(CHUNK_ID, chunk_id.id, sizeof(hash_sha256_t),
+			&error));
+	chunk_meta2 =
+		meta2_maintenance_create_chunk(&chunk_id, chunk_hash, 0, chunk_size, 0);
 	meta2_maintenance_add_chunk(content_meta2, chunk_meta2);
 
 	content_text.container_id = CONTAINER_ID;
@@ -284,7 +290,8 @@ test_check_chunk_referencing()
 	chunk_text.metadata = "chunk metadata";
 	chunk_text.container_id = CONTAINER_ID;
 
-	test_dept_assert_true(check_chunk_referencing(&content_text, &chunk_text, content_meta2, &mismatch, &error));
+	test_dept_assert_true(check_chunk_referencing(&content_text, &chunk_text,
+			content_meta2, &mismatch, &error));
 	test_dept_assert_false(error);
 	test_dept_assert_false(mismatch);
 }
@@ -295,8 +302,8 @@ test_check_chunk_referencing_meta2_empty_prop()
 	GError *error = NULL;
 	struct content_textinfo_s content_text;
 	struct chunk_textinfo_s chunk_text;
-	struct meta2_raw_content_s* content_meta2;
-	struct meta2_raw_chunk_s* chunk_meta2;
+	struct meta2_raw_content_s *content_meta2;
+	struct meta2_raw_chunk_s *chunk_meta2;
 	GSList *mismatch = NULL;
 	container_id_t container_id;
 	chunk_id_t chunk_id;
@@ -308,7 +315,9 @@ test_check_chunk_referencing_meta2_empty_prop()
 	memset(&chunk_id, 0, sizeof(chunk_id_t));
 	memset(hash, 0, sizeof(chunk_hash_t));
 
-	content_meta2 = meta2_maintenance_create_content(container_id, 0, 0, 0, content_name, sizeof(content_name));
+	content_meta2 =
+		meta2_maintenance_create_content(container_id, 0, 0, 0, content_name,
+		sizeof(content_name));
 	chunk_meta2 = meta2_maintenance_create_chunk(&chunk_id, hash, 0, 0, 0);
 	meta2_maintenance_add_chunk(content_meta2, chunk_meta2);
 
@@ -327,7 +336,8 @@ test_check_chunk_referencing_meta2_empty_prop()
 	chunk_text.metadata = "chunk metadata";
 	chunk_text.container_id = CONTAINER_ID;
 
-	test_dept_assert_true(check_chunk_referencing(&content_text, &chunk_text, content_meta2, &mismatch, &error));
+	test_dept_assert_true(check_chunk_referencing(&content_text, &chunk_text,
+			content_meta2, &mismatch, &error));
 	test_dept_assert_false(error);
 	test_dept_assert_true(mismatch);
 	test_dept_assert_equals_int(6, g_slist_length(mismatch));
@@ -339,23 +349,31 @@ test_check_chunk_referencing_chunk_empty_attr()
 	GError *error = NULL;
 	struct content_textinfo_s content_text;
 	struct chunk_textinfo_s chunk_text;
-	struct meta2_raw_content_s* content_meta2;
-	struct meta2_raw_chunk_s* chunk_meta2;
+	struct meta2_raw_content_s *content_meta2;
+	struct meta2_raw_chunk_s *chunk_meta2;
 	GSList *mismatch = NULL;
 	container_id_t container_id;
 	chunk_id_t chunk_id;
-	
+
 	memset(&content_text, 0, sizeof(struct content_textinfo_s));
 	memset(&chunk_text, 0, sizeof(struct chunk_textinfo_s));
-	
-	test_dept_assert_true(hex2bin(CONTAINER_ID, container_id, sizeof(container_id_t), &error));
-	content_meta2 = meta2_maintenance_create_content(container_id, 4096, 3, 0, CONTENT_NAME, strlen(CONTENT_NAME));
-	content_meta2->system_metadata = g_byte_array_append(g_byte_array_new(), CONTENT_SYSMETADATA, strlen(CONTENT_SYSMETADATA)+1);
-	test_dept_assert_true(hex2bin(CHUNK_ID, chunk_id.id, sizeof(hash_sha256_t), &error));
-	chunk_meta2 = meta2_maintenance_create_chunk(&chunk_id, chunk_hash, 0, chunk_size, 1);
+
+	test_dept_assert_true(hex2bin(CONTAINER_ID, container_id,
+			sizeof(container_id_t), &error));
+	content_meta2 =
+		meta2_maintenance_create_content(container_id, 4096, 3, 0, CONTENT_NAME,
+		strlen(CONTENT_NAME));
+	content_meta2->system_metadata =
+		g_byte_array_append(g_byte_array_new(), CONTENT_SYSMETADATA,
+		strlen(CONTENT_SYSMETADATA) + 1);
+	test_dept_assert_true(hex2bin(CHUNK_ID, chunk_id.id, sizeof(hash_sha256_t),
+			&error));
+	chunk_meta2 =
+		meta2_maintenance_create_chunk(&chunk_id, chunk_hash, 0, chunk_size, 1);
 	meta2_maintenance_add_chunk(content_meta2, chunk_meta2);
 
-	test_dept_assert_true(check_chunk_referencing(&content_text, &chunk_text, content_meta2, &mismatch, &error));
+	test_dept_assert_true(check_chunk_referencing(&content_text, &chunk_text,
+			content_meta2, &mismatch, &error));
 	test_dept_assert_false(error);
 	test_dept_assert_true(mismatch);
 	test_dept_assert_equals_int(6, g_slist_length(mismatch));
@@ -367,8 +385,8 @@ test_check_chunk_referencing_chunk_position_zero_empty_attr()
 	GError *error = NULL;
 	struct content_textinfo_s content_text;
 	struct chunk_textinfo_s chunk_text;
-	struct meta2_raw_content_s* content_meta2;
-	struct meta2_raw_chunk_s* chunk_meta2;
+	struct meta2_raw_content_s *content_meta2;
+	struct meta2_raw_chunk_s *chunk_meta2;
 	GSList *mismatch = NULL;
 	container_id_t container_id;
 	chunk_id_t chunk_id;
@@ -378,14 +396,22 @@ test_check_chunk_referencing_chunk_position_zero_empty_attr()
 
 	chunk_text.position = "0";
 
-	test_dept_assert_true(hex2bin(CONTAINER_ID, container_id, sizeof(container_id_t), &error));
-	content_meta2 = meta2_maintenance_create_content(container_id, 4096, 3, 0, CONTENT_NAME, strlen(CONTENT_NAME));
-	content_meta2->system_metadata = g_byte_array_append(g_byte_array_new(), CONTENT_SYSMETADATA, strlen(CONTENT_SYSMETADATA)+1);
-	test_dept_assert_true(hex2bin(CHUNK_ID, chunk_id.id, sizeof(hash_sha256_t), &error));
-	chunk_meta2 = meta2_maintenance_create_chunk(&chunk_id, chunk_hash, 0, chunk_size, 3);
+	test_dept_assert_true(hex2bin(CONTAINER_ID, container_id,
+			sizeof(container_id_t), &error));
+	content_meta2 =
+		meta2_maintenance_create_content(container_id, 4096, 3, 0, CONTENT_NAME,
+		strlen(CONTENT_NAME));
+	content_meta2->system_metadata =
+		g_byte_array_append(g_byte_array_new(), CONTENT_SYSMETADATA,
+		strlen(CONTENT_SYSMETADATA) + 1);
+	test_dept_assert_true(hex2bin(CHUNK_ID, chunk_id.id, sizeof(hash_sha256_t),
+			&error));
+	chunk_meta2 =
+		meta2_maintenance_create_chunk(&chunk_id, chunk_hash, 0, chunk_size, 3);
 	meta2_maintenance_add_chunk(content_meta2, chunk_meta2);
 
-	test_dept_assert_true(check_chunk_referencing(&content_text, &chunk_text, content_meta2, &mismatch, &error));
+	test_dept_assert_true(check_chunk_referencing(&content_text, &chunk_text,
+			content_meta2, &mismatch, &error));
 	test_dept_assert_false(error);
 	test_dept_assert_true(mismatch);
 	test_dept_assert_equals_int(8, g_slist_length(mismatch));

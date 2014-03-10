@@ -1,25 +1,5 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef LOG_DOMAIN
-# define LOG_DOMAIN "conscience.api"
-#endif
-#ifdef HAVE_CONFIG_H
-# include "../config.h"
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "conscience.api"
 #endif
 #include <stdlib.h>
 #include <string.h>
@@ -31,7 +11,7 @@
 #include "./conscience_broken_holder.h"
 
 void
-broken_holder_fix_meta1(struct broken_holder_s * bh, struct broken_fields_s *bf)
+broken_holder_fix_meta1(struct broken_holder_s *bh, struct broken_fields_s *bf)
 {
 	broken_meta1_t *brk_meta1;
 	addr_info_t *addr;
@@ -44,20 +24,21 @@ broken_holder_fix_meta1(struct broken_holder_s * bh, struct broken_fields_s *bf)
 
 	brk_meta1 = g_hash_table_lookup(bh->ht_meta1, addr);
 	if (brk_meta1) {
-		if (0 >= (-- brk_meta1->counter)) {
+		if (0 >= (--brk_meta1->counter)) {
 			INFO("META1=[%s:%i] has been totally fixed", bf->ip, bf->port);
-			g_hash_table_remove( bh->ht_meta1, addr);
-		} else {
+			g_hash_table_remove(bh->ht_meta1, addr);
+		}
+		else {
 			INFO("META1=[%s:%i] has been partially fixed", bf->ip, bf->port);
 		}
 	}
 
 	g_free(addr);
-	return ;
+	return;
 }
 
 void
-broken_holder_fix_meta2(struct broken_holder_s * bh, struct broken_fields_s *bf)
+broken_holder_fix_meta2(struct broken_holder_s *bh, struct broken_fields_s *bf)
 {
 	addr_info_t *addr;
 	broken_meta2_t *brk_m2;
@@ -65,65 +46,74 @@ broken_holder_fix_meta2(struct broken_holder_s * bh, struct broken_fields_s *bf)
 	addr = build_addr_info(bf->ip, bf->port, NULL);
 	if (!addr) {
 		INFO("Failed to fix the META2=[%s:%i]", bf->ip, bf->port);
-		return ;
+		return;
 	}
 
 	brk_m2 = g_hash_table_lookup(bh->ht_meta2, addr);
 	if (brk_m2) {
 		if (brk_m2->totally_broken) {
 			INFO("META2=[%s:%i] is not totally broken", bf->ip, bf->port);
-		} else if (0>=(--brk_m2->counter)) {
+		}
+		else if (0 >= (--brk_m2->counter)) {
 			INFO("META2=[%s:%i] has been totally fixed", bf->ip, bf->port);
-			g_hash_table_remove( bh->ht_meta2, addr );
-		} else {
+			g_hash_table_remove(bh->ht_meta2, addr);
+		}
+		else {
 			INFO("META2=[%s:%i] has been partially fixed", bf->ip, bf->port);
 		}
 	}
 
 	g_free(addr);
-	return ;
+	return;
 }
 
 void
-broken_holder_fix_content(struct broken_holder_s * bh, struct broken_fields_s *bf, struct broken_meta2_s *brk_m2)
+broken_holder_fix_content(struct broken_holder_s *bh,
+	struct broken_fields_s *bf, struct broken_meta2_s *brk_m2)
 {
 	struct broken_content_s *brk_content;
 	char key[STRLEN_CONTAINERID + LIMIT_LENGTH_CONTENTPATH + 1];
 
-	(void)bh;
+	(void) bh;
 	memset(key, '\0', sizeof(key));
 	g_snprintf(key, sizeof(key), "%s:%s", bf->cid, bf->content);
 
 	brk_content = g_hash_table_lookup(brk_m2->broken_containers, key);
 	if (!brk_content) {
 		DEBUG("Content [%s/%s/%s] not broken", bf->ns, bf->cid, bf->content);
-	} else {
-		if (0 >= (-- brk_content->counter)) {
-			INFO("Content [%s/%s/%s] totally fixed", bf->ns, bf->cid, bf->content);
-			g_hash_table_remove( brk_m2->broken_containers, key);
-		} else {
-			INFO("Content [%s/%s/%s] partially fixed", bf->ns, bf->cid, bf->content);
+	}
+	else {
+		if (0 >= (--brk_content->counter)) {
+			INFO("Content [%s/%s/%s] totally fixed", bf->ns, bf->cid,
+				bf->content);
+			g_hash_table_remove(brk_m2->broken_containers, key);
+		}
+		else {
+			INFO("Content [%s/%s/%s] partially fixed", bf->ns, bf->cid,
+				bf->content);
 		}
 	}
 }
 
 void
-broken_holder_fix_container(struct broken_holder_s * bh, struct broken_fields_s *bf, struct broken_meta2_s *brk_m2)
+broken_holder_fix_container(struct broken_holder_s *bh,
+	struct broken_fields_s *bf, struct broken_meta2_s *brk_m2)
 {
 	struct broken_content_s *brk_content;
 	char key[STRLEN_CONTAINERID + LIMIT_LENGTH_CONTENTPATH + 1];
 
-	(void)bh;
+	(void) bh;
 	memset(key, '\0', sizeof(key));
 	g_snprintf(key, sizeof(key), "%s:all", bf->cid);
 
 	brk_content = g_hash_table_lookup(brk_m2->broken_containers, key);
 	if (!brk_content) {
 		DEBUG("Container [%s/%s] not broken", bf->ns, bf->cid);
-	} else {
+	}
+	else {
 		if (0 >= (--brk_content->counter)) {
 			INFO("Container [%s/%s] totally fixed", bf->ns, bf->cid);
-			g_hash_table_remove( brk_m2->broken_containers, key);
+			g_hash_table_remove(brk_m2->broken_containers, key);
 		}
 		else {
 			INFO("Container [%s/%s] partially fixed", bf->ns, bf->cid);
@@ -132,7 +122,8 @@ broken_holder_fix_container(struct broken_holder_s * bh, struct broken_fields_s 
 }
 
 static void
-_fix_in_one_meta2(struct broken_holder_s * bh, struct broken_fields_s *bf, struct broken_meta2_s *brk_m2)
+_fix_in_one_meta2(struct broken_holder_s *bh, struct broken_fields_s *bf,
+	struct broken_meta2_s *brk_m2)
 {
 	if (!brk_m2) {
 		DEBUG("META2=[%s:%i] not broken, not fixing [%s/%s/%s]",
@@ -153,20 +144,22 @@ _fix_in_one_meta2(struct broken_holder_s * bh, struct broken_fields_s *bf, struc
 }
 
 static void
-_fix_in_all_meta2(struct broken_holder_s * bh, struct broken_fields_s *bf)
+_fix_in_all_meta2(struct broken_holder_s *bh, struct broken_fields_s *bf)
 {
 	GHashTableIter iter;
 	gpointer k, v;
-	
+
 	g_hash_table_iter_init(&iter, bh->ht_meta2);
 	while (g_hash_table_iter_next(&iter, &k, &v)) {
-		struct broken_meta2_s *brk_m2 = v;	
+		struct broken_meta2_s *brk_m2 = v;
+
 		_fix_in_one_meta2(bh, bf, brk_m2);
 	}
 }
 
 void
-broken_holder_fix_in_meta2(struct broken_holder_s * bh, struct broken_fields_s *bf)
+broken_holder_fix_in_meta2(struct broken_holder_s *bh,
+	struct broken_fields_s *bf)
 {
 	addr_info_t *addr;
 
@@ -182,7 +175,7 @@ broken_holder_fix_in_meta2(struct broken_holder_s * bh, struct broken_fields_s *
 }
 
 void
-broken_holder_fix_element(struct broken_holder_s *bh, const gchar *element)
+broken_holder_fix_element(struct broken_holder_s *bh, const gchar * element)
 {
 	gchar **tokens;
 	gsize tokens_length;
@@ -190,56 +183,43 @@ broken_holder_fix_element(struct broken_holder_s *bh, const gchar *element)
 
 	if (!bh || !element) {
 		errno = EINVAL;
-		return ;
+		return;
 	}
 
-	memset(&bf,0x00,sizeof(bf));
+	memset(&bf, 0x00, sizeof(bf));
 	bf.packed = element;
 	bf.ns = bh->conscience->ns_info.name;
 
-#ifdef HYPER_VERBOSE
-	DEBUG("Fixing broken element [%s]", element);
-#endif
-
-	tokens = g_strsplit(element,":",0);
+	tokens = g_strsplit(element, ":", 0);
 	if (!tokens) {
 		errno = EBADMSG;
 		return;
 	}
 	tokens_length = g_strv_length(tokens);
-	
+
 	/*special case for the broken META1 */
-	if (tokens_length == 3 && g_ascii_strcasecmp(tokens[0],"META1")) {
-#ifdef HYPER_VERBOSE
-		TRACE("META1 matched");
-#endif
+	if (tokens_length == 3 && g_ascii_strcasecmp(tokens[0], "META1")) {
 		bf.ip = tokens[1];
 		bf.port = atoi(tokens[2]);
 		broken_holder_fix_meta1(bh, &bf);
 	}
-	else if (tokens_length>=2 && tokens_length<=5) {
+	else if (tokens_length >= 2 && tokens_length <= 5) {
 
 		bf.ip = tokens[0];
 		bf.port = atoi(tokens[1]);
 
 		switch (tokens_length) {
-		case 5:
-			bf.cause = *(tokens[4]) ? tokens[4] : NULL;
-		case 4:
-			bf.content = *(tokens[3]) ? tokens[3] : NULL;
-		case 3:
-#ifdef HYPER_VERBOSE
-			TRACE("Container matched");
-#endif
-			bf.cid = *(tokens[2]) ? tokens[2] : NULL;
-			broken_holder_fix_in_meta2(bh, &bf);
-			break;
-		case 2:
-#ifdef HYPER_VERBOSE
-			TRACE("META2 matched");
-#endif
-			broken_holder_fix_meta2(bh, &bf);
-			break;
+			case 5:
+				bf.cause = *(tokens[4]) ? tokens[4] : NULL;
+			case 4:
+				bf.content = *(tokens[3]) ? tokens[3] : NULL;
+			case 3:
+				bf.cid = *(tokens[2]) ? tokens[2] : NULL;
+				broken_holder_fix_in_meta2(bh, &bf);
+				break;
+			case 2:
+				broken_holder_fix_meta2(bh, &bf);
+				break;
 		}
 	}
 	else {
@@ -249,4 +229,3 @@ broken_holder_fix_element(struct broken_holder_s *bh, const gchar *element)
 
 	g_strfreev(tokens);
 }
-

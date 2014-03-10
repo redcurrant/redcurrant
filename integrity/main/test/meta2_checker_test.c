@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2013 AtoS Worldline
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #include <unistd.h>
 #include <glib.h>
 #include <test-dept.h>
@@ -40,23 +23,24 @@
 
 
 gboolean
-fake_rawx_client_get_directory_data(rawx_session_t * session, hash_sha256_t chunk_id,
-    struct content_textinfo_s *content, struct chunk_textinfo_s *chunk, GError ** error)
+fake_rawx_client_get_directory_data(rawx_session_t * session,
+	hash_sha256_t chunk_id, struct content_textinfo_s * content,
+	struct chunk_textinfo_s * chunk, GError ** error)
 {
-        content->container_id = CONTAINER_ID;
-        content->path = CONTENT_NAME;
-        content->size = g_strdup_printf("%d", CONTENT_SIZE);
-        content->chunk_nb = g_strdup_printf("%d", NB_CHUNK);
-        content->metadata = CONTENT_METADATA;
-        content->system_metadata = CONTENT_SYSMETADATA;
+	content->container_id = CONTAINER_ID;
+	content->path = CONTENT_NAME;
+	content->size = g_strdup_printf("%d", CONTENT_SIZE);
+	content->chunk_nb = g_strdup_printf("%d", NB_CHUNK);
+	content->metadata = CONTENT_METADATA;
+	content->system_metadata = CONTENT_SYSMETADATA;
 
-        chunk->id = CHUNK_ID;
-        chunk->path = CONTENT_NAME;
-        chunk->size = g_strdup_printf("%d", CHUNK_SIZE);
-        chunk->position = g_strdup_printf("%d", CHUNK_POSITION);
-        chunk->hash = CHUNK_HASH;
-        chunk->metadata = CHUNK_METADATA;
-        chunk->container_id = CONTAINER_ID;
+	chunk->id = CHUNK_ID;
+	chunk->path = CONTENT_NAME;
+	chunk->size = g_strdup_printf("%d", CHUNK_SIZE);
+	chunk->position = g_strdup_printf("%d", CHUNK_POSITION);
+	chunk->hash = CHUNK_HASH;
+	chunk->metadata = CHUNK_METADATA;
+	chunk->container_id = CONTAINER_ID;
 
 	return TRUE;
 }
@@ -65,8 +49,8 @@ fake_rawx_client_get_directory_data(rawx_session_t * session, hash_sha256_t chun
 void
 setup()
 {
-        /* Init log4c */
-        log4c_init();
+	/* Init log4c */
+	log4c_init();
 }
 
 void
@@ -75,11 +59,12 @@ teardown()
 	log4c_fini();
 }
 
-void test_check_meta2_chunk_args_null()
+void
+test_check_meta2_chunk_args_null()
 {
 	GError *error = NULL;
 	struct meta2_raw_content_s raw_content;
-	GSList* broken;
+	GSList *broken;
 
 	test_dept_assert_false(check_meta2_chunk(NULL, &broken, &error));
 	test_dept_assert_true(error);
@@ -94,31 +79,41 @@ void test_check_meta2_chunk_args_null()
 void
 test_check_meta2_chunk()
 {
-        GError *error = NULL;
-        struct meta2_raw_content_s* content_meta2;
-        struct meta2_raw_chunk_s* chunk_meta2;
-        GSList *mismatch = NULL;
-        container_id_t container_id;
-        chunk_id_t chunk_id;
-	addr_info_t* rawx_addr = build_addr_info("127.0.0.1", 6523, &error);
+	GError *error = NULL;
+	struct meta2_raw_content_s *content_meta2;
+	struct meta2_raw_chunk_s *chunk_meta2;
+	GSList *mismatch = NULL;
+	container_id_t container_id;
+	chunk_id_t chunk_id;
+	addr_info_t *rawx_addr = build_addr_info("127.0.0.1", 6523, &error);
 	chunk_hash_t chunk_hash;
 
-        test_dept_assert_true(hex2bin(CONTAINER_ID, container_id, sizeof(container_id_t), &error));
-        content_meta2 = meta2_maintenance_create_content(container_id, CONTENT_SIZE, NB_CHUNK, 0, CONTENT_NAME, strlen(CONTENT_NAME));
-        content_meta2->system_metadata = g_byte_array_append(g_byte_array_new(), CONTENT_SYSMETADATA, strlen(CONTENT_SYSMETADATA)+1);
-	test_dept_assert_true(hex2bin(CHUNK_HASH, chunk_hash, sizeof(chunk_hash_t), &error));
-        test_dept_assert_true(hex2bin(CHUNK_ID, chunk_id.id, sizeof(hash_sha256_t), &error));
+	test_dept_assert_true(hex2bin(CONTAINER_ID, container_id,
+			sizeof(container_id_t), &error));
+	content_meta2 =
+		meta2_maintenance_create_content(container_id, CONTENT_SIZE, NB_CHUNK,
+		0, CONTENT_NAME, strlen(CONTENT_NAME));
+	content_meta2->system_metadata =
+		g_byte_array_append(g_byte_array_new(), CONTENT_SYSMETADATA,
+		strlen(CONTENT_SYSMETADATA) + 1);
+	test_dept_assert_true(hex2bin(CHUNK_HASH, chunk_hash, sizeof(chunk_hash_t),
+			&error));
+	test_dept_assert_true(hex2bin(CHUNK_ID, chunk_id.id, sizeof(hash_sha256_t),
+			&error));
 	memcpy(&(chunk_id.addr), rawx_addr, sizeof(addr_info_t));
-        chunk_meta2 = meta2_maintenance_create_chunk(&chunk_id, chunk_hash, CHUNK_POSITION, CHUNK_SIZE, 0);
-        meta2_maintenance_add_chunk(content_meta2, chunk_meta2);
+	chunk_meta2 =
+		meta2_maintenance_create_chunk(&chunk_id, chunk_hash, CHUNK_POSITION,
+		CHUNK_SIZE, 0);
+	meta2_maintenance_add_chunk(content_meta2, chunk_meta2);
 
-	test_dept_rawx_client_get_directory_data_set(fake_rawx_client_get_directory_data);
+	test_dept_rawx_client_get_directory_data_set
+		(fake_rawx_client_get_directory_data);
 
-        //test_dept_assert_true(check_meta2_chunk(content_meta2, &mismatch, &error));
+	//test_dept_assert_true(check_meta2_chunk(content_meta2, &mismatch, &error));
 	if (!check_meta2_chunk(content_meta2, &mismatch, &error)) {
 		ERROR("%s", error->message);
 		return;
 	}
-        test_dept_assert_false(error);
-        test_dept_assert_false(mismatch);
+	test_dept_assert_false(error);
+	test_dept_assert_false(mismatch);
 }
