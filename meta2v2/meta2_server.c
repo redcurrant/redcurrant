@@ -43,7 +43,7 @@ _init_kafka_events(void)
 		GRID_WARN(err->message);
 		g_clear_error(&err);
 	} else {
-		err = meta2_backend_init_kafka_topic(m2, "redcurrant.meta2");
+		err = meta2_backend_init_kafka_topic(m2, "redc.meta2");
 		if (err) {
 			GRID_WARN(err->message);
 			g_clear_error(&err);
