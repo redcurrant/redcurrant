@@ -31,7 +31,7 @@ The build process of Redcurrant's core depends on:
 In additon, the build process of Redcurrant's crawler tools repends on:
 * json-c
 * zeromq3
-* debus
+* dbus
 
 ### Configuration
 
