@@ -1,32 +1,11 @@
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%bcond_with test
-%bcond_with nightly
 
 %define _unpackaged_files_terminate_build 0
 
 Name:		redcurrant
-
-%if %{?_with_test:1}%{?_with_nightly:1}0
-%if %{with test}
-# Testing purpose only. Do not modify.
-%define		date %(date +"%Y%m%d%H%M")
-Version:	test%{date}.%{tag}
-Release:	1%{?dist}
-Provides:	%{name} = %{redc_version}-%{redc_release}
-%define		tarversion %{tag}
-%endif
-%if %{with nightly}
-# Nightly purpose only. Do not modify.
-Version:	nightly.%{tag_date}
-Release:	1%{?dist}
-Provides:	%{name} = %{redc_version}-%{redc_release}
-%define		tarversion %{tag_branch}.%{tag_date}
-%endif
-%else
-Version:	%{redc_version}
-Release:	%{redc_release}%{?dist}
+Version:	1.8.4
+Release:	1
 %define		tarversion %{version}
-%endif
 
 Summary:	Redcurrant cloud storage solution
 Group:		Redcurrant
@@ -594,5 +573,5 @@ fi
 /sbin/ldconfig
 
 %changelog
-* Mon Aug 18 2014 - %{redc_version}-1 - Remi Nivet <remi.nivet@worldline.com>
+* Mon Aug 18 2014 - %{version}-%{release} - Remi Nivet <remi.nivet@worldline.com>
 - Initial release
