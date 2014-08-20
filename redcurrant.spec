@@ -11,7 +11,7 @@ Summary:	Redcurrant cloud storage solution
 Group:		Redcurrant
 License:	AGPL3, GNU Affero General Public License v3.0
 URL:		http://www.redcurrent.io/sources/redcurrant-${version}.tar.gz
-Source0:	%{name}-%{tarversion}.tar.bz2
+Source0:	%{name}-%{tarversion}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 %define prefix	/usr
