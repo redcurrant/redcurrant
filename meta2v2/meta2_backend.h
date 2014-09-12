@@ -8,6 +8,10 @@
 # include <meta2v2/meta2_utils.h>
 # include <glib.h>
 
+#ifdef USE_KAFKA
+# include <librdkafka/rdkafka.h>
+#endif
+
 struct grid_lbpool_s;
 struct meta2_backend_s;
 struct event_config_s;
@@ -49,12 +53,31 @@ void meta2_backend_clean(struct meta2_backend_s *m2);
 GError *meta2_backend_init_kafka(struct meta2_backend_s *m2);
 
 /**
+ * Free Kafka broker handle (and the topic, if not already freed).
+ */
+void meta2_backend_free_kafka(struct meta2_backend_s *m2);
+
+/**
  * Initialize Kafka topic. No-op if already initialized.
  *
  * @param name The name of the topic to initialize
  */
 GError *meta2_backend_init_kafka_topic(struct meta2_backend_s *m2,
 		const gchar *name);
+
+/**
+ * Get an already initialized Kafka topic.
+ *
+ * @param name the name of the topic to get
+ * @return the Kafka topic (may be NULL if not initialized)
+ */
+rd_kafka_topic_t *meta2_backend_get_kafka_topic(struct meta2_backend_s *m2,
+		const gchar *name);
+
+/**
+ * Free the Kafka topic.
+ */
+void meta2_backend_free_kafka_topics(struct meta2_backend_s *m2);
 #endif
 
 /*!
@@ -82,8 +105,19 @@ void meta2_backend_configure_nsinfo(struct meta2_backend_s *m2,
 gboolean meta2_backend_get_nsinfo(struct meta2_backend_s *m2,
 		struct namespace_info_s *dst);
 
+/**
+ * Get the event configuration of the specified namespace. If not defined,
+ * look for its parent namespace configuration.
+ */
 struct event_config_s * meta2_backend_get_event_config(struct meta2_backend_s *m2,
 		const gchar *ns_name);
+
+/**
+ * Same as previous, but you can prevent the fallback on parent namespace by
+ * passing FALSE as the last argument.
+ */
+struct event_config_s * meta2_backend_get_event_config2(struct meta2_backend_s *m2,
+		const gchar *ns_name, gboolean vns_fallback);
 
 /*!
  * Tests if the backend has been fully initiated. I.e. it checks a
