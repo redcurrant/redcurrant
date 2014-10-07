@@ -5,7 +5,12 @@ link_directories(
 		${ASN1C_LIBRARY_DIRS})
 
 include_directories(AFTER
-		${OPENSSL_INCLUDE_DIRS})
+		${OPENSSL_INCLUDE_DIRS}
+		${RDKAFKA_INCLUDE_DIRS})
+
+if (GLIB2_VERSION VERSION_LESS "2.30")
+	add_definitions(-DOLD_GLIB2)
+endif()
 
 add_custom_command(
 	OUTPUT
@@ -115,6 +120,7 @@ add_library(metautils SHARED
 		metatypes.h
 		metautils.h
 		metautils_internals.h
+		notifications.h notifications.c
 		volume_lock.h
 		utils_addr_info.c
 		utils_chunk_info.c
@@ -143,7 +149,7 @@ add_library(metautils SHARED
 
 target_link_libraries(metautils
 		${OPENSSL_LIBRARIES} ${GLIB2_LIBRARIES}
-		${JSONC_LIBRARIES} -lm -lexpat)
+		${JSONC_LIBRARIES} ${RDKAFKA_LIBRARIES} -lm -lexpat)
 
 add_dependencies(metautils asn1c_generation)
 

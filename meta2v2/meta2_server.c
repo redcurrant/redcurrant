@@ -12,6 +12,7 @@
 #include <glib.h>
 
 #include <metautils/lib/metautils.h>
+#include <metautils/lib/event_config_macros.h>
 #include <cluster/lib/gridcluster.h>
 #include <server/network_server.h>
 #include <server/transport_gridd.h>
@@ -30,78 +31,9 @@ static struct grid_lbpool_s *glp = NULL;
 static struct meta2_backend_s *m2 = NULL;
 static struct sqlx_upgrader_s *upgrader = NULL;
 
-/**
- * Connect (or reconnect) to Apache Kafka broker
- * in order to send events and ensure the specified topic
- * is created.
- */
-static void
-_init_kafka_events(const gchar *topic)
-{
-#ifdef USE_KAFKA
-	GError *err = NULL;
-	err = meta2_backend_init_kafka(m2);
-	if (err) {
-		GRID_WARN(err->message);
-		g_clear_error(&err);
-	} else {
-		err = meta2_backend_kafka_topic_cache(m2, topic);
-		if (err) {
-			GRID_WARN(err->message);
-			g_clear_error(&err);
-		}
-	}
-#endif
-}
 
-static void
-_clear_kafka_events(void)
-{
-#ifdef USE_KAFKA
-	meta2_backend_free_kafka(m2);
-#endif
-}
+EVENT_CONFIG_UGLY_MACRO(meta2_backend_get_evt_config_repo(m2), "meta2", META2_EVT_TOPIC)
 
-static void
-_task_reload_event_config(gpointer p)
-{
-	GError *err = NULL;
-	gboolean must_clear_kafka = TRUE;
-
-	void _update_each(gpointer k, gpointer v, gpointer ignored) {
-		(void) ignored;
-		if (!err) {
-			struct event_config_s *conf = meta2_backend_get_event_config2(m2,
-					(char *)k, FALSE);
-			err = event_config_reconfigure(conf, (char *)v);
-			if (!err && event_is_kafka_enabled(conf)) {
-				must_clear_kafka = FALSE;
-				_init_kafka_events(
-						event_get_kafka_topic_name(conf, META2_EVT_TOPIC));
-			}
-		}
-	}
-
-	GHashTable *ht = gridcluster_get_event_config(&(PSRV(p)->nsinfo),
-			META2_TYPE_NAME);
-	if (!ht)
-		err = NEWERROR(EINVAL, "Invalid parameter");
-	else {
-		g_hash_table_foreach(ht, _update_each, NULL);
-		g_hash_table_destroy(ht);
-	}
-
-	if (!err)
-		GRID_TRACE("Event config reloaded");
-	else {
-		GRID_WARN("Event config reload error [%s] : (%d) %s",
-				PSRV(p)->ns_name, err->code, err->message);
-		g_clear_error(&err);
-	}
-
-	if (must_clear_kafka)
-		_clear_kafka_events();
-}
 
 static void
 _task_reconfigure_m2(gpointer p)

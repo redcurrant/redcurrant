@@ -13,10 +13,6 @@
 # include <meta2v2/meta2_backend.h>
 # include <meta2v2/meta2_events.h>
 
-#ifdef USE_KAFKA
-# include <librdkafka/rdkafka.h>
-#endif
-
 # ifndef M2V2_KEY_VERSION
 #  define M2V2_KEY_VERSION "m2vers"
 # endif
@@ -86,8 +82,7 @@ struct meta2_backend_s
 	gboolean flag_precheck_on_generate;
 
 	/* Notification events */
-	GStaticRWLock rwlock_evt_config;
-	GHashTable *evt_config; /* <gchar*, struct event_config_s*> */
+	struct event_config_repo_s *evt_config_repo;
 
 	// array of GSList* of addr_info_t*
 	GPtrArray *m0_mapping;
@@ -95,12 +90,6 @@ struct meta2_backend_s
 	GHashTable *modified_containers;
 
 	struct hc_resolver_s *resolver;
-
-#ifdef USE_KAFKA
-	// TODO: move to sqlx_repository_s, we may need it in meta1
-	rd_kafka_t *kafka_handle;
-	GHashTable *kafka_topics; // GHashTable<rd_kafka_topic_t*>
-#endif
 };
 
 struct transient_element_s

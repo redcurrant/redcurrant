@@ -10,6 +10,7 @@
 #include <sys/resource.h>
 
 #include <metautils/lib/metautils.h>
+#include <metautils/lib/event_config_macros.h>
 #include <cluster/lib/gridcluster.h>
 #include <server/network_server.h>
 #include <server/grid_daemon.h>
@@ -27,6 +28,8 @@
 
 static struct grid_lbpool_s *glp = NULL;
 static struct meta1_backend_s *m1 = NULL;
+
+EVENT_CONFIG_UGLY_MACRO(meta1_backend_get_evt_config_repo(m1), "meta1", META1_EVT_TOPIC)
 
 static GError*
 _reload_prefixes(struct sqlx_service_s *ss, gboolean init)
@@ -229,6 +232,8 @@ _post_config(struct sqlx_service_s *ss)
 		}
 	}
 
+	grid_task_queue_register(ss->gtq_reload, 5,
+			_task_reload_event_config, NULL, ss);
 	grid_task_queue_register(ss->gtq_reload, 5,
 			_task_reload_policies, NULL, ss);
 	grid_task_queue_register(ss->gtq_reload, 11,
