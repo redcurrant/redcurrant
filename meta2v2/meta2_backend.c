@@ -5,6 +5,7 @@
 #include <glib.h>
 
 #include <metautils/lib/metautils.h>
+#include <metautils/lib/event_config.h>
 #include <cluster/lib/gridcluster.h>
 
 #include <sqliterepo/sqliterepo.h>
@@ -25,10 +26,6 @@
 #include <meta2/remote/meta2_remote.h>
 
 #include <resolver/hc_resolver.h>
-
-#ifdef USE_KAFKA
-#include <librdkafka/rdkafka.h>
-#endif
 
 enum m2v2_open_type_e
 {
@@ -358,125 +355,38 @@ _check_policy(struct meta2_backend_s *m2, const gchar *polname)
 	return err;
 }
 
-#ifdef USE_KAFKA
-GError *
-meta2_backend_init_kafka(struct meta2_backend_s *m2)
+metautils_notifier_t *
+meta2_backend_get_notifier(struct meta2_backend_s *m2)
 {
-	GError *err = NULL;
-	gchar errmsg[256];
-	gchar str_addr[128];
-	service_info_t *broker = NULL;
-
-	// Already initialized
-	if (m2->kafka_handle != NULL)
-		return NULL;
-
-	// TODO: customize configuration
-	rd_kafka_t *handle = rd_kafka_new(RD_KAFKA_PRODUCER, NULL,
-			errmsg, sizeof(errmsg));
-
-	if (!handle) {
-		err = NEWERROR(CODE_INTERNAL_ERROR,
-				"Failed to initialize Kafka: %s", errmsg);
-		goto end;
-	}
-	rd_kafka_set_logger(handle, rd_kafka_log_syslog);
-	broker = get_one_namespace_service(m2->ns_name, "kafka", &err);
-	if (err) {
-		rd_kafka_destroy(handle);
-		goto end;
-	}
-	grid_addrinfo_to_string(&(broker->addr), str_addr, sizeof(str_addr));
-	if (!rd_kafka_brokers_add(handle, str_addr)) {
-		err = NEWERROR(CODE_INTERNAL_ERROR,
-				"Failed to configure kafka broker to %s", str_addr);
-		rd_kafka_destroy(handle);
-		goto end;
-	} else {
-		service_info_clean(broker);
-	}
-	m2->kafka_topics = g_hash_table_new_full(g_str_hash, g_str_equal,
-			g_free, (GDestroyNotify)rd_kafka_topic_destroy);
-	m2->kafka_handle = handle;
-
-end:
-	return err;
+	return event_config_repo_get_notifier(m2->evt_config_repo);
 }
 
-void
-meta2_backend_free_kafka(struct meta2_backend_s *m2)
+struct event_config_repo_s *
+meta2_backend_get_evt_config_repo(const struct meta2_backend_s *m2)
 {
-	if (m2->kafka_handle) {
-		// Set pointer to NULL so Kafka events are disabled immediately
-		rd_kafka_t *handle = m2->kafka_handle;
-		m2->kafka_handle = NULL;
-		// Now clear handle
-		meta2_backend_kafka_topic_cache_clear(m2);
-		rd_kafka_destroy(handle);
-	}
+	return m2->evt_config_repo;
 }
 
 GError *
-meta2_backend_kafka_topic_ref(struct meta2_backend_s *m2, const gchar *name,
-		rd_kafka_topic_t **topic)
+meta2_backend_init_notifs(struct meta2_backend_s *m2)
 {
-	rd_kafka_topic_t *new_topic = NULL;
-
-	g_assert(m2 != NULL);
-
-	if (!m2->kafka_handle) {
-		return NEWERROR(CODE_INTERNAL_ERROR,
-				"No kafka handle, events disabled?");
-	}
-
-	// TODO: customize topic configuration
-	// Returns a reference if topic already exists
-	new_topic = rd_kafka_topic_new(m2->kafka_handle, name, NULL);
-	if (!new_topic) {
-		return NEWERROR(CODE_INTERNAL_ERROR,
-				"Failed to initialize Kafka topic: %s", strerror(errno));
-	}
-	*topic = new_topic;
-	return NULL;
+	metautils_notifier_t *notifier = meta2_backend_get_notifier(m2);
+	return metautils_notifier_init_kafka(notifier);
 }
 
 void
-meta2_backend_kafka_topic_unref(struct meta2_backend_s *m2,
-		rd_kafka_topic_t *utopic)
+meta2_backend_free_notifs(struct meta2_backend_s *m2)
 {
-	(void) m2;
-	// Decreases reference counter
-	rd_kafka_topic_destroy(utopic);
+	metautils_notifier_t *notifier = meta2_backend_get_notifier(m2);
+	metautils_notifier_free_kafka(notifier);
 }
 
 GError *
-meta2_backend_kafka_topic_cache(struct meta2_backend_s *m2, const gchar *name)
+meta2_backend_prepare_notif_topic(struct meta2_backend_s *m2, const gchar *name)
 {
-	GError *err = NULL;
-	rd_kafka_topic_t *topic = NULL;
-
-	g_assert(m2 != NULL);
-
-	if (!m2->kafka_handle)
-		return NULL;
-
-	err = meta2_backend_kafka_topic_ref(m2, name, &topic);
-	if (!err) {
-		g_hash_table_insert(m2->kafka_topics, g_strdup(name), topic);
-	}
-	return err;
+	metautils_notifier_t *notifier = meta2_backend_get_notifier(m2);
+	return metautils_notifier_prepare_kafka_topic(notifier, name);
 }
-
-void
-meta2_backend_kafka_topic_cache_clear(struct meta2_backend_s *m2)
-{
-	if (m2->kafka_topics) {
-		// Hash table was created with topic destroy callback
-		g_hash_table_destroy(m2->kafka_topics);
-		m2->kafka_topics = NULL;
-	}
-}
-#endif
 
 GError *
 meta2_backend_init(struct meta2_backend_s **result,
@@ -503,8 +413,7 @@ meta2_backend_init(struct meta2_backend_s **result,
 	m2->repo = repo;
 	m2->glp = glp;
 	m2->policies = service_update_policies_create();
-	m2->evt_config = g_hash_table_new_full(g_str_hash, g_str_equal,
-			g_free, (GDestroyNotify) event_config_destroy);
+	m2->evt_config_repo = event_config_repo_create(m2->ns_name, m2->glp);
 
 	m2->lock_ns_info = g_mutex_new();
 
@@ -543,21 +452,7 @@ struct event_config_s *
 meta2_backend_get_event_config2(struct meta2_backend_s *m2, const char *ns_name,
 		gboolean vns_fallback)
 {
-	struct event_config_s *event = NULL;
-	if (NULL != m2) {
-		g_static_rw_lock_writer_lock(&m2->rwlock_evt_config);
-		if (vns_fallback)
-			event = namespace_hash_table_lookup(m2->evt_config, ns_name, NULL);
-		else
-			event = g_hash_table_lookup(m2->evt_config, ns_name);
-		if (!event) {
-			GRID_DEBUG("Event config not found for %s, creating one", ns_name);
-			event = event_config_create();
-			g_hash_table_insert(m2->evt_config, g_strdup(ns_name), event);
-		}
-		g_static_rw_lock_writer_unlock(&m2->rwlock_evt_config);
-	}
-	return event;
+	return event_config_repo_get(m2->evt_config_repo, ns_name, vns_fallback);
 }
 
 struct event_config_s *
@@ -578,9 +473,6 @@ meta2_backend_clean(struct meta2_backend_s *m2)
 	if (m2->lock_ns_info) {
 		g_mutex_free(m2->lock_ns_info);
 	}
-	if (m2->evt_config) {
-		g_hash_table_destroy(m2->evt_config);
-	}
 	if (m2->m0_mapping) {
 		g_ptr_array_free(m2->m0_mapping, TRUE);
 	}
@@ -599,10 +491,8 @@ meta2_backend_clean(struct meta2_backend_s *m2)
 	if (m2->resolver) {
 		m2->resolver = NULL;
 	}
-#ifdef USE_KAFKA
-	meta2_backend_free_kafka(m2); // also cleans topics
-#endif
-	g_static_rw_lock_free(&m2->rwlock_evt_config);
+	meta2_backend_free_notifs(m2); // also cleans topics
+	event_config_repo_clear(&m2->evt_config_repo);
 	namespace_info_clear(&(m2->ns_info));
 	g_free(m2);
 }

@@ -13,7 +13,9 @@
 #include <metautils/lib/metautils.h>
 #include <metautils/lib/metacomm.h>
 #include <sqliterepo/sqliterepo.h>
+#include <sqliterepo/election.h>
 #include <meta2/remote/meta2_remote.h>
+#include <cluster/lib/gridcluster.h>
 
 #include "./internals.h"
 #include "./internals_sqlite.h"
@@ -41,6 +43,7 @@ meta1_backend_init(const gchar *ns, struct sqlx_repository_s *repo,
 	m1->ns_policies = g_hash_table_new_full(g_str_hash, g_str_equal,
 			g_free, (GDestroyNotify) service_update_policies_destroy);
 
+	m1->evt_config_repo = event_config_repo_create(m1->ns_name, m1->lb);
 	return m1;
 }
 
@@ -56,6 +59,10 @@ meta1_backend_clean(struct meta1_backend_s *m1)
 
 	if (m1->ns_policies) {
 		g_hash_table_destroy(m1->ns_policies);
+	}
+
+	if (m1->evt_config_repo) {
+		event_config_repo_clear(&(m1->evt_config_repo));
 	}
 
 	g_static_rw_lock_free(&m1->rwlock_ns_policies);
@@ -112,5 +119,47 @@ gchar *
 meta1_backend_get_ns_name(const struct meta1_backend_s *m1)
 {
 	return g_strdup(m1->ns_name);
+}
+
+struct event_config_repo_s *
+meta1_backend_get_evt_config_repo(const struct meta1_backend_s *m1)
+{
+	return m1->evt_config_repo;
+}
+
+metautils_notifier_t *
+meta1_backend_get_notifier(struct meta1_backend_s *m1)
+{
+	return event_config_repo_get_notifier(m1->evt_config_repo);
+}
+
+struct event_config_s *
+meta1_backend_get_event_config(struct meta1_backend_s *m1, const char *ns_name)
+{
+	return event_config_repo_get(m1->evt_config_repo, ns_name, TRUE);
+}
+
+// TODO: add another parameter with the wanted brokers (Kafka, AMQ...)
+GError *
+meta1_backend_init_notifs(struct meta1_backend_s *m1)
+{
+	metautils_notifier_t *notifier = meta1_backend_get_notifier(m1);
+	return metautils_notifier_init_kafka(notifier);
+}
+
+// TODO: copied from meta2v2/meta2_backend.c, should factorize
+const gchar*
+meta1_backend_get_local_addr(struct meta1_backend_s *m1)
+{
+	const gchar* m1url = NULL;
+    struct election_manager_s* em =
+			sqlx_repository_get_elections_manager(m1->repository);
+    if (em) {
+        const struct replication_config_s *emrc = election_manager_get_config(em);
+        if (emrc) {
+            m1url = emrc->get_local_url(emrc->ctx);
+        }
+    }
+	return m1url;
 }
 
