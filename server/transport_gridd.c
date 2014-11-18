@@ -51,16 +51,17 @@ struct gridd_request_dispatcher_s
 
 struct req_ctx_s
 {
-	struct timeval tvstart;
+	struct timespec tv_start, tv_parsed, tv_end;
+
 	struct message_s *request;
 	struct network_client_s *client;
 	struct transport_client_context_s *clt_ctx;
 	struct network_transport_s *transport;
 	struct gridd_request_dispatcher_s *disp;
 	struct hashstr_s *reqname;
-	gboolean final_sent;
 	gchar *subject;
 	const gchar *reqid;
+	gboolean final_sent;
 };
 
 static inline int
@@ -222,12 +223,14 @@ transport_gridd_factory0(struct gridd_request_dispatcher_s *dispatcher,
 static void
 network_client_log_access(struct req_ctx_s *ctx, const gchar *fmt, ...)
 {
-	struct timeval now, diff;
+	struct timespec diff_total, diff_handler;
 	GString *gstr;
 	va_list args;
 
-	gettimeofday(&now, NULL);
-	timersub(&now, &(ctx->tvstart), &diff);
+	if (!ctx->tv_end.tv_sec)
+		network_server_now(&ctx->tv_end);
+	timespec_sub(&ctx->tv_end, &ctx->tv_start, &diff_total);
+	timespec_sub(&ctx->tv_end, &ctx->tv_parsed, &diff_handler);
 
 	gstr = g_string_sized_new(256);
 
@@ -235,7 +238,9 @@ network_client_log_access(struct req_ctx_s *ctx, const gchar *fmt, ...)
 	g_string_append_c(gstr, ' ');
 	g_string_append(gstr, ctx->client->peer_name);
 
-	g_string_append_printf(gstr, " %ld.%06ld ", diff.tv_sec, diff.tv_usec);
+	g_string_append_printf(gstr, " %ld.%06ld %ld.%06ld ",
+			diff_total.tv_sec, diff_total.tv_nsec / 1000,
+			diff_handler.tv_sec, diff_handler.tv_nsec / 1000);
 
 	va_start(args, fmt);
 	g_string_append_vprintf(gstr, fmt, args);
@@ -431,6 +436,7 @@ transport_gridd_notify_error(struct network_client_s *clt)
 {
 	EXTRA_ASSERT(clt != NULL);
 	//GRID_TRACE("Transport: error on fd=%d", clt->fd);
+	// @todo TODO write an access log trace
 	_client_send_error(clt);
 	_ctx_reset_cnx_data(clt->transport.client_context);
 }
@@ -519,14 +525,15 @@ static inline void
 _notify_request(struct req_ctx_s *ctx,
 		const gchar *name_req, const gchar *name_time)
 {
-	struct timeval tvnow, tvdiff;
+	struct timespec diff;
 	guint64 e_s, e_us, e_sum;
 
-	gettimeofday(&tvnow, NULL);
-	timersub(&tvnow, &(ctx->tvstart), &tvdiff);
+	if (!ctx->tv_end.tv_sec)
+		network_server_now(&ctx->tv_end);
+	timespec_sub(&ctx->tv_end, &ctx->tv_start, &diff);
 
-	e_s = tvdiff.tv_sec;
-	e_us = tvdiff.tv_usec;
+	e_s = diff.tv_sec;
+	e_us = diff.tv_nsec / 1000;
 	e_sum = e_s * 1000000LLU + e_us;
 
 	grid_stats_holder_increment(ctx->client->local_stats,
@@ -563,10 +570,11 @@ _client_reply_fixed(struct req_ctx_s *req_ctx, gint code, const gchar *msg)
 	MESSAGE reply = NULL;
 
 	EXTRA_ASSERT(!req_ctx->final_sent);
-	if ((req_ctx->final_sent = is_code_final(code)))
+	if ((req_ctx->final_sent = is_code_final(code))) {
 		network_client_log_access(req_ctx, "%s %s [%s] %d %s",
 				req_ctx->reqid, hashstr_str(req_ctx->reqname),
 				req_ctx->subject, code, msg);
+	}
 	return metaXServer_reply_simple(&reply, req_ctx->request, code, msg, NULL)
 		&& _reply_message(req_ctx->client, reply);
 }
@@ -754,13 +762,18 @@ _client_manage_l4v(struct network_client_s *client, GByteArray *gba)
 	req_ctx.subject = g_malloc0(sizeof(void*));
 	req_ctx.final_sent = FALSE;
 	req_ctx.client = client;
-	gettimeofday(&(req_ctx.tvstart), NULL);
 	req_ctx.transport = &(client->transport);
 	req_ctx.clt_ctx = req_ctx.transport->client_context;
 	req_ctx.disp = req_ctx.clt_ctx->dispatcher;
 
 	offset = gba->len;
-	if (!message_unmarshall(request, gba->data, &offset, &err)) {
+	int asn1_rc = message_unmarshall(request, gba->data, &offset, &err);
+
+	// take the encoding into account
+	memcpy(&req_ctx.tv_start, &client->time.evt_in, sizeof(req_ctx.tv_start));
+	network_server_now(&req_ctx.tv_parsed);
+
+	if (!asn1_rc) {
 		network_client_log_access(&req_ctx,
 				"- - [] 400 Malformed ASN.1/BER Message");
 		GRID_INFO("fd=%d ASN.1 decoder error: (%d) %s",
