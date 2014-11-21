@@ -339,7 +339,17 @@ _copy_chunk(const gchar *from, const gchar*to)
 {
 	GError *err = NULL;
 	struct http_pipe_s *p = NULL;
+
+	gboolean _header_filter(gpointer u, const gchar *h) {
+		(void) u;
+		if (NULL == h)
+			return FALSE;
+		return g_str_has_prefix(h, "chunk_")
+				|| g_str_has_prefix(h, "content_");
+	}
+
 	p = http_pipe_create(from, to);
+	http_pipe_filter_headers(p, _header_filter, NULL);
 	err = http_pipe_run(p);
 	http_pipe_destroy(p);
 	return err;
