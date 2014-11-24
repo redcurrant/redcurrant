@@ -60,8 +60,11 @@ gridcluster_event_SaveNewEvent(struct event_config_s *evt_config, gridcluster_ev
 	time_t now = time(0);
 	int fd;
 
-	GRID_INFO("Event config : [%s]", event_config_dump(evt_config));
-	GRID_INFO("Writing event in [%s]", event_get_dir(evt_config));
+	GRID_TRACE("Event config : [%s]", event_config_dump(evt_config));
+	if (!event_is_enabled(evt_config))
+		return NULL;
+
+	GRID_TRACE2("Writing event in [%s]", event_get_dir(evt_config));
 
 	gchar *str_ueid     = gridcluster_event_get_string(evt, GRIDCLUSTER_EVTFIELD_UEID);
 	gchar *str_aggrname = gridcluster_event_get_string(evt, GRIDCLUSTER_EVTFIELD_AGGRNAME);
@@ -71,7 +74,7 @@ gridcluster_event_SaveNewEvent(struct event_config_s *evt_config, gridcluster_ev
 
 	g_snprintf(dirname, sizeof(dirname), "%s%c%.2s", event_get_dir(evt_config),
 			G_DIR_SEPARATOR, str_cid);
-	GRID_INFO("dir path = [%s]", dirname);
+	GRID_TRACE2("dir path = [%s]", dirname);
 	g_snprintf(abspath, sizeof(abspath), "%s%c%s", dirname, G_DIR_SEPARATOR,
 			(str_aggrname ? str_aggrname : str_ueid));
 
@@ -79,7 +82,7 @@ retry:
 	g_snprintf(tmppath, sizeof(tmppath), "%s%c.event-XXXXXX", dirname,
 			G_DIR_SEPARATOR);
 
-	GRID_INFO("tmp path for mkstemp = [%s]", tmppath);
+	GRID_TRACE2("tmp path for mkstemp = [%s]", tmppath);
 
 	if (0 > (fd = g_mkstemp(tmppath))) {
 		if (errno == ENOENT) {
@@ -95,7 +98,7 @@ retry:
 		err = NEWERROR(500, "Event write error (mkstemp) : errno=%d (%s)",
 				errno, strerror(errno));
 	} else {
-		GRID_INFO("fd opened");
+		GRID_TRACE2("fd opened");
 		/* change file attribute */
 		if (0 != fchmod(fd, 0644))
 			err = NEWERROR(500, "Event error (chmod) : errno=%d (%s)",
@@ -110,14 +113,14 @@ retry:
 			else {
 				write(fd, gba->data, gba->len);
 				g_byte_array_free(gba, TRUE);
-				GRID_INFO("Event written");
+				GRID_TRACE2("Event written");
 			}
 		}
 
 
 		/* set extended attributes (XATTR) */
 		if (!err) {
-			GRID_INFO("Setting xattr");
+			GRID_TRACE2("Setting xattr");
 			gchar str_now[64], str_seq[64];
 			bzero(str_now, sizeof(str_now));
 			bzero(str_seq, sizeof(str_seq));
@@ -130,18 +133,18 @@ retry:
 				err = NEWERROR(500, "Event error (setxattr) : errno=%d (%s)",
 						errno, strerror(errno));
 			}
-			GRID_INFO("xattr ok");
+			GRID_TRACE2("xattr ok");
 		}
 
 		/* rename the file */
 		if (!err) {
-			GRID_INFO("going to rename...");
+			GRID_TRACE2("going to rename...");
 			if (0 != rename(tmppath, abspath)) {
 				err = NEWERROR(500, "Event error (rename) : errno=%d (%s)",
 						errno, strerror(errno));
 				(void) unlink(tmppath);
 			}
-			GRID_INFO("Rename done, event ok");
+			GRID_TRACE2("Rename done, event ok");
 		}
 
 		metautils_pclose(&fd);

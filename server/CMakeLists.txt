@@ -54,6 +54,7 @@ install(FILES
 			slab.h
 			transport_gridd.h
 			transport_http.h
+			stats_holder.h
 		DESTINATION include/server
 		PERMISSIONS
 			OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)
