@@ -97,6 +97,17 @@ const gchar *data_security_type_name(enum data_security_e type);
 const struct data_treatments_s *storage_policy_get_data_treatments(
 		const struct storage_policy_s *sp);
 
+/** Inits a storage class from scratch, with its namespace configuration. */
+struct storage_class_s * storage_class_init (struct namespace_info_s *ni,
+		const char *name);
+
+/** Frees all the internal memory used by the storage class pointed by <sc> */
+void storage_class_clean(struct storage_class_s *sc);
+
+/** Calls storage_class_clean() on <u> and ignores <ignored> */
+void storage_class_gclean(gpointer u, gpointer ignored);
+
+
 /**
  * @param sp
  * @return

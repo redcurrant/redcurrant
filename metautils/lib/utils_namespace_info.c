@@ -269,9 +269,10 @@ namespace_info_get_storage_class(namespace_info_t *ni, const gchar *stgclass_key
 	if (ni->storage_class != NULL) {
 		GByteArray *gba = NULL;
 		gba = g_hash_table_lookup(ni->storage_class, stgclass_key);
-		if (gba != NULL) {
+		if (!gba->data || gba->len <= 0)
+			return g_strdup("");
+		if (gba != NULL)
 			return g_strndup((gchar*)gba->data, gba->len);
-		}
 	}
 	return NULL;
 }
