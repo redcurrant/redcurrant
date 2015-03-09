@@ -99,9 +99,12 @@ add_definitions(-DAPI_VERSION="${API_VERSION}")
 add_definitions(-DSHORT_API_VERSION="${SHORT_API_VERSION}")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-MESSAGE("DEBUG symbols enabled")
 add_definitions(-DHAVE_EXTRA_ASSERT=1)
 add_definitions(-DHAVE_ASSERT_EXTRA=1)
+endif()
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+MESSAGE("DEBUG symbols enabled")
 add_definitions(-DHAVE_EXTRA_DEBUG=1)
 add_definitions(-DHAVE_DEBUG_EXTRA=1)
 endif()
