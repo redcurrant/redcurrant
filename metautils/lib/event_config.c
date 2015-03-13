@@ -21,7 +21,7 @@ struct event_config_s {
 struct event_config_repo_s {
 	GStaticRWLock rwlock;
 	GHashTable *evt_config; /* <gchar*, struct event_config_s*> */
-	metautils_notifier_t *notifier;
+	metautils_notif_pool_t *notifier;
 };
 
 static GQuark gquark_log = 0;
@@ -193,7 +193,7 @@ event_config_repo_create(const gchar *ns_name, struct grid_lbpool_s *lbpool)
 	conf->evt_config = g_hash_table_new_full(g_str_hash, g_str_equal,
 			g_free, (GDestroyNotify) event_config_destroy);
 	g_static_rw_lock_init(&(conf->rwlock));
-	metautils_notifier_init(&(conf->notifier), ns_name, lbpool);
+	metautils_notif_pool_init(&(conf->notifier), ns_name, lbpool);
 
 	return conf;
 }
@@ -205,7 +205,7 @@ event_config_repo_clear(struct event_config_repo_s **repo)
 		return;
 	struct event_config_repo_s *repo2 = *repo;
 	*repo = NULL;
-	metautils_notifier_clear(&(repo2->notifier));
+	metautils_notif_pool_clear(&(repo2->notifier));
 	if (repo2->evt_config) {
 		g_hash_table_destroy(repo2->evt_config);
 	}
@@ -214,7 +214,7 @@ event_config_repo_clear(struct event_config_repo_s **repo)
 	g_free(repo2);
 }
 
-metautils_notifier_t *
+metautils_notif_pool_t *
 event_config_repo_get_notifier(struct event_config_repo_s *repo)
 {
 	return repo->notifier;

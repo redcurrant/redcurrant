@@ -7,39 +7,42 @@
 // Kafka docs says that 10000 partitions is huge but should work
 #define MAX_TOPIC_PARTITIONS 16384
 
-struct metautils_notifier_s;
-typedef struct metautils_notifier_s metautils_notifier_t;
+struct metautils_notif_pool_s;
+typedef struct metautils_notif_pool_s metautils_notif_pool_t;
+
+typedef GError *(*notifier_configure)(const namespace_info_t *nsinfo,
+		struct grid_lbpool_s *lbpool, GSList *topics, gpointer *handle);
+typedef GError *(*notifier_send)(gpointer handle, const gchar *topic,
+		const guint32 *key, GByteArray *data);
+typedef void (*notifier_free)(gpointer handle);
+
+struct notifier_s
+{
+	const gchar *type;
+	gpointer handle;
+	notifier_configure configure;
+	notifier_free free;
+	notifier_send send;
+};
+
 
 /**
  * Allocate and initialize a notification handle.
  */
-void metautils_notifier_init(metautils_notifier_t **notifier,
+void metautils_notif_pool_init(metautils_notif_pool_t **pool,
 	const gchar *ns_name, struct grid_lbpool_s *lbpool);
 
 /**
  * Clear a notification handle.
  */
-void metautils_notifier_clear(metautils_notifier_t **notifier);
+void metautils_notif_pool_clear(metautils_notif_pool_t **notifier);
 
-/**
- * Configure the notifier to send notifications to Kafka.
- *
- * @param notifier A notifier instance
- */
-GError *metautils_notifier_init_kafka(metautils_notifier_t *notifier);
 
-/**
- * Free the Kafka notifier only. Other notifiers will continue to work.
- */
-void metautils_notifier_free_kafka(metautils_notifier_t *notifier);
+GError *metautils_notif_pool_configure_type(metautils_notif_pool_t *pool,
+		namespace_info_t *nsinfo, const gchar *type, GSList *topics);
 
-/**
- * Create a Kafka topic instance, and add it to the cache.
- * This will speed up the notification process and avoid allocating a topic
- * on each call to metautils_notifier_send().
- */
-GError *metautils_notifier_prepare_kafka_topic(metautils_notifier_t *notifier,
-		 const gchar *topic_name);
+void metautils_notif_pool_clear_type(metautils_notif_pool_t *pool,
+		const gchar *type);
 
 /**
  * Send a raw notification to the specified topic.
@@ -47,7 +50,7 @@ GError *metautils_notifier_prepare_kafka_topic(metautils_notifier_t *notifier,
  * @param lb_key Pointer to a 32 bit integer helping for
  *   notification load balancing (can be NULL)
  */
-GError *metautils_notifier_send_raw(metautils_notifier_t *notifier,
+GError *metautils_notif_pool_send_raw(metautils_notif_pool_t *pool,
 	const gchar *topic, GByteArray *data, const guint32 *lb_key);
 
 /**
@@ -57,7 +60,7 @@ GError *metautils_notifier_send_raw(metautils_notifier_t *notifier,
  * @param lb_key Pointer to a 32 bit integer helping for
  *   notification load balancing (can be NULL)
  */
-GError *metautils_notifier_send_json(metautils_notifier_t *notifier,
+GError *metautils_notif_pool_send_json(metautils_notif_pool_t *pool,
 	const gchar *topic, const gchar *src_addr, const char *notif_type,
 	const gchar *notif_data, const guint32 *lb_key);
 

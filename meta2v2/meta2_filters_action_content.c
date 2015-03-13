@@ -443,7 +443,7 @@ meta2_filter_action_get_content(struct gridd_filter_ctx_s *ctx,
 		}
 
 		if (urls == NULL) {
-			e = NEWERROR(404,
+			e = NEWERROR(CODE_CONTENT_NOTFOUND,
 					"Did not find any matching alias for chunk %s",
 					chunk_id);
 			GRID_DEBUG(e->message);
