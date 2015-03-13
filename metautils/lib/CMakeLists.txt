@@ -151,7 +151,17 @@ add_library(metautils SHARED
 
 target_link_libraries(metautils
 		${OPENSSL_LIBRARIES} ${GLIB2_LIBRARIES}
-		${JSONC_LIBRARIES} ${RDKAFKA_LIBRARIES} -lm -lexpat)
+		${JSONC_LIBRARIES} -lm -lexpat)
+
+if (RDKAFKA_FOUND)
+	# Build a static library dynamically linked to rdkafka
+	add_library(notifier_kafka STATIC notifier_kafka.c)
+	target_link_libraries(notifier_kafka
+			${RDKAFKA_LIBRARIES} ${GLIB2_LIBRARIES})
+	# Add this library as a dependency to metautils
+	target_link_libraries(metautils notifier_kafka)
+endif()
+
 
 add_dependencies(metautils asn1c_generation)
 

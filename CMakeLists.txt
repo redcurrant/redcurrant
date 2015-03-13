@@ -416,6 +416,8 @@ if (DEFINED RDKAFKA_FOUND)
 	find_library(RDKAFKA_LIBRARIES rdkafka ${RDKAFKA_LIBRARY_DIRS})
 	if (NOT RDKAFKA_LIBRARIES)
 		set (RDKAFKA_FOUND OFF)
+	else()
+		add_definitions(-DRD_KAFKA_ENABLED=1)
 	endif()
 endif ()
 
