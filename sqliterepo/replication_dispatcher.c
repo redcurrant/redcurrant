@@ -507,6 +507,7 @@ _pipe_from(const gchar *source, struct sqlx_repository_s *repo,
 		const gchar *base, const gchar *type)
 {
 	GError *err;
+	gchar path[LIMIT_LENGTH_VOLUMENAME+32] = {0};
 	struct sqlx_name_s name;
 	struct restore_ctx_s *ctx = NULL;
 
@@ -515,7 +516,9 @@ _pipe_from(const gchar *source, struct sqlx_repository_s *repo,
 	name.base = base;
 	name.type = type;
 
-	err = restore_ctx_create("/tmp/restore.sqlite3.XXXXXX", &ctx);
+	g_snprintf(path, sizeof(path), "%s/tmp/restore.sqlite3.XXXXXX",
+			repo->basedir);
+	err = restore_ctx_create(path, &ctx);
 	if (err != NULL)
 		goto end;
 
