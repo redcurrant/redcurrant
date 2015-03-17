@@ -492,6 +492,7 @@ sqlx_service_set_defaults(void)
 	SRV.cfg_max_workers = 200;
 	SRV.flag_replicable = TRUE;
 	SRV.flag_autocreate = TRUE;
+	SRV.flag_autoupgrade = FALSE;
 	SRV.flag_delete_on = TRUE;
 	SRV.flag_cached_bases = TRUE;
 
@@ -626,6 +627,9 @@ sqlx_service_get_options(void)
 			" by several requests in the same time."},
 		{"DeleteEnabled", OT_BOOL, {.b = &SRV.flag_delete_on},
 			"If not set, prevents deleting database files from disk"},
+		{"AutoUpgrade", OT_BOOL, {.b=&SRV.flag_autoupgrade},
+			"Allow the service to automatically upgrade bases which"
+			" do not contain latest version of the schema"},
 
 		{NULL, 0, {.i=0}, NULL}
 	};

@@ -125,6 +125,8 @@ struct sqlx_service_s
 	// FALSE : ELECTION_MODE_NONE
 	gboolean flag_replicable;
 
+	// Must bases be automatically upgraded after open?
+	gboolean flag_autoupgrade;
 };
 
 // Public API

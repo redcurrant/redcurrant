@@ -196,9 +196,12 @@ _post_config(struct sqlx_service_s *ss)
 {
 	GError *err = NULL;
 
-	upgrader = sqlx_upgrader_create();
-	sqlx_upgrader_register(upgrader, "!1.8", "1.8", _upgrade_to_18, NULL);
-	sqlx_repository_configure_open_callback(ss->repository, meta2_on_open, upgrader);
+	if (ss->flag_autoupgrade) {
+		upgrader = sqlx_upgrader_create();
+		sqlx_upgrader_register(upgrader, "!1.8", "1.8", _upgrade_to_18, NULL);
+		sqlx_repository_configure_open_callback(ss->repository, meta2_on_open,
+				upgrader);
+	}
 
 	err = sqlx_service_extras_init(ss);
 	if (err != NULL) {
