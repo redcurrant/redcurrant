@@ -1493,7 +1493,7 @@ _evtcfg_preload_with_default(GHashTable *ht, gchar *ns, const gchar *srvtype)
 {
 	if (!g_ascii_strcasecmp(srvtype, "meta2"))
 		g_hash_table_insert(ht, g_strdup(ns), g_strdup(
-					"enabled=false;dir=/GRID/common/spool;aggregate=false"
+					"enabled=false;dir=/var/spool/redcurrant;aggregate=false"
 					";kafka_enabled=false;kafka_topic=redc.meta2"));
 	else
 		g_hash_table_insert(ht, g_strdup(ns), g_strdup(""));

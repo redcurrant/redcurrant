@@ -1,7 +1,7 @@
 #ifndef _EVENT_H_
 #define _EVENT_H_
 #include <glib.h>
-#define SPOOLDIR "/GRID/common/spool"
+#define SPOOLDIR "/var/spool/redcurrant"
 
 typedef struct spooldir_stat_s {
 	guint32 nb_evt;

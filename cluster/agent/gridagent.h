@@ -5,7 +5,9 @@
 
 #define AGENT_DEFAULT_EVENT_XATTR "user.grid.agent.incoming-time"
 
-#define AGENT_SOCK_PATH "/GRID/common/run/gridagent.sock"
+#ifndef AGENT_SOCK_PATH
+# define AGENT_SOCK_PATH "/var/run/redcurrant/gridagent.sock"
+#endif
 
 #define MSG_SRVTYPE_LST "SRVTYPELST"
 #define MSG_SRV_GET1 "SRVGET1"

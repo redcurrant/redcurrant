@@ -2,14 +2,14 @@
 daemon=true
 to_op=2000
 to_cnx=20000
-pidfile=/GRID/common/run/metacd.pid
+pidfile=/var/run/redcurrant/metacd.pid
 
 [Server.metacd]
 min_workers=100
 min_spare_workers=200
 max_spare_workers=400
 max_workers=400
-listen=/GRID/common/run/metacd.sock?mode=0666
+listen=/var/run/redcurrant/metacd.sock?mode=0666
 plugins=metacd,fallback
 
 #	### Uncomment these lines and configure the listen address

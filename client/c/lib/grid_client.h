@@ -16,7 +16,7 @@
 #define GS_ERROR ((gs_status_t)0)
 
 #define GS_ENVKEY_METACDSOCK "GS_METACD_SOCKET"
-#define GS_DEFAULT_METACDSOCK "/GRID/common/run/metacd.sock"
+#define GS_DEFAULT_METACDSOCK "/var/run/redcurrant/metacd.sock"
 
 #define GS_ENVKEY_MAXSPARE "GS_MAX_SPARE"
 #define GS_DEFAULT_MAXSPARE "5"

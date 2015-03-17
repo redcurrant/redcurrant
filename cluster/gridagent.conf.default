@@ -7,7 +7,7 @@ backlog=4096
 cluster_update_freq=2
 service_check_freq=2
 
-events.spool.dir=/GRID/common/spool
+events.spool.dir=/var/spool/redcurrant
 events.spool.size=9999
 events.mode.dir=755
 events.mode.file=644
