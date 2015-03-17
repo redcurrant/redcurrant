@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <sqlite3.h>
+#include <glib.h>
 
 #include <metautils/lib/metautils.h>
 #include <meta2v2/generic.h>
@@ -421,7 +422,11 @@ _db_get_bean(const struct bean_descriptor_s *descr,
 	if (!(err = _stmt_apply_GV_parameters(stmt, params))) {
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
 			cb(u, _row_to_bean(descr, stmt));
-		g_assert(rc == SQLITE_OK || rc == SQLITE_DONE);
+		if (unlikely(!(rc == SQLITE_OK || rc == SQLITE_DONE))) {
+			err = NEWERROR(CODE_INTERNAL_ERROR,
+					"Got an error from sqlite: (%d) %s",
+					rc, sqlite_strerror(rc));
+		}
 	}
 
 	sqlite3_finalize(stmt);
@@ -459,7 +464,11 @@ _db_count_bean(const struct bean_descriptor_s *descr,
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
 			*pcount = sqlite3_column_int64(stmt, 0);
 		}
-		g_assert(rc == SQLITE_OK || rc == SQLITE_DONE);
+		if (unlikely(!(rc == SQLITE_OK || rc == SQLITE_DONE))) {
+			err = NEWERROR(CODE_INTERNAL_ERROR,
+					"Got an error from sqlite: (%d) %s",
+					rc, sqlite_strerror(rc));
+		}
 	}
 
 	sqlite3_finalize(stmt);
