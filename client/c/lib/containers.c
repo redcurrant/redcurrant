@@ -830,6 +830,7 @@ gs_container_load (gs_container_t *container, GError **err)
 gs_status_t
 gs_container_reconnect_and_refresh (gs_container_t *container, GError **err, gboolean may_refresh)
 {
+	GError *local_err = NULL;
 	/*sanity checks*/
 	if (!container) {
 		GSETERROR(err, "invalid parameter");
@@ -858,10 +859,17 @@ gs_container_reconnect_and_refresh (gs_container_t *container, GError **err, gbo
 	struct hc_url_s *url = hc_url_empty();
 	hc_url_set(url, HCURL_NS, gs_get_full_vns(container->info.gs));
 	hc_url_set(url, HCURL_HEXID, container->str_cID);
-	*err = m2v2_remote_execute_HAS(addr, NULL, url);
+	local_err = m2v2_remote_execute_HAS(addr, NULL, url);
 	hc_url_clean(url);
-	if (*err) {
+	if (local_err) {
 		metautils_pclose(&(container->meta2_cnx));
+		if (err)
+			*err = local_err;
+		else {
+			GRID_WARN("Error while checking container existence on meta2: %s",
+					local_err->message);
+			g_clear_error(&local_err);
+		}
 		return GS_ERROR;
 	}
 
