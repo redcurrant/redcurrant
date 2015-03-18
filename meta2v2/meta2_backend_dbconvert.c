@@ -15,6 +15,7 @@
 #include <metautils/lib/metautils.h>
 
 #include <meta2v2/meta2_backend_dbconvert.h>
+#include <meta2v2/meta2_backend_internals.h>
 #include <meta2v2/generic.h>
 #include <meta2v2/meta2_macros.h>
 
@@ -1834,14 +1835,6 @@ m2_convert_db(sqlite3 *db)
 	GRID_TRACE("Going to retrieve admin values");
 	ret = _retrieve_values(db, old_admin_table, fields_names, p_retrieved_values, &err);
 
-	/* */
-	strcpy(req, "DELETE from admin;");
-	if (!_execute_request(req, db, NULL, NULL, &err)) {
-		GRID_TRACE("error on del req : %s", err->message);
-		g_prefix_error(&err, "error executing request [%s]: ", req);
-		goto error;
-	}
-
 	CVDB_CREATE_TABLE(chunk_table);
 	CVDB_CREATE_TABLE(content_table);
 	CVDB_CREATE_TABLE(content_header_table);
@@ -1852,6 +1845,14 @@ m2_convert_db(sqlite3 *db)
 	_create_indexes(db);
 
 	_init_ctime_result();
+
+	/* clean up admin table only after successfully create others tables */
+	strcpy(req, "DELETE from admin;");
+	if (!_execute_request(req, db, NULL, NULL, &err)) {
+		GRID_TRACE("error on del req : %s", err->message);
+		g_prefix_error(&err, "error executing request [%s]: ", req);
+		goto error;
+	}
 
 	//----------------------------------------------------------------
 	/* Build a list with entries we need */
@@ -1876,6 +1877,9 @@ m2_convert_db(sqlite3 *db)
 			_exec_adm(db, "sys.container_size", tmp);
 		}
 	}
+	_exec_adm(db, META2_INIT_FLAG, "1");
+	_exec_adm(db, "schema_version", "1.8");
+	_exec_adm(db, "base_type", "meta2");
 
 	CVDB_FREE_LISTS;
 	CVDB_FREE_RETR_VAL(p_retrieved_values);
@@ -2665,7 +2669,7 @@ int main(int argc, char **argv)
 		g_strlcpy(ns_name, tokens[0], sizeof(ns_name)-1);
 		g_strlcpy(container_name, tokens[1], sizeof(container_name)-1);
 		g_strfreev(tokens);
-		
+
 		container_id_t cid;
 		memset(cid, 0, sizeof(cid));
 		meta1_name2hash(cid, ns_name, container_name);
@@ -2686,14 +2690,19 @@ int main(int argc, char **argv)
 		if (dbpath[0] != '\0') {
 			g_clear_error(&err);
 			GTimer *timer = g_timer_new();
-			if (m2_convert_db(dbpath, &err))
-				fprintf(stdout, "Database [%s] converted successfully.\n", dbpath);
-			else
-				fprintf(stderr, "Error converting database [%s]: [%s]\n", dbpath, err ? err->message : "<no error set>");
-			fprintf(stdout, "Conversion took %f seconds.\n", g_timer_elapsed(timer, NULL));
+			if (m2_convert_db(dbpath, &err)) {
+				fprintf(stdout, "Database [%s] converted successfully.\n",
+						dbpath);
+			} else {
+				fprintf(stderr, "Error converting database [%s]: [%s]\n",
+						dbpath, err ? err->message : "<no error set>");
+			}
+			fprintf(stdout, "Conversion took %f seconds.\n",
+					g_timer_elapsed(timer, NULL));
 			g_timer_destroy(timer);
 		} else {
-			fprintf(stderr, "Could not find container [%s] in namespace [%s]\n", container_name, ns_name);
+			fprintf(stderr, "Could not find container [%s] in namespace [%s]\n",
+					container_name, ns_name);
 		}
 		g_free(dbpath);
 	}
