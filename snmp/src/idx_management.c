@@ -15,7 +15,7 @@
 
 #include "idx_management.h"
 
-#define IDX_STORE_PATH "/GRID/common/run/"
+#define IDX_STORE_PATH "/var/run/redcurrant"
 #define NEW_EXT ".new"
 
 static int

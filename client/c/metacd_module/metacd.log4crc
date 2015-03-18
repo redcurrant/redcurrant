@@ -8,6 +8,6 @@
 	</config>
 	<layout name="dated_r" type="dated_r"/>
 	<rollingpolicy name="pol_all" type="sizewin" maxsize="5000000" maxnum="20" />
-	<appender name="app_all" type="rollingfile" logdir="/GRID/common/logs" prefix="metacd.log" layout="dated_r" rollingpolicy="pol_all"/>
+	<appender name="app_all" type="rollingfile" logdir="/var/log/redcurrant/common" prefix="metacd.log" layout="dated_r" rollingpolicy="pol_all"/>
 	<category name="root" priority="info" appender="app_all"/>
 </log4c>

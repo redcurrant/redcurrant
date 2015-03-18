@@ -9,7 +9,7 @@
 # include <cluster/agent/gridagent.h>
 
 # define IS_FORKED_AGENT (agent_type!=PT_REQ)
-# define GS_AGENT_SPOOLDIR "/GRID/common/spool"
+# define GS_AGENT_SPOOLDIR "/var/spool/redcurrant"
 
 #ifndef GS_CONFIG_EVENT_DELAY
 # define GS_CONFIG_EVENT_DELAY "event_delay"

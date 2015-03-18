@@ -42,7 +42,7 @@
 
 #define EVENTS_MODE_FILE_DEFAULT        0444
 #define EVENTS_MODE_DIR_DEFAULT         0755
-#define EVENTS_SPOOL_DIR_DEFAULT        "/GRID/common/spool"
+#define EVENTS_SPOOL_DIR_DEFAULT        "/var/spool/redcurrant"
 #define EVENTS_SPOOL_SIZE_DEFAULT       0
 #define EVENTS_SPOOL_SIZE_DEFAULT       0
 #define EVENTS_MANAGE_ENABLE_DEFAULT    1

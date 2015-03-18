@@ -70,8 +70,8 @@ gboolean flag_manage_broken = DEFAULT_BROKEN_MANAGE;
 int period_push_broken = DEFAULT_BROKEN_FREQ;
 int period_get_broken = DEFAULT_BROKEN_FREQ;
 
-gchar str_opt_config[1024] = "/GRID/common/conf/gridagent.conf";
-gchar str_opt_log[1024] = "/GRID/common/conf/gridagent.log4crc";
+gchar str_opt_config[1024] = "/etc/redcurrant/gridagent.conf";
+gchar str_opt_log[1024] = "/etc/redcurrant/gridagent.log4crc";
 
 static int flag_help = FALSE;
 static gchar ns_name[LIMIT_LENGTH_NSNAME];

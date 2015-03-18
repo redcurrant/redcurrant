@@ -40,7 +40,7 @@ event_config_create(void)
 	result->enabled = FALSE;
 	result->lock = g_mutex_new();
 	result->seq = 0;
-	result->dir = g_strdup("/GRID/common/spool");
+	result->dir = g_strdup("/var/spool/redcurrant");
 	result->aggregate = FALSE;
 	result->last_error = 0;
 	result->delay_on_error = 0;

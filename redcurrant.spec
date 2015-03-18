@@ -250,12 +250,15 @@ echo "%{libdir}" >${RPM_BUILD_ROOT}/etc/ld.so.conf.d/grid.conf
 %{__install} -m 644 cluster/gridstorage.conf ${RPM_BUILD_ROOT}/etc/gridstorage.conf
 
 # Install default gridagent config files
-%{__mkdir_p} ${RPM_BUILD_ROOT}/GRID/common/{conf,run,spool,init,logs}
-%{__install} -m 644 cluster/gridagent.conf.default ${RPM_BUILD_ROOT}/GRID/common/conf/gridagent.conf
-%{__install} -m 644 cluster/gridagent.log4crc.default ${RPM_BUILD_ROOT}/GRID/common/conf/gridagent.log4crc
+%{__mkdir_p} ${RPM_BUILD_ROOT}%{_var}/run/redcurrant
+%{__mkdir_p} ${RPM_BUILD_ROOT}%{_var}/spool/redcurrant
+%{__mkdir_p} ${RPM_BUILD_ROOT}%{_var}/log/redcurrant
+%{__mkdir_p} ${RPM_BUILD_ROOT}%{_sysconfdir}/redcurrant
+%{__install} -m 644 cluster/gridagent.conf.default ${RPM_BUILD_ROOT}%{_sysconfdir}/redcurrant/gridagent.conf
+%{__install} -m 644 cluster/gridagent.log4crc.default ${RPM_BUILD_ROOT}%{_sysconfdir}/redcurrant/gridagent.log4crc
 
 # Install metacd default config files
-%{__install} -m 644 client/c/metacd_module/metacd.{conf,log4crc} ${RPM_BUILD_ROOT}/GRID/common/conf/
+%{__install} -m 644 client/c/metacd_module/metacd.{conf,log4crc} ${RPM_BUILD_ROOT}%{_sysconfdir}/redcurrant/
 
 # Create home directory for admgrid
 %{__mkdir_p} ${RPM_BUILD_ROOT}/home/admgrid
@@ -272,6 +275,9 @@ rm -rf $RPM_BUILD_ROOT
 %files common
 %defattr(-,root,root,-)
 /etc/ld.so.conf.d/grid.conf
+%dir %attr(755,admgrid,admgrid) %{_var}/run/redcurrant
+%dir %attr(755,admgrid,admgrid) %{_var}/log/redcurrant
+%dir %attr(755,admgrid,admgrid) %{_sysconfdir}/redcurrant
 %defattr(755,root,root,-)
 %{libdir}/libgridclient.so*
 %{libdir}/libsolrutils.so
@@ -309,9 +315,9 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %config(noreplace) /etc/gridstorage.conf
 %dir %attr(755,admgrid,admgrid) /etc/gridstorage.conf.d
-%dir %attr(755,admgrid,admgrid) /GRID
-%config(noreplace) /GRID/common/conf/gridagent.conf
-%config(noreplace) /GRID/common/conf/gridagent.log4crc
+%dir %attr(755,admgrid,admgrid) %{_var}/spool/redcurrant
+%config(noreplace) %{_sysconfdir}/redcurrant/gridagent.conf
+%config(noreplace) %{_sysconfdir}/redcurrant/gridagent.log4crc
 %dir %attr(755,admgrid,admgrid) /home/admgrid
 %defattr(755,root,root,-)
 %{libdir}/grid/acl.so*
@@ -370,8 +376,8 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(755,root,root,-)
 %{prefix}/bin/redc
 %{libdir}/grid/metacd_module.so*
-%config(noreplace) %verify(not md5 size mtime) /GRID/common/conf/metacd.conf
-%config(noreplace) %verify(not md5 size mtime) /GRID/common/conf/metacd.log4crc
+%config(noreplace) %verify(not md5 size mtime) %{_sysconfdir}/redcurrant/metacd.conf
+%config(noreplace) %verify(not md5 size mtime) %{_sysconfdir}/redcurrant/metacd.log4crc
 
 %files client-devel
 %defattr(-,root,root,-)
