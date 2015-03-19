@@ -57,6 +57,7 @@ _on_bean_ctx_append_udata_list(struct on_bean_ctx_s *obc)
 	} else {
 		GRID_TRACE("Events disabled, cleaning beans immediately");
 		_bean_cleanl2(obc->l);
+		obc->l = NULL;
 	}
 }
 
