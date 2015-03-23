@@ -24,7 +24,7 @@ _kafka_topic_ref(struct kafka_handle_s *handle, const gchar *name,
 		rd_kafka_topic_conf_t *topic_conf, rd_kafka_topic_t **topic)
 {
 	rd_kafka_topic_t *new_topic = NULL;
-	if (!handle->kafka) {
+	if (!handle || !handle->kafka) {
 		return NEWERROR(CODE_INTERNAL_ERROR,
 				"No kafka handle, events disabled?");
 	}
