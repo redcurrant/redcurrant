@@ -54,6 +54,7 @@ namespace_hash_table_lookup(GHashTable *table, const gchar *ns_name,
 					parent_ns, param_name);
 		} else {
 			strncpy(key, parent_ns, (int)(end - parent_ns));
+			key[end - parent_ns] = '\0';
 		}
 		value = g_hash_table_lookup(table, key);
 	} while (!value && (end = strrchr(parent_ns, '.')) != NULL);
