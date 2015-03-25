@@ -3,6 +3,7 @@
 #endif
 
 #include <malloc.h>
+#include <errno.h>
 #include <glib.h>
 #include <sqlite3.h>
 
@@ -476,29 +477,61 @@ _dump_chunked(struct sqlx_repository_s *repo, const gchar *base,
 		const gchar *type,
 		void (*_send_chunk)(GByteArray *chunk, gint64 remaining))
 {
-	guint64 sent = 0;
 	GError *err = NULL;
+	int my_fd = -1, rc = 0;
+	guint64 sent = 0;
+	gint64 bytes_read = 0;
+	struct stat st;
 	struct sqlx_sqlite3_s *sq3 = NULL;
 
 	GRID_TRACE2("%s(%p,%s,%s,%p)", __FUNCTION__, repo, base, type, _send_chunk);
 
 	err = sqlx_repository_open_and_lock(repo, type, base,
 			SQLX_OPEN_LOCAL|SQLX_OPEN_NOREFCHECK, &sq3, NULL);
-	if (NULL != err)
-		return err;
+	if (err)
+		goto end;
 
-	GError *_dump_chunked_cb(GByteArray *gba, gint64 remaining, gpointer arg)
+	GError *_copy_fd(int fd, gpointer arg)
 	{
 		(void) arg;
-		sent += gba->len;
-		_send_chunk(gba, remaining);
+		if (my_fd >= 0) {
+			return NEWERROR(CODE_INTERNAL_ERROR,
+					"Callback %s called twice!", __func__);
+		}
+		my_fd = dup(fd);
 		return NULL;
 	}
 
-	err = sqlx_repository_dump_base_chunked(sq3, SQLX_DUMP_CHUNK_SIZE,
-			_dump_chunked_cb, NULL);
-
+	err = sqlx_repository_dump_base_fd(sq3, _copy_fd, NULL);
 	sqlx_repository_unlock_and_close_noerror(sq3);
+
+	if (err)
+		goto end;
+	if (my_fd < 0) {
+		err = NEWERROR(CODE_INTERNAL_ERROR,
+				"Callback %s not called!", __func__);
+		goto end;
+	}
+
+	rc = fstat(my_fd, &st);
+	if (rc < 0) {
+		err = NEWERROR(CODE_INTERNAL_ERROR,
+				"Failed to stat the temporary base: (%d) %s",
+				errno, strerror(errno));
+		goto end;
+	}
+	do {
+		GByteArray *gba = g_byte_array_new();
+		err = metautils_read_fd(my_fd, SQLX_DUMP_CHUNK_SIZE, gba);
+		if (!err) {
+			bytes_read += gba->len;
+			sent += gba->len;
+			_send_chunk(gba,  st.st_size - bytes_read);
+		}
+	} while (!err && bytes_read < st.st_size);
+
+end:
+	metautils_pclose(&my_fd);
 	return err;
 }
 
