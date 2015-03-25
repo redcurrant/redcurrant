@@ -546,6 +546,9 @@ sqlx_service_specific_fini(void)
 	if (SRV.gtq_register)
 		grid_task_queue_destroy(SRV.gtq_register);
 
+	if (SRV.extras)
+		sqlx_service_extras_clear(&SRV);
+
 	if (SRV.server)
 		network_server_clean(SRV.server);
 	if (SRV.dispatcher)
@@ -574,9 +577,6 @@ sqlx_service_specific_fini(void)
 		g_string_free(SRV.url, TRUE);
 	if (SRV.zk_url)
 		metautils_str_clean(&SRV.zk_url);
-
-	if (SRV.extras)
-		sqlx_service_extras_clear(&SRV);
 
 	namespace_info_clear(&SRV.nsinfo);
 }

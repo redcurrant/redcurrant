@@ -82,9 +82,12 @@ static GError *
 _get_peers(struct sqlx_service_s *ss, const gchar *n, const gchar *t,
 		gboolean nocache, gchar ***result)
 {
-	(void) nocache;
 	GSList *peers;
 	GError *err;
+
+	// We do not have a cache, nothing to do
+	if (!result && nocache)
+		return NULL;
 
 	if (!n || !t || !result)
 		return NEWERROR(500, "BUG [%s:%s:%d]", __FUNCTION__, __FILE__, __LINE__);

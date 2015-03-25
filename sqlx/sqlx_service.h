@@ -29,6 +29,8 @@ struct sqlx_service_config_s
 	const guint zk_hash_width;
 	const gchar *schema;
 
+	/** Get replication peers from an upper-level service.
+	 * If `result` is NULL and `nocache` is TRUE, just decache them. */
 	GError* (*get_peers) (struct sqlx_service_s *ss,
 			const gchar *n, const gchar *t, gboolean nocache,
 			gchar ***result);

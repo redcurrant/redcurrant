@@ -65,7 +65,7 @@ static GError *
 _get_peers(struct sqlx_service_s *ss, const gchar *n, const gchar *t,
 		gboolean nocache, gchar ***result)
 {
-	if (!n || !t || !result)
+	if (!n || !t || (!result && !nocache))
 		return NEWERROR(500, "BUG [%s:%s:%d]", __FUNCTION__, __FILE__, __LINE__);
 
 	const gchar *sep = strchr(n, '@');
@@ -82,6 +82,10 @@ _get_peers(struct sqlx_service_s *ss, const gchar *n, const gchar *t,
 
 	if (nocache) {
 		hc_decache_reference_service(ss->resolver, u, t);
+		if (!result) {
+			hc_url_clean(u);
+			return NULL;
+		}
 	}
 
 	gchar **peers = NULL;

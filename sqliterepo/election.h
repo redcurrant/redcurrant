@@ -55,7 +55,9 @@ struct replication_config_s
 	 * @param ctx the pointer registered in the configuration
 	 * @param n the logical name of the base (not the physical path)
 	 * @param t the logical type of the base (not the file extension)
+	 * @param nocache renew the peer cache before answering
 	 * @param result a placeholder for the array of peers.
+	 *   If NULL is passed and 'nocache' is TRUE, just flush the peer cache.
 	 * @return NULL if 'result'
 	 */
 	GError* (*get_peers) (gpointer ctx, const gchar *n, const gchar *t,

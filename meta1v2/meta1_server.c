@@ -158,12 +158,19 @@ _get_peers(struct sqlx_service_s *ss, const gchar *n, const gchar *t,
 	container_id_t cid;
 	guchar s[3]= {0,0,0};
 
-	if (!n || !t || !result)
+	if (!n || !t || (!result && !nocache))
 		return NEWERROR(500, "BUG [%s:%s:%d]", __FUNCTION__, __FILE__, __LINE__);
 	if (!g_str_has_prefix(t, META1_TYPE_NAME))
 		return NEWERROR(400, "Invalid type name");
 	if (!metautils_str_ishexa(n,4))
 		return NEWERROR(400, "Invalid base name");
+
+	if (nocache) {
+		_reload_prefixes(ss, FALSE);
+		if (!result) {
+			return NULL;
+		}
+	}
 
 	memset(cid, 0, sizeof(container_id_t));
 	s[0] = n[0];
@@ -172,9 +179,6 @@ _get_peers(struct sqlx_service_s *ss, const gchar *n, const gchar *t,
 	s[0] = n[2];
 	s[1] = n[3];
 	((guint8*)cid)[1] = g_ascii_strtoull((gchar*)s, NULL, 16);
-
-	if (nocache)
-		_reload_prefixes(ss, FALSE);
 
 	gchar **peers = meta1_prefixes_get_peers(
 			meta1_backend_get_prefixes(m1), cid);

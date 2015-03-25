@@ -119,7 +119,7 @@ static GError *
 _get_peers(struct sqlx_service_s *ss, const gchar *n, const gchar *t,
 		gboolean nocache, gchar ***result)
 {
-	if (!n || !t || !result)
+	if (!n || !t || (!result && !nocache))
 		return NEWERROR(500, "BUG [%s:%s:%d]", __FUNCTION__, __FILE__, __LINE__);
 	if (!g_str_has_prefix(t, META2_TYPE_NAME))
 		return NEWERROR(400, "Invalid type name: '%s'", t);
@@ -137,6 +137,10 @@ _get_peers(struct sqlx_service_s *ss, const gchar *n, const gchar *t,
 retry:
 	if (nocache) {
 		hc_decache_reference_service(ss->resolver, u, t);
+		if (!result) {
+			hc_url_clean(u);
+			return NULL;
+		}
 	}
 	err = hc_resolve_reference_service(ss->resolver, u, t, &peers);
 
