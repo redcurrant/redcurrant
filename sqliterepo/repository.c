@@ -1344,51 +1344,6 @@ _backup_main(sqlite3 *src, sqlite3 *dst)
 	return err;
 }
 
-static GError*
-_read_file_chunk(int fd, guint64 chunk_size, GByteArray *gba)
-{
-	ssize_t r;
-	guint64 tot = 0;
-	guint8 *d;
-	GError *err = NULL;
-
-	d = g_malloc(SQLX_DUMP_BUFFER_SIZE);
-
-	do {
-		r = read(fd, d, MIN(chunk_size - tot, SQLX_DUMP_BUFFER_SIZE));
-		if (r < 0) {
-			err = NEWERROR(errno, "read error: %s", strerror(errno));
-		} else if (r > 0) {
-			tot += r;
-			g_byte_array_append(gba, d, r);
-		}
-	} while (r > 0 && tot < chunk_size && !err);
-
-	g_free(d);
-	return err;
-}
-
-static GError*
-_read_file(int fd, GByteArray *gba)
-{
-	int rc;
-	struct stat st;
-	GError *err = NULL;
-
-	rc = fstat(fd, &st);
-	GRID_TRACE2("%s(%d,%p) size=%"G_GSIZE_FORMAT, __FUNCTION__, fd,
-			gba, st.st_size);
-
-	if (0 > rc)
-		return NEWERROR(errno, "Failed to stat the temporary base");
-
-	g_byte_array_set_size(gba, st.st_size);
-	g_byte_array_set_size(gba, 0);
-
-	err = _read_file_chunk(fd, (guint64)st.st_size, gba);
-	return err;
-}
-
 GError*
 sqlx_repository_backup_base(struct sqlx_sqlite3_s *src_sq3,
 		struct sqlx_sqlite3_s *dst_sq3)
@@ -1465,7 +1420,7 @@ sqlx_repository_dump_base_gba(struct sqlx_sqlite3_s *sq3, GByteArray **dump)
 		GError *_err = NULL;
 		GByteArray **dump2 = arg;
 		GByteArray *_dump = g_byte_array_new();
-		_err = _read_file(fd, _dump);
+		_err = metautils_read_fd_full(fd, _dump);
 		if (!_err)
 			*dump2 = _dump;
 		else
@@ -1492,7 +1447,7 @@ sqlx_repository_dump_base_chunked(struct sqlx_sqlite3_s *sq3,
 			return NEWERROR(errno, "Failed to stat the temporary base");
 		do {
 			GByteArray *gba = g_byte_array_new();
-			err = _read_file_chunk(fd, chunk_size, gba);
+			err = metautils_read_fd(fd, chunk_size, gba);
 			if (!err) {
 				bytes_read += gba->len;
 				err = callback(gba, st.st_size - bytes_read, callback_arg);

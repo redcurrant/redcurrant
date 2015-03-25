@@ -29,6 +29,7 @@
 # include <metautils/lib/metautils_strings.h>
 # include <metautils/lib/metautils_sockets.h>
 # include <metautils/lib/metautils_containers.h>
+# include <metautils/lib/metautils_fd.h>
 # include <metautils/lib/metautils_gba.h>
 # include <metautils/lib/metautils_resolv.h>
 # include <metautils/lib/metautils_loggers.h>

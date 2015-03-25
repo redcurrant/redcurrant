@@ -127,6 +127,7 @@ add_library(metautils SHARED
 		utils_chunk_info.c
 		utils_container_event.c
 		utils_hash.c
+		utils_fd.c
 		utils_gba.c
 		utils_kv.c
 		utils_acl.c
