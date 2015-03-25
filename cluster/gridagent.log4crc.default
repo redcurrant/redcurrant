@@ -9,7 +9,7 @@
 <!--
 	<layout name="dated_r" type="dated_r"/>
 	<rollingpolicy name="pol_all" type="sizewin" maxsize="5000000" maxnum="10" />
-	<appender name="app_all" type="rollingfile" logdir="/GRID/common/logs"
+	<appender name="app_all" type="rollingfile" logdir="/var/log/redcurrant/common"
 		prefix="agent.log" layout="dated_r" rollingpolicy="pol_all"/>
 -->
 	<layout name="layout_all" type="syslog" tag="gridagent" facility="LOCAL0"/>

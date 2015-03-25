@@ -105,7 +105,7 @@ save_known_service_to_file(GArray *known_services, const char *file_name, GError
 }
 
 int get_idx_of_service(const char *service_type, struct grid_service_data *service, GError **error) {
-	char file_name[strlen(IDX_STORE_PATH) + strlen(service_type) +1];
+	gchar file_name[256];
 	struct stat file_stat;
 	int rc;
 	GArray *known_services = NULL;
@@ -113,10 +113,11 @@ int get_idx_of_service(const char *service_type, struct grid_service_data *servi
 	gboolean idx_found = FALSE;
 	int last_idx = 0;
 
-	memset(file_name, '\0', strlen(IDX_STORE_PATH) + strlen(service_type) +1);
+	memset(file_name, '\0', sizeof(file_name));
 	memset(&file_stat, 0, sizeof(struct stat));
 
-	sprintf(file_name, "%s%s_snmp_idx.dat", IDX_STORE_PATH, service_type);
+	sprintf(file_name, "%s%c%s_snmp_idx.dat", IDX_STORE_PATH, G_DIR_SEPARATOR,
+			service_type);
 
 	rc = stat(file_name, &file_stat);
 	if (rc < 0 && errno != ENOENT && errno != ENOTDIR) {

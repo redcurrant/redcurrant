@@ -1,5 +1,5 @@
 [General]
-daemon=true
+daemon=false
 to_op=2000
 to_cnx=20000
 pidfile=/var/run/redcurrant/metacd.pid
