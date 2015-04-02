@@ -1543,7 +1543,7 @@ _delete_beans(struct meta2_backend_s *m2b,
 		}
 	}
 
-	err = meta2_backend_get_alias(m2b, url, M2V2_FLAG_NODELETED, _cb, NULL);
+	err = meta2_backend_get_alias(m2b, url, 0, _cb, NULL);
 	if (NULL != err) {
 		GRID_DEBUG("Failed to get alias : %s", err->message);
 		goto exit;
@@ -1561,7 +1561,8 @@ exit:
 	_bean_cleanl2(in_place);
 	_bean_cleanl2(to_drop);
 	_bean_cleanl2(beans);
-	g_string_free(content_id, TRUE);
+	if (content_id)
+		g_string_free(content_id, TRUE);
 
 	return err;
 }

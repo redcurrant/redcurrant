@@ -567,9 +567,13 @@ _reload_content(gs_content_t *content, GSList **p_filtered, GSList **p_beans, GE
 	bzero(target, 64);
 	addr_info_to_string(&(C1_C0(content)->meta2_addr), target, 64);
 
+	gchar *container_name = C0_NAME(C1_C0(content));
 	struct hc_url_s *url = hc_url_empty();
 	hc_url_set(url, HCURL_NS, gs_get_full_vns(C1_C0(content)->info.gs));
-	hc_url_set(url, HCURL_REFERENCE, C0_NAME(C1_C0(content)));
+	if (container_name && *container_name)
+		hc_url_set(url, HCURL_REFERENCE, container_name);
+	else
+		hc_url_set(url, HCURL_HEXID, C0_IDSTR(C1_C0(content)));
 	hc_url_set(url, HCURL_PATH, C1_PATH(content));
 	if (!content->version) {
 		flags |= M2V2_FLAG_NODELETED;
