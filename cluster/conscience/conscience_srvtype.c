@@ -207,7 +207,7 @@ conscience_srvtype_register_srv(struct conscience_srvtype_s *srvtype,
 
 	memcpy(&(service->id), srvid, sizeof(struct conscience_srvid_s));
 	service->tags = g_ptr_array_new();
-	service->locked = FALSE;
+	service->flags &= ~CONSCIENCE_FLAG_LOCK_SCORE;
 	service->score.timestamp = time(0);
 	service->score.value = -1;
 	service->srvtype = srvtype;
@@ -254,7 +254,8 @@ conscience_srvtype_remove_expired(struct conscience_srvtype_s * srvtype,
 
 		struct conscience_srv_s *pService = value;
 
-		if (!pService->locked && pService->score.timestamp < oldest) {
+		if (!(pService->flags & CONSCIENCE_FLAG_LOCK_SCORE)
+				&& pService->score.timestamp < oldest) {
 			if (callback)
 				callback(pService, u);
 			g_hash_table_iter_steal(&iter);
@@ -289,7 +290,8 @@ conscience_srvtype_run_all(struct conscience_srvtype_s * srvtype,
 		oldest = time(0) - srvtype->score_expiration;
 		beacon = &(srvtype->services_ring);
 		for (srv = beacon->next; rc && srv && srv != beacon; srv = srv->next) {
-			if (srv->locked || srv->score.timestamp > oldest)
+			if ((srv->flags & CONSCIENCE_FLAG_LOCK_SCORE)
+					|| srv->score.timestamp > oldest)
 				rc = callback(srv, udata);
 		}
 	}
@@ -426,7 +428,7 @@ conscience_srvtype_refresh(struct conscience_srvtype_s *srvtype,
 		if (tag_first != NULL && tag_first->type == STVT_BOOL && tag_first->value.b) {
 			DEBUG("Service [%s] lauched for the first time => locking score to 0", si->type);
 			p_srv->score.value = 0;
-			p_srv->locked = TRUE;
+			p_srv->flags |= CONSCIENCE_FLAG_LOCK_SCORE;
 		}
 		else
 			p_srv->score.value = -1;

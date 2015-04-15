@@ -30,7 +30,7 @@ struct conscience_srv_s
 	struct conscience_srvtype_s *srvtype;
 	gchar description[LIMIT_LENGTH_SRVDESCR];
 	score_t score;
-	gboolean locked;
+	guint32 flags;
 	GPtrArray *tags;
 	time_t  time_last_alert;
 

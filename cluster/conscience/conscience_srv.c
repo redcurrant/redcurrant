@@ -131,7 +131,7 @@ conscience_srv_compute_score(struct conscience_srv_s
 		return NULL;
 	}
 
-	if (service->locked)
+	if (service->flags & CONSCIENCE_FLAG_LOCK_SCORE)
 		return &(service->score);
 
 	srvtype = service->srvtype;
@@ -192,7 +192,7 @@ conscience_srv_lock_score( struct conscience_srv_s *srv, gint s )
 		return;
 	srv->score.value = s;
 	srv->score.timestamp = time(0);
-	srv->locked = TRUE;
+	srv->flags |= CONSCIENCE_FLAG_LOCK_SCORE;
 }
 
 void

@@ -39,6 +39,10 @@
  */
 #define SRVTYPE_FLAG_LOCK_WRITER     0x00000008
 
+#define CONSCIENCE_FLAG_LOCK_SCORE   0x00000001
+#define CONSCIENCE_FLAG_LOCAL_SRV    0x00000002
+
+
 /** struct used in virtual_namespace_tree in conscience */
 struct vns_info_s
 {
@@ -68,6 +72,8 @@ struct conscience_s
 	gridcluster_event_handler_t *event_handler;
 
 	GNode *virtual_namespace_tree;
+
+	addr_info_t *master_addr;
 };
 
 /**  */

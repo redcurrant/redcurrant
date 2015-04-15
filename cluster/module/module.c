@@ -29,6 +29,7 @@
 #include <cluster/events/gridcluster_eventhandler.h>
 #include <cluster/conscience/conscience.h>
 #include <cluster/conscience/conscience_broken_holder_common.h>
+#include <cluster/remote/gridcluster_remote.h>
 
 #include "alerting.h"
 #include "module.h"
@@ -99,6 +100,8 @@ struct cmd_s
 };
 
 static void _alert_service_with_zeroed_score(struct conscience_srv_s *srv);
+static void push_service(struct conscience_s *cs, struct service_info_s *si,
+		guint32 lock_score);
 
 /* ------------------------------------------------------------------------- */
 
@@ -195,7 +198,7 @@ service_checker( struct conscience_srv_s * srv, gpointer u)
 	if (!u)
 		return FALSE;
 	if (srv) {
-		if (!srv->locked) {
+		if (!(srv->flags & CONSCIENCE_FLAG_LOCK_SCORE)) {
 			if (srv->score.value < 0)
 				srv->score.value = 0;
 			else if (srv->score.value > 100)
@@ -337,6 +340,97 @@ timer_expire_services(gpointer u)
 
 	g_slist_foreach(list_type_names,g_free1,NULL);
 	g_slist_free(list_type_names);
+}
+
+static gboolean
+prepare_upload_to_master(struct conscience_srv_s *srv, gpointer u)
+{
+	service_info_t *srvinfo = NULL;
+	GSList **services = NULL;
+
+	if (!(services = u))
+		return FALSE;
+
+	if (!(srv->flags & CONSCIENCE_FLAG_LOCAL_SRV))
+		return TRUE;
+
+	srvinfo = g_malloc0(sizeof(service_info_t));
+	conscience_srv_fill_srvinfo(srvinfo, srv);
+	*services = g_slist_prepend(*services, srvinfo);
+
+	return TRUE;
+}
+
+static void
+timer_read_from_master(gpointer u)
+{
+	GError *err = NULL;
+	GSList *srvtypes = NULL, *services = NULL;
+	// FIXME: use only the array
+	gchar **srvtypes_array = NULL;
+	gint counter = 0;
+	gpointer k, v;
+	GHashTableIter iterator;
+	struct metacnx_ctx_s cnx;
+
+	/* -- List service types -------------------------------------- */
+	conscience_lock_srvtypes(conscience,'r');
+	g_hash_table_iter_init(&iterator, conscience->srvtypes);
+	while (g_hash_table_iter_next(&iterator, &k, &v)) {
+		if (k) {
+			srvtypes = g_slist_prepend(srvtypes, g_strdup(k));
+		}
+	}
+	conscience_unlock_srvtypes(conscience);
+
+	/* -- Upload local services ---------------------------------- */
+	srvtypes_array = (gchar**)metautils_list_to_array(srvtypes);
+	conscience_run_srvtypes(conscience, &err,
+			SRVTYPE_FLAG_LOCK_ENABLE,
+			srvtypes_array,
+			prepare_upload_to_master, &services);
+
+	// FIXME: hardcoded timeout
+	gcluster_push_services(conscience->master_addr, 15000, services, FALSE, &err);
+	g_free(srvtypes_array); // values are freed below
+	g_slist_free_full(services, (GDestroyNotify)service_info_clean);
+	services = NULL;
+	if (err)
+		goto end;
+
+	/* -- Download all services ---------------------------------- */
+	metacnx_clear(&cnx);
+	metacnx_init_with_addr(&cnx, conscience->master_addr, &err);
+	if (err)
+		goto end;
+
+	for (GSList *t_cur = srvtypes; t_cur; t_cur = t_cur->next) {
+		const gchar *srvtype = t_cur->data;
+		services = gcluster_get_services_full(&cnx, srvtype, &err);
+		if (err)
+			goto end;
+
+		for (GSList *s_cur = services; s_cur; s_cur = s_cur->next) {
+			service_info_t *service = s_cur->data;
+			// We must lock all scores locally otherwise we would recompute
+			// the score of services that have been locked on master.
+			push_service(conscience, service, CONSCIENCE_FLAG_LOCK_SCORE);
+			counter++;
+		}
+
+		g_slist_free_full(services, (GDestroyNotify)service_info_clean);
+		services = NULL;
+	}
+
+	GRID_DEBUG("%d services fetched from master conscience", counter);
+
+end:
+	if (err) {
+		GRID_WARN("Failed to refresh services from master: %s", err->message);
+		g_clear_error(&err);
+	}
+	metacnx_close(&cnx);
+	g_slist_free_full(srvtypes, g_free);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1244,14 +1338,14 @@ handler_get_service(struct request_context_s *req_ctx)
  * @param si
  */
 static void
-push_service(struct conscience_s *cs, struct service_info_s *si, gboolean lock_score)
+push_service(struct conscience_s *cs, struct service_info_s *si, guint32 flags)
 {
 	gchar str_addr[STRLEN_ADDRINFO + 1], str_descr[LIMIT_LENGTH_SRVDESCR];
 	gint32 old_score=0;
 	GError *error_local=NULL;
 	struct conscience_srvtype_s *srvtype;
 	struct conscience_srv_s *srv;
-
+	gboolean lock_score = BOOL(flags & CONSCIENCE_FLAG_LOCK_SCORE);
 
 	if (0 == g_ascii_strcasecmp(NAME_SRVTYPE_META0, si->type)) {
 		/* If we forced a meta0 in config, registering or unlocking is not
@@ -1288,9 +1382,9 @@ push_service(struct conscience_s *cs, struct service_info_s *si, gboolean lock_s
 			 * (new services comes with a zeroed score). */
 			if (lock_score) {
 				if (si->score.value >= 0) /* lock */
-					srv->locked = TRUE;
+					srv->flags |= CONSCIENCE_FLAG_LOCK_SCORE;
 				else { /* unlock */
-					srv->locked = FALSE;
+					srv->flags &= ~CONSCIENCE_FLAG_LOCK_SCORE;
 					srv->score.value = old_score;
 				}
 			}
@@ -1303,22 +1397,32 @@ push_service(struct conscience_s *cs, struct service_info_s *si, gboolean lock_s
 				}
 			}
 
+			if (flags & CONSCIENCE_FLAG_LOCAL_SRV)
+				srv->flags |= CONSCIENCE_FLAG_LOCAL_SRV;
+
 			_conscience_srv_prepare_cache(srv);
 		}
 		else { /* first register */
 			srv = conscience_srvtype_get_srv(srvtype, (struct conscience_srvid_s*)&(si->addr));
 			if (srv) {
-				if (lock_score)
-					srv->locked = (si->score.value >= 0);
+				if (lock_score) {
+					if (si->score.value >= 0) {
+						srv->flags |= CONSCIENCE_FLAG_LOCK_SCORE;
+					} else {
+						srv->flags &= ~CONSCIENCE_FLAG_LOCK_SCORE;
+					}
+				}
+				if (flags & CONSCIENCE_FLAG_LOCAL_SRV)
+					srv->flags |= CONSCIENCE_FLAG_LOCAL_SRV;
 				_conscience_srv_prepare_cache(srv);
 			}
 		}
 		conscience_release_locked_srvtype(srvtype);
 		/* XXX end of critical section */
 
-		if (srv)
+		if (srv) {
 			DEBUG("Service [%s] refreshed with score=%d", str_descr, srv->score.value);
-		else {
+		} else {
 			addr_info_to_string(&(si->addr),str_addr,sizeof(str_addr));
 			NOTICE("Service [%s/%s/%s] registered", conscience_get_namespace(cs), si->type, str_addr);
 		}
@@ -1344,7 +1448,7 @@ push_service(struct conscience_s *cs, struct service_info_s *si, gboolean lock_s
 static gint
 handler_push_service(struct request_context_s *req_ctx)
 {
-	gboolean lock_action = FALSE;
+	guint32 flags = CONSCIENCE_FLAG_LOCAL_SRV;
 	gint counter;
 	GSList *list_srvinfo, *l;
 	void *data;
@@ -1355,7 +1459,9 @@ handler_push_service(struct request_context_s *req_ctx)
 	init_reply_ctx_with_request(req_ctx, &(ctx));
 
 	/*check if we must work on the lock*/
-	lock_action = (0 < message_get_field(req_ctx->request,"LOCK",sizeof("LOCK")-1, &data, &data_size, NULL));
+	flags |= (0 < message_get_field(req_ctx->request,
+			"LOCK", sizeof("LOCK")-1, &data, &data_size, NULL))?
+			CONSCIENCE_FLAG_LOCK_SCORE:0;
 
 	/*Get the body and unpack it as a list of services */
 	if (0 >= message_get_BODY(req_ctx->request, &data, &data_size, &(ctx.warning))) {
@@ -1372,7 +1478,7 @@ handler_push_service(struct request_context_s *req_ctx)
 	/*Now push each service and reply the success */
 	for (counter = 0, l = list_srvinfo; l; l = g_slist_next(l)) {
 		if (l->data) {
-			push_service(conscience, (struct service_info_s *) (l->data), lock_action);
+			push_service(conscience, (struct service_info_s *) (l->data), flags);
 			service_info_clean(l->data);
 			l->data = NULL;
 			counter++;
@@ -2671,6 +2777,15 @@ plugin_init(GHashTable * params, GError ** err)
 	conscience->ns_info.chunk_size = g_ascii_strtoll(str, NULL, 10);
 	NOTICE("[NS=%s] Chunk size set to %"G_GINT64_FORMAT, conscience->ns_info.name, conscience->ns_info.chunk_size);
 
+	if ((str = g_hash_table_lookup(params, KEY_MASTER_CONSCIENCE))) {
+		conscience->master_addr = g_malloc0(sizeof(addr_info_t));
+		if (!grid_string_to_addrinfo(str, NULL, conscience->master_addr)) {
+			GRID_WARN("Invalid address specified for master: %s", str);
+			g_free(conscience->master_addr);
+			conscience->master_addr = NULL;
+		}
+	}
+
 	/* Serialization optimizations */
 	str = g_hash_table_lookup(params, KEY_SERIALIZE_SRVINFO_CACHED);
 	if (NULL != str)
@@ -2760,6 +2875,13 @@ plugin_init(GHashTable * params, GError ** err)
 	}
 	if (!message_handler_add("conscience", plugin_matcher, plugin_handler, err)) {
 		GSETERROR(err, "Failed to add a new server message handler");
+		goto error;
+	}
+
+	if (conscience->master_addr
+			&& !srvtimer_register_regular("conscience.master_read",
+				timer_read_from_master, NULL, conscience, 1LL)) {
+		GSETERROR(err, "Failed to register the conscience master read callback");
 		goto error;
 	}
 

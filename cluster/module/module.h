@@ -45,6 +45,7 @@
 
 #define KEY_VNS_LIST "vns_list"
 #define KEY_WRITABLE_VNS "writable_vns"
+#define KEY_MASTER_CONSCIENCE "master_conscience"
 
 # define DOMAIN_PERIODIC "conscience.dump"
 
