@@ -367,33 +367,30 @@ do {\
 				content_from_meta2->system_metadata->len));
 	}
 
-	/* Check properties on chunk with position 0 */
-	if (chunk_from_chunk->position != NULL && 0 == atoi(chunk_from_chunk->position)) {
-		/* Check content nb chunk */
-		if (content_from_chunk->chunk_nb == NULL) {
-			ADD_BRK_EL_BIN(L_CHUNK, P_CONTENT_CHUNK_NB, R_MISSING,
-			    g_memdup(&(content_from_meta2->nb_chunks), sizeof(content_from_meta2->nb_chunks)));
-		}
-		else {
-			guint32 nb_chunk = atoi(content_from_chunk->chunk_nb);
+	/* Check content nb chunk */
+	if (content_from_chunk->chunk_nb == NULL) {
+		ADD_BRK_EL_BIN(L_CHUNK, P_CONTENT_CHUNK_NB, R_MISSING,
+				g_memdup(&(content_from_meta2->nb_chunks), sizeof(content_from_meta2->nb_chunks)));
+	}
+	else {
+		guint32 nb_chunk = atoi(content_from_chunk->chunk_nb);
 
-			if (nb_chunk != content_from_meta2->nb_chunks)
-				ADD_BRK_EL_BIN(L_ALL, P_CONTENT_CHUNK_NB, R_MISMATCH,
-				    g_memdup(&(content_from_meta2->nb_chunks), sizeof(content_from_meta2->nb_chunks)));
-		}
+		if (nb_chunk != content_from_meta2->nb_chunks)
+			ADD_BRK_EL_BIN(L_ALL, P_CONTENT_CHUNK_NB, R_MISMATCH,
+					g_memdup(&(content_from_meta2->nb_chunks), sizeof(content_from_meta2->nb_chunks)));
+	}
 
-		/* Check content size */
-		if (content_from_chunk->size == NULL) {
-			ADD_BRK_EL_BIN(L_CHUNK, P_CONTENT_SIZE, R_MISSING, g_memdup(&(content_from_meta2->size),
+	/* Check content size */
+	if (content_from_chunk->size == NULL) {
+		ADD_BRK_EL_BIN(L_CHUNK, P_CONTENT_SIZE, R_MISSING, g_memdup(&(content_from_meta2->size),
 				sizeof(content_from_meta2->size)));
-		}
-		else {
-			gint64 size = g_ascii_strtoll(content_from_chunk->size, NULL, 10);
+	}
+	else {
+		gint64 size = g_ascii_strtoll(content_from_chunk->size, NULL, 10);
 
-			if (size != content_from_meta2->size)
-				ADD_BRK_EL_BIN(L_ALL, P_CONTENT_SIZE, R_MISMATCH, g_memdup(&(content_from_meta2->size),
+		if (size != content_from_meta2->size)
+			ADD_BRK_EL_BIN(L_ALL, P_CONTENT_SIZE, R_MISMATCH, g_memdup(&(content_from_meta2->size),
 					sizeof(content_from_meta2->size)));
-		}
 	}
 
 	//--------------------
@@ -1253,39 +1250,52 @@ check_chunk_orphan(check_info_t *ci, check_result_t *cres, GError **p_err)
 	//            container and service found on meta1,
 	//            if content not found: check if container exist on meta2
 	if (!ctx->loc->m2_url || !ctx->content) {
-		if (is_dryrun) {
-			check_result_append_msg(cres, "Content [%s/%s] not found "
-					"(not fixable in dryrun mode)",
-					content_info->container_id, content_info->path);
-			goto success;
-		}
-		// check / create
-		if (!_ensure_container_created(ctx, check_info, cres, &err)) {
-			GRID_DEBUG("Giving up chunk integration (no container).");
-			goto clean_up;
-		}
-
-		if (ctx->loc->m2_url == NULL) {
-			if (!_reinit_ctx(&ctx, check_info->ct_info, &err))
+		if (!is_dryrun) {
+			if (!_ensure_container_created(ctx, check_info, cres, &err)) {
+				GRID_DEBUG("Giving up chunk integration (no container).");
 				goto clean_up;
+			}
+
+			if (ctx->loc->m2_url == NULL) {
+				if (!_reinit_ctx(&ctx, check_info->ct_info, &err))
+					goto clean_up;
+			}
+		} else {
+			check_result_append_msg(cres, "Chunk not found in content"
+					" specified in its XATTR"
+					" (not fixable in dryrun mode)");
 		}
 
 		g_clear_error(&err);
 	}
 
-	// if content not found, try to find content from chunk id
+	// if content not found, try to find a content from chunk id
 	if (!ctx->content) {
 		g_clear_error(&err);
 		if (!_find_content_from_chunkid(ctx, check_info, &err)) {
-			if (err && err->code != CODE_NOT_FOUND && err->code != CODE_CONTENT_NOTFOUND)
+			if (err && err->code != 404
+					&& err->code != CODE_CONTENT_NOTFOUND
+					&& err->code != CODE_CONTAINER_NOTFOUND)
 				goto clean_up;
 			g_clear_error(&err);
 			err = _content_fill(ctx, check_info);
 			if (err)
 				goto clean_up;
+			if (is_dryrun) {
+				check_result_append_msg(cres, "Content [%s/%s] not found "
+						"(not fixable in dryrun mode)",
+						content_info->container_id, content_info->path);
+				goto success;
+			}
 			check_result_append_msg(cres, "Content [%s] in container [%s]"
 					" will be created.",
 					content_info->path, content_info->container_id);
+		} else {
+			check_result_append_msg(cres, "Found a reference to chunk id [%s]"
+					" in content [%s] in container [%s], exiting",
+					check_info->ck_info->id,
+					content_info->path, content_info->container_id);
+			goto success;
 		}
 	}
 
