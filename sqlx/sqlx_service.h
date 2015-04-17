@@ -103,6 +103,8 @@ struct sqlx_service_s
 	guint cfg_max_passive;
 	guint cfg_max_active;
 	guint cfg_max_workers;
+	// Maximum free heap kilobytes (see malloc_trim)
+	guint cfg_max_heap_free;
 
 	guint sync_mode_repli;
 	guint sync_mode_solo;

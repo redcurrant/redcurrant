@@ -9,6 +9,8 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#include <malloc.h>
+
 #include <glib.h>
 
 #include <metautils/lib/metautils.h>
@@ -41,6 +43,7 @@ static void sqlx_service_specific_stop(void);
 // Periodic tasks & thread's workers
 static void _task_register(gpointer p);
 static void _task_expire_bases(gpointer p);
+static void _task_garbage_collect(gpointer p);
 static void _task_expire_resolver(gpointer p);
 static void _task_retry_elections(gpointer p);
 static void _task_reload_nsinfo(gpointer p);
@@ -321,6 +324,7 @@ _configure_tasks(struct sqlx_service_s *ss)
 	grid_task_queue_register(ss->gtq_reload, 5, _task_reload_nsinfo, NULL, ss);
 	grid_task_queue_register(ss->gtq_reload, 5, _task_reload_workers, NULL, ss);
 
+	grid_task_queue_register(ss->gtq_admin, 30, _task_garbage_collect, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_bases, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_resolver, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_retry_elections, NULL, ss);
@@ -490,6 +494,7 @@ sqlx_service_set_defaults(void)
 	SRV.cfg_max_passive = 0;
 	SRV.cfg_max_active = 0;
 	SRV.cfg_max_workers = 200;
+	SRV.cfg_max_heap_free = 4 * 1024;
 	SRV.flag_replicable = TRUE;
 	SRV.flag_autocreate = TRUE;
 	SRV.flag_autoupgrade = FALSE;
@@ -621,6 +626,8 @@ sqlx_service_get_options(void)
 			"Limits the number of concurrent active connections" },
 		{"MaxWorkers", OT_UINT, {.u=&SRV.cfg_max_workers},
 			"Limits the number of worker threads" },
+		{"MaxHeapFree", OT_UINT, {.u=&SRV.cfg_max_heap_free},
+			"Amount of free memory to keep for future allocations (kB)" },
 
 		{"CacheEnabled", OT_BOOL, {.b = &SRV.flag_cached_bases},
 			"If set, each base will be cached in a way it won't be accessed"
@@ -721,6 +728,14 @@ _task_expire_bases(gpointer p)
 		if (count)
 			GRID_DEBUG("Expired %u bases", count);
 	}
+}
+
+static void
+_task_garbage_collect(gpointer p)
+{
+	/* Force malloc to release memory to the system.
+	 * Allow cfg_max_heap_free kiB of unused but not released memory. */
+	malloc_trim(PSRV(p)->cfg_max_heap_free * 1024);
 }
 
 static void
