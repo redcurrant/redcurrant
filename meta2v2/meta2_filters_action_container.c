@@ -66,7 +66,7 @@ int
 meta2_filter_action_create_container(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)
 {
-	(void) reply;
+	reply->did_write = TRUE;
 	return _create_container(ctx);
 }
 
@@ -74,7 +74,7 @@ int
 meta2_filter_action_create_container_v1(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)
 {
-	(void) reply;
+	reply->did_write = TRUE;
 	return _create_container(ctx);
 }
 
@@ -123,7 +123,7 @@ meta2_filter_action_delete_container(struct gridd_filter_ctx_s *ctx,
 			meta2_filter_ctx_get_url(ctx),
 			flags);
 
-	(void) reply;
+	reply->did_write = TRUE;
 
 	if (!err)
 		return FILTER_OK;
@@ -135,7 +135,7 @@ int
 meta2_filter_action_purge_container(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)
 {
-	(void) reply;
+	reply->did_write = TRUE;
 
 	// M2V2_MODE_DRYRUN, ...
     guint32 flags = 0;
@@ -176,7 +176,7 @@ meta2_filter_action_deduplicate_container(struct gridd_filter_ctx_s *ctx,
 			meta2_filter_ctx_get_url(ctx),
 			flags,
 			&status_message);
-	(void) reply;
+	reply->did_write = TRUE;
 
 	if (!err) {
 		if (status_message != NULL)
@@ -1175,10 +1175,11 @@ int
 meta2_filter_action_delete_beans(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)
 {
-	(void) reply;
 	struct hc_url_s *url = meta2_filter_ctx_get_url(ctx);
 	struct meta2_backend_s *m2b = meta2_filter_ctx_get_backend(ctx);
 	GSList *beans = meta2_filter_ctx_get_input_udata(ctx);
+
+	reply->did_write = TRUE;
 
 	GError *err = meta2_backend_delete_beans(m2b, url, beans);
 	if (!err)
@@ -1207,6 +1208,8 @@ meta2_filter_action_substitute_chunks(struct gridd_filter_ctx_s *ctx,
 	GError *err = meta2_backend_substitute_chunks(m2b, url, restrict_to_alias,
 			chunk_lists[0], chunk_lists[1], _get_cb, obc);
 
+	reply->did_write = TRUE;
+
 	if (err) {
 		GRID_DEBUG("Failed to substitute chunks: %s", err->message);
 		meta2_filter_ctx_set_error(ctx, err);
@@ -1225,11 +1228,12 @@ meta2_filter_action_substitute_chunks(struct gridd_filter_ctx_s *ctx,
 int meta2_filter_action_take_snapshot(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)
 {
-	(void) reply;
 	GError *err = NULL;
 	struct hc_url_s *url = meta2_filter_ctx_get_url(ctx);
 	struct meta2_backend_s *m2b = meta2_filter_ctx_get_backend(ctx);
 	const gchar *snap_name = hc_url_get(url, HCURL_SNAPSHOT);
+
+	reply->did_write = TRUE;
 
 	err = meta2_backend_take_snapshot(m2b, url, snap_name);
 	if (err != NULL) {
@@ -1265,11 +1269,12 @@ int meta2_filter_action_list_snapshots(struct gridd_filter_ctx_s *ctx,
 int meta2_filter_action_delete_snapshot(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)
 {
-	(void) reply;
 	GError *err = NULL;
 	struct hc_url_s *url = meta2_filter_ctx_get_url(ctx);
 	struct meta2_backend_s *m2b = meta2_filter_ctx_get_backend(ctx);
 	const gchar *snap_name = hc_url_get(url, HCURL_SNAPSHOT);
+
+	reply->did_write = TRUE;
 
 	err = meta2_backend_delete_snapshot(m2b, url, snap_name);
 	if (err != NULL) {
@@ -1282,13 +1287,14 @@ int meta2_filter_action_delete_snapshot(struct gridd_filter_ctx_s *ctx,
 int meta2_filter_action_restore_snapshot(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)
 {
-	(void) reply;
 	GError *err = NULL;
 	struct hc_url_s *url = meta2_filter_ctx_get_url(ctx);
 	struct meta2_backend_s *m2b = meta2_filter_ctx_get_backend(ctx);
 	const gchar *snap_name = hc_url_get(url, HCURL_SNAPSHOT);
 	gboolean hard_restore = meta2_filter_ctx_get_param(ctx,
 			M2_KEY_SNAPSHOT_HARDRESTORE) != NULL;
+
+	reply->did_write = TRUE;
 
 	err = meta2_backend_restore_snapshot(m2b, url, snap_name, hard_restore);
 	if (err != NULL) {

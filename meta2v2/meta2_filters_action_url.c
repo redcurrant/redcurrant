@@ -136,6 +136,8 @@ meta2_filter_action_update_storage_policy(struct gridd_filter_ctx_s *ctx,
 	memset(&ni, 0, sizeof(ni));
 	meta2_backend_get_nsinfo(m2b, &ni);
 
+	reply->did_write = TRUE;
+
 	/* ensure storage policy */
 	if((!stgpol) || (NULL ==(sp = storage_policy_init(&ni, stgpol)))) {
 		meta2_filter_ctx_set_error(ctx, NEWERROR(400, "Invalid storage policy [%s]", stgpol));

@@ -10,9 +10,26 @@
 #  define INNER_STAT_NAME_REQ_COUNTER "gridd.counter.allreq"
 # endif
 
+# ifndef INNER_STAT_NAME_READ_COUNTER
+#  define INNER_STAT_NAME_READ_COUNTER "gridd.counter.readreq"
+# endif
+
+# ifndef INNER_STAT_NAME_WRITE_COUNTER
+#  define INNER_STAT_NAME_WRITE_COUNTER "gridd.counter.writereq"
+# endif
+
 # ifndef INNER_STAT_NAME_REQ_TIME
 #  define INNER_STAT_NAME_REQ_TIME "gridd.counter.alltime"
 # endif
+
+# ifndef INNER_STAT_NAME_READ_TIME
+#  define INNER_STAT_NAME_READ_TIME "gridd.counter.readtime"
+# endif
+
+# ifndef INNER_STAT_NAME_WRITE_TIME
+#  define INNER_STAT_NAME_WRITE_TIME "gridd.counter.writetime"
+# endif
+
 
 /**
  * @defgroup server_transgrid GRIDD transport
@@ -98,6 +115,9 @@ struct gridd_reply_ctx_s
 
 	/* extracted from the request */
 	const struct hashstr_s *reqname;
+
+	/* Did the request handler write something on disk? */
+	gboolean did_write;
 };
 
 /**
