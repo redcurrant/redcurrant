@@ -180,7 +180,11 @@ _init_configless_structures(struct sqlx_service_s *ss)
 			|| !(ss->si = g_malloc0(sizeof(struct service_info_s)))
 			|| !(ss->clients_pool = gridd_client_pool_create())
 			|| !(ss->gsr_reqtime = grid_single_rrd_create(network_server_bogonow(ss->server), 8))
-			|| !(ss->gsr_reqcounter = grid_single_rrd_create(network_server_bogonow(ss->server),8))
+			|| !(ss->gsr_reqcounter = grid_single_rrd_create(network_server_bogonow(ss->server), 8))
+			|| !(ss->gsr_readreqtime = grid_single_rrd_create(network_server_bogonow(ss->server), 8))
+			|| !(ss->gsr_readreqcounter = grid_single_rrd_create(network_server_bogonow(ss->server), 8))
+			|| !(ss->gsr_writereqtime = grid_single_rrd_create(network_server_bogonow(ss->server), 8))
+			|| !(ss->gsr_writereqcounter = grid_single_rrd_create(network_server_bogonow(ss->server), 8))
 			|| !(ss->resolver = hc_resolver_create())
 			|| !(ss->gtq_admin = grid_task_queue_create("admin"))
 			|| !(ss->gtq_register = grid_task_queue_create("register"))
@@ -571,6 +575,15 @@ sqlx_service_specific_fini(void)
 		grid_single_rrd_destroy(SRV.gsr_reqtime);
 	if (SRV.gsr_reqcounter)
 		grid_single_rrd_destroy(SRV.gsr_reqcounter);
+	if (SRV.gsr_readreqtime)
+		grid_single_rrd_destroy(SRV.gsr_readreqtime);
+	if (SRV.gsr_readreqcounter)
+		grid_single_rrd_destroy(SRV.gsr_readreqcounter);
+	if (SRV.gsr_writereqtime)
+		grid_single_rrd_destroy(SRV.gsr_writereqtime);
+	if (SRV.gsr_writereqcounter)
+		grid_single_rrd_destroy(SRV.gsr_writereqcounter);
+
 
 	if (SRV.custom_tags)
 		g_slist_free_full(SRV.custom_tags, g_free);
@@ -690,20 +703,44 @@ _task_register(gpointer p)
 	grid_single_rrd_feed(network_server_get_stats(PSRV(p)->server), now,
 			INNER_STAT_NAME_REQ_COUNTER, PSRV(p)->gsr_reqcounter,
 			INNER_STAT_NAME_REQ_TIME, PSRV(p)->gsr_reqtime,
+			INNER_STAT_NAME_READ_COUNTER, PSRV(p)->gsr_readreqcounter,
+			INNER_STAT_NAME_READ_TIME, PSRV(p)->gsr_readreqtime,
+			INNER_STAT_NAME_WRITE_COUNTER, PSRV(p)->gsr_writereqcounter,
+			INNER_STAT_NAME_WRITE_TIME, PSRV(p)->gsr_reqtime,
 			NULL);
 
 	guint64 avg_counter = grid_single_rrd_get_delta(PSRV(p)->gsr_reqcounter,
 			now, 4);
 	guint64 avg_time = grid_single_rrd_get_delta(PSRV(p)->gsr_reqtime,
 			now, 4);
+	guint64 avg_read_counter = grid_single_rrd_get_delta(
+			PSRV(p)->gsr_readreqcounter, now, 4);
+	guint64 avg_read_time = grid_single_rrd_get_delta(
+			PSRV(p)->gsr_readreqtime, now, 4);
+	guint64 avg_write_counter = grid_single_rrd_get_delta(
+			PSRV(p)->gsr_writereqcounter, now, 4);
+	guint64 avg_write_time = grid_single_rrd_get_delta(
+			PSRV(p)->gsr_writereqtime, now, 4);
 
 	avg_counter = MACRO_COND(avg_counter != 0, avg_counter, 1);
 	avg_time = MACRO_COND(avg_time != 0, avg_time, 1);
+	avg_read_counter = MACRO_COND(avg_read_counter != 0, avg_read_counter, 1);
+	avg_read_time = MACRO_COND(avg_read_time != 0, avg_read_time, 1);
+	avg_write_counter = MACRO_COND(avg_write_counter != 0, avg_write_counter, 1);
+	avg_write_time = MACRO_COND(avg_write_time != 0, avg_write_time, 1);
 
 	service_tag_set_value_i64(service_info_ensure_tag(PSRV(p)->si->tags,
 				"stat.total_reqpersec"), avg_counter / 4);
 	service_tag_set_value_i64(service_info_ensure_tag(PSRV(p)->si->tags,
 				"stat.total_avreqtime"), (avg_time)/(avg_counter));
+	service_tag_set_value_i64(service_info_ensure_tag(PSRV(p)->si->tags,
+				"stat.read_reqpersec"), avg_read_counter / 4);
+	service_tag_set_value_i64(service_info_ensure_tag(PSRV(p)->si->tags,
+				"stat.read_avreqtime"), (avg_read_time)/(avg_read_counter));
+	service_tag_set_value_i64(service_info_ensure_tag(PSRV(p)->si->tags,
+				"stat.write_reqpersec"), avg_write_counter / 4);
+	service_tag_set_value_i64(service_info_ensure_tag(PSRV(p)->si->tags,
+				"stat.write_avreqtime"), (avg_write_time)/(avg_write_counter));
 	service_tag_set_value_float(service_info_ensure_tag(PSRV(p)->si->tags,
 				"stat.req_idle"), network_server_reqidle(PSRV(p)->server));
 

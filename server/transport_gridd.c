@@ -63,6 +63,12 @@ struct req_ctx_s
 	gchar *uid;
 	const gchar *reqid;
 	gboolean final_sent;
+
+	struct {
+		gint64 bytes_received;
+		gint64 bytes_sent;
+		gboolean did_write;
+	} stats;
 };
 
 static inline int
@@ -103,6 +109,10 @@ gridd_register_requests_stats(struct grid_stats_holder_s *stats,
 	grid_stats_holder_increment(stats,
 			INNER_STAT_NAME_REQ_TIME, 0LLU,
 			INNER_STAT_NAME_REQ_COUNTER, 0LLU,
+			INNER_STAT_NAME_WRITE_TIME, 0LLU,
+			INNER_STAT_NAME_WRITE_COUNTER, 0LLU,
+			INNER_STAT_NAME_READ_TIME, 0LLU,
+			INNER_STAT_NAME_READ_COUNTER, 0LLU,
 			NULL);
 	g_tree_foreach(disp->tree_requests, _traverser, NULL);
 }
@@ -563,9 +573,20 @@ _notify_request(struct req_ctx_s *ctx,
 			name_time, e_sum,
 			INNER_STAT_NAME_REQ_TIME, e_sum,
 			NULL);
+	if (ctx->stats.did_write) {
+		grid_stats_holder_increment(ctx->client->local_stats,
+				INNER_STAT_NAME_WRITE_COUNTER, guint_to_guint64(1),
+				INNER_STAT_NAME_WRITE_TIME, e_sum,
+				NULL);
+	} else {
+		grid_stats_holder_increment(ctx->client->local_stats,
+				INNER_STAT_NAME_READ_COUNTER, guint_to_guint64(1),
+				INNER_STAT_NAME_READ_TIME, e_sum,
+				NULL);
+	}
 }
 
-static gboolean
+static gsize
 _reply_message(struct network_client_s *clt, struct message_s *reply)
 {
 	int rc;
@@ -577,12 +598,12 @@ _reply_message(struct network_client_s *clt, struct message_s *reply)
 
 	if (rc) {
 		network_client_send_slab(clt, data_slab_make_buffer(encoded, encoded_size));
-		return TRUE;
+		return encoded_size;
 	}
 
 	if (encoded)
 		g_free(encoded);
-	return FALSE;
+	return 0;
 }
 
 static gboolean
@@ -649,6 +670,7 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 		body = b;
 	}
 	void _send_reply(gint code, gchar *msg) {
+		gsize answer_size = 0;
 		struct message_s *answer = NULL;
 
 		EXTRA_ASSERT(!req_ctx->final_sent);
@@ -679,15 +701,17 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 		}
 
 		/* encode and send */
+		answer_size = _reply_message(req_ctx->client, answer);
+
 		if ((req_ctx->final_sent = is_code_final(code))) {
 			struct log_item_s item;
 			item.req_ctx = req_ctx;
 			item.code = code;
 			item.msg = msg;
-			item.out_len = 0;
+			item.out_len = answer_size;
 			network_client_log_access(&item);
 		}
-		_reply_message(req_ctx->client, answer);
+		req_ctx->stats.bytes_sent += answer_size;
 	}
 	void _send_error(gint code, GError *e) {
 		EXTRA_ASSERT(!req_ctx->final_sent);
@@ -748,17 +772,19 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 	ctx.client = req_ctx->client;
 	ctx.request = req_ctx->request;
 	ctx.reqname = req_ctx->reqname;
+	ctx.did_write = FALSE;
 
 	hdl = g_tree_lookup(req_ctx->disp->tree_requests, req_ctx->reqname);
 	if (!hdl) {
 		rc = _client_reply_fixed(req_ctx, 404, "No handler found");
 		_notify_request(req_ctx,
-				GRID_STAT_PREFIX_REQ ".UNEXPECTED", 
+				GRID_STAT_PREFIX_REQ ".UNEXPECTED",
 				GRID_STAT_PREFIX_TIME".UNEXPECTED");
 	}
 	else {
 		EXTRA_ASSERT(hdl->handler != NULL);
 		rc = hdl->handler(&ctx, hdl->gdata, hdl->hdata);
+		req_ctx->stats.did_write = ctx.did_write;
 		_notify_request(req_ctx, hdl->stat_name_req, hdl->stat_name_time);
 	}
 
@@ -813,6 +839,7 @@ _client_manage_l4v(struct network_client_s *client, GByteArray *gba)
 	req_ctx.transport = &(client->transport);
 	req_ctx.clt_ctx = req_ctx.transport->client_context;
 	req_ctx.disp = req_ctx.clt_ctx->dispatcher;
+	req_ctx.stats.bytes_received = gba->len;
 
 	offset = gba->len;
 	int asn1_rc = message_unmarshall(request, gba->data, &offset, &err);

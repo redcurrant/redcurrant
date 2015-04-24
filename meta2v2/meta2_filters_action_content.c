@@ -368,6 +368,8 @@ meta2_filter_action_put_content(struct gridd_filter_ctx_s *ctx,
 	const char *copy_source = meta2_filter_ctx_get_param(ctx, M2_KEY_COPY_SOURCE);
 	struct hc_url_s *url = meta2_filter_ctx_get_url(ctx);
 
+	reply->did_write = TRUE;
+
 	if(NULL != copy_source) {
 		reply->subject("%s|%s|COPY(%s)", hc_url_get(url, HCURL_WHOLE),
 				hc_url_get(url, HCURL_HEXID), copy_source);
@@ -382,13 +384,14 @@ meta2_filter_action_append_content(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)
 {
 	TRACE_FILTER();
-	(void) reply;
 	GError *e = NULL;
 	GSList *beans = meta2_filter_ctx_get_input_udata(ctx);
 	struct meta2_backend_s *m2b = meta2_filter_ctx_get_backend(ctx);
 	struct hc_url_s *url = meta2_filter_ctx_get_url(ctx);
 	struct on_bean_ctx_s *obc = _on_bean_ctx_init(ctx, reply);
 	GRID_DEBUG("Appending %d beans", g_slist_length(beans));
+
+	reply->did_write = TRUE;
 
 	e = meta2_backend_append_to_alias(m2b, url, beans, _get_cb, obc);
 	if(NULL != e) {
@@ -482,7 +485,6 @@ int
 meta2_filter_action_delete_content(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)
 {
-	(void) reply;
 	guint32 flags = 0;
 	gboolean sync_del = FALSE;
 	GError *e = NULL;
@@ -494,6 +496,8 @@ meta2_filter_action_delete_content(struct gridd_filter_ctx_s *ctx,
 		flags = (guint32)atoi(fstr);
 	}
 	sync_del = BOOL(flags & M2V2_FLAG_SYNCDEL);
+
+	reply->did_write = TRUE;
 
 	TRACE_FILTER();
 	e = meta2_backend_delete_alias(m2b, url, sync_del, _get_cb, obc);
@@ -721,6 +725,8 @@ meta2_filter_action_set_content_properties(struct gridd_filter_ctx_s *ctx,
 	if (NULL != fstr) {
 		action = atoi(fstr);
 	}
+
+	reply->did_write = TRUE;
 
 	switch (action) {
 		case CONTENT_PROP_INIT:
