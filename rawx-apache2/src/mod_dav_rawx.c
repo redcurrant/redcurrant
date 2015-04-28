@@ -63,6 +63,7 @@ dav_rawx_create_server_config(apr_pool_t *p, server_rec *s)
 	conf->headers_scheme = HEADER_SCHEME_V1;
 	conf->fsync_on_close = FSYNC_ON_CHUNK;
 	conf->FILE_buffer_size = 0;
+	conf->stat_smoothing_delay = 8;
 
 	return conf;
 }
@@ -85,6 +86,7 @@ dav_rawx_merge_server_config(apr_pool_t *p, void *base, void *overrides)
 	newconf->fsync_on_close = child->fsync_on_close;
 	newconf->headers_scheme = child->headers_scheme;
 	newconf->FILE_buffer_size = child->FILE_buffer_size;
+	newconf->stat_smoothing_delay = child->stat_smoothing_delay;
 	memcpy(newconf->docroot, child->docroot, sizeof(newconf->docroot));
 	memcpy(newconf->ns_name, child->ns_name, sizeof(newconf->ns_name));
 	update_rawx_conf(p, &(newconf->rawx_conf), newconf->ns_name);
@@ -318,6 +320,26 @@ dav_rawx_cmd_gridconfig_upblock(cmd_parms *cmd, void *config, const char *arg1)
 }
 
 static const char *
+dav_rawx_cmd_gridconfig_stat_delay(cmd_parms *cmd, void *config, const char *arg1)
+{
+	dav_rawx_server_conf *conf;
+	(void) config;
+
+	DAV_XDEBUG_POOL(cmd->pool, 0, "%s()", __FUNCTION__);
+
+	conf = ap_get_module_config(cmd->server->module_config, &dav_rawx_module);
+
+	if (arg1 && *arg1) {
+		conf->stat_smoothing_delay = atoi(arg1);
+		if (conf->stat_smoothing_delay < 1)
+			conf->stat_smoothing_delay = 1;
+		else if (conf->stat_smoothing_delay > 60)
+			conf->stat_smoothing_delay = 60;
+	}
+	return NULL;
+}
+
+static const char *
 dav_rawx_cmd_gridconfig_acl(cmd_parms *cmd, void *config, const char *arg1)
 {
 	dav_rawx_server_conf *conf;
@@ -384,7 +406,8 @@ _destroy_shm_cb(void *handle)
 }
 
 static apr_status_t
-_create_shm_if_needed(char *shm_path, server_rec *server, apr_pool_t *plog)
+_create_shm_if_needed(char *shm_path, server_rec *server, apr_pool_t *plog,
+		int stat_smoothing_delay)
 {
 	apr_pool_t *ppool = server->process->pool;
 	apr_shm_t *shm = NULL;
@@ -406,16 +429,17 @@ _create_shm_if_needed(char *shm_path, server_rec *server, apr_pool_t *plog)
 		/* Init the SHM */
 		void *ptr_counter = apr_shm_baseaddr_get(shm);
 		if (ptr_counter) {
+			int rrd_size = stat_smoothing_delay * 2;
 			bzero(ptr_counter, sizeof(struct shm_stats_s));
 			/* init rrd's */
-			rawx_stats_rrd_init(&(((struct shm_stats_s *) ptr_counter)->body.rrd_req_sec));
-			rawx_stats_rrd_init(&(((struct shm_stats_s *) ptr_counter)->body.rrd_duration));
-			rawx_stats_rrd_init(&(((struct shm_stats_s *) ptr_counter)->body.rrd_req_put_sec));
-			rawx_stats_rrd_init(&(((struct shm_stats_s *) ptr_counter)->body.rrd_put_duration));
-			rawx_stats_rrd_init(&(((struct shm_stats_s *) ptr_counter)->body.rrd_req_get_sec));
-			rawx_stats_rrd_init(&(((struct shm_stats_s *) ptr_counter)->body.rrd_get_duration));
-			rawx_stats_rrd_init(&(((struct shm_stats_s *) ptr_counter)->body.rrd_req_del_sec));
-			rawx_stats_rrd_init(&(((struct shm_stats_s *) ptr_counter)->body.rrd_del_duration));
+			rawx_stats_rrd_init_sized(&(((struct shm_stats_s *) ptr_counter)->body.rrd_req_sec), rrd_size);
+			rawx_stats_rrd_init_sized(&(((struct shm_stats_s *) ptr_counter)->body.rrd_duration), rrd_size);
+			rawx_stats_rrd_init_sized(&(((struct shm_stats_s *) ptr_counter)->body.rrd_req_put_sec), rrd_size);
+			rawx_stats_rrd_init_sized(&(((struct shm_stats_s *) ptr_counter)->body.rrd_put_duration), rrd_size);
+			rawx_stats_rrd_init_sized(&(((struct shm_stats_s *) ptr_counter)->body.rrd_req_get_sec), rrd_size);
+			rawx_stats_rrd_init_sized(&(((struct shm_stats_s *) ptr_counter)->body.rrd_get_duration), rrd_size);
+			rawx_stats_rrd_init_sized(&(((struct shm_stats_s *) ptr_counter)->body.rrd_req_del_sec), rrd_size);
+			rawx_stats_rrd_init_sized(&(((struct shm_stats_s *) ptr_counter)->body.rrd_del_duration), rrd_size);
 		}
 		// Save the SHM handle in the process' pool, without cleanup callback
 		apr_pool_userdata_set(shm, SHM_HANDLE_KEY, NULL, ppool);
@@ -534,7 +558,8 @@ rawx_hook_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp,
 		goto label_error;
 	}
 
-	if (_create_shm_if_needed(conf->shm.path, server, plog) != APR_SUCCESS) {
+	if (_create_shm_if_needed(conf->shm.path, server, plog,
+			conf->stat_smoothing_delay) != APR_SUCCESS) {
 		DAV_ERROR_POOL(plog, 0, "Failed to init the RAWX statistics support");
 		return DONE;
 	}
@@ -573,7 +598,8 @@ static const command_rec dav_rawx_cmds[] =
     AP_INIT_TAKE1("grid_fsync_dir",   dav_rawx_cmd_gridconfig_fsync_dir,   NULL, RSRC_CONF, "do fsync on chunk direcory after renaming .pending"),
     AP_INIT_TAKE1("grid_headers",     dav_rawx_cmd_gridconfig_headers,     NULL, RSRC_CONF, "which header scheme to adopt (1, 2, both)"),
     AP_INIT_TAKE1("grid_acl",         dav_rawx_cmd_gridconfig_acl,         NULL, RSRC_CONF, "enabled acl"),
-    AP_INIT_TAKE1("grid_upload_blocksize",    dav_rawx_cmd_gridconfig_upblock,     NULL, RSRC_CONF, "upload block size"),
+    AP_INIT_TAKE1("grid_upload_blocksize", dav_rawx_cmd_gridconfig_upblock, NULL, RSRC_CONF, "upload block size"),
+    AP_INIT_TAKE1("grid_stat_delay",  dav_rawx_cmd_gridconfig_stat_delay,  NULL, RSRC_CONF, "delay for request stat smoothing (1 to 60 seconds)"),
     AP_INIT_TAKE1(NULL,  NULL,  NULL, RSRC_CONF, NULL)
 };
 

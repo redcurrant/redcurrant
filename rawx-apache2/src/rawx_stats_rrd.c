@@ -50,12 +50,21 @@ rawx_stats_rrd_create(apr_pool_t *pool, time_t period)
 }
 
 void
-rawx_stats_rrd_init(struct rawx_stats_rrd_s *rsr)
+rawx_stats_rrd_init_sized(struct rawx_stats_rrd_s *rsr, time_t period)
 {
+	if (period >= (time_t) (sizeof(rsr->ten) / sizeof(apr_uint32_t)))
+		period = (sizeof(rsr->ten) / sizeof(apr_uint32_t))- 1;
+	memset(rsr, 0, sizeof(rsr));
 	rsr->lock = 0;
 	rsr->last = time(0);
-	rsr->period = 8;
-	_init_tab_values(rsr, 8);
+	rsr->period = period;
+	_init_tab_values(rsr, period);
+}
+
+void
+rawx_stats_rrd_init(struct rawx_stats_rrd_s *rsr)
+{
+	rawx_stats_rrd_init_sized(rsr, 8);
 }
 
 void
@@ -93,20 +102,11 @@ rawx_stats_rrd_dup(apr_pool_t *pool, struct rawx_stats_rrd_s *rrd)
 static void
 _rsr_blank_empty_slots(register struct rawx_stats_rrd_s *rsr, register apr_uint32_t v, register time_t now)
 {
-	register apr_time_t last;
-
-	last = rsr->last % rsr->period;
-	rsr->last = now;
-	now = now % rsr->period;
-
-	if (now - last >= rsr->period) {
-		last = 0;
-		now = rsr->period-1;
+	for (time_t i = 0; rsr->last != now && i++ < rsr->period ;) {
+		rsr->last++;
+		rsr->ten[rsr->last % rsr->period] = v;
 	}
-	do {
-		rsr->ten[last] = v;
-		last = (last+1) % rsr->period;
-	} while (last != now);
+	rsr->last = now;
 }
 
 void
@@ -165,7 +165,7 @@ rawx_stats_rrd_get_delta(struct rawx_stats_rrd_s *rsr, time_t period)
 static char *
 _dump_rrd(struct rawx_stats_rrd_s *rsr, apr_pool_t *p)
 {
-	return apr_psprintf(p, "[\"last\": \"%li\", period\": \"%li\", ten\": %s] ",
+	return apr_psprintf(p, "[\"last\": %li, \"period\": %li, \"ten\": %s] ",
 			rsr->last, rsr->period, rawx_stats_rrd_dump_values(rsr, p));
 }
 
@@ -173,10 +173,9 @@ struct delta_debug_s *
 rawx_stats_rrd_debug_get_delta(struct rawx_stats_rrd_s *rsr, apr_pool_t *p, time_t period)
 {
 	time_t now;
-
 	char *result = NULL;
 
-	result = apr_psprintf(p, "%s | period : %li ", _dump_rrd(rsr,p), period);
+	result = apr_psprintf(p, "%s | period: %li ", _dump_rrd(rsr,p), period);
 
 	if (period >= rsr->period)
 		return 0;
@@ -188,14 +187,13 @@ rawx_stats_rrd_debug_get_delta(struct rawx_stats_rrd_s *rsr, apr_pool_t *p, time
 	apr_uint32_t nrp = now % rsr->period;
 	apr_uint32_t nprp = (now-period) % rsr->period;
 
-	result = apr_psprintf(p, "%s| now : %li after bs: %s"
+	result = apr_psprintf(p, "%s| now: %li after bs: %s"
 				"operation = rsr->ten[%li mod %li] - "
 				"rsr->ten[(%li-%li) mod %li] "
 				"(rsr->ten[%u] - rsr->ten[%u] "
 				"(%u - %u (%u)))",
 				result, now, _dump_rrd(rsr,p), now, rsr->period, now, period, rsr->period, nrp, 
 				nprp, rsr->ten[nrp], rsr->ten[nprp], op);
-
 	struct delta_debug_s *dd = apr_palloc(p, sizeof(struct delta_debug_s));
 	dd->dump = result;
 	dd->delta = op;
