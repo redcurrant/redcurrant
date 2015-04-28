@@ -225,7 +225,7 @@ server_add_stat(dav_rawx_server_conf *conf, const char *n, apr_uint32_t value, a
 void
 server_inc_stat(dav_rawx_server_conf *conf, const char *n, apr_time_t duration)
 {
-	server_add_stat(conf, n, 1LLU, duration);
+	server_add_stat(conf, n, 1U, duration);
 }
 
 void

@@ -45,7 +45,7 @@ request_get_duration(const request_rec *req)
 {
 	apr_uint64_t t = 0;
 	apr_time_t d = apr_time_now() - req->request_time;
-	t = d;
+	t = MAX(1, d);
 	return t;
 }
 
