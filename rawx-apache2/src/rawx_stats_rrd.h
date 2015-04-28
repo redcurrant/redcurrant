@@ -27,8 +27,8 @@ struct rawx_stats_rrd_s
 {
 	time_t last;
 	time_t period;
-	apr_uint32_t ten[8];
 	apr_uint32_t lock;
+	apr_uint32_t ten[64];
 };
 
 struct delta_debug_s
@@ -50,6 +50,7 @@ struct rawx_stats_rrd_s * rawx_stats_rrd_create(apr_pool_t *pool, time_t period)
  *
  */
 void rawx_stats_rrd_init(struct rawx_stats_rrd_s *rsr);
+void rawx_stats_rrd_init_sized(struct rawx_stats_rrd_s *rsr, time_t period);
 
 void rawx_stats_rrd_lock(struct rawx_stats_rrd_s *rsr);
 
