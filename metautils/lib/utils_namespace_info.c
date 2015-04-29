@@ -331,6 +331,20 @@ namespace_info_get_srv_param_i64(const namespace_info_t *ni,
 	return res;
 }
 
+void
+namespace_info_update_options(const namespace_info_t *ni, GHashTable *overrides)
+{
+	GHashTableIter iter;
+	gpointer k, v;
+
+	if (!overrides)
+		return;
+
+	g_hash_table_iter_init(&iter, overrides);
+	while (g_hash_table_iter_next(&iter, &k, &v))
+		g_hash_table_insert(ni->options, g_strdup(k), metautils_gba_dup(v));
+}
+
 //------------------------------------------------------------------------------
 
 static GError *

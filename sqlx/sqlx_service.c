@@ -39,6 +39,7 @@ static void sqlx_service_action(void);
 static void sqlx_service_set_defaults(void);
 static void sqlx_service_specific_fini(void);
 static void sqlx_service_specific_stop(void);
+static void sqlx_service_configure_overrides(GHashTable *overrides);
 
 // Periodic tasks & thread's workers
 static void _task_register(gpointer p);
@@ -62,6 +63,7 @@ static struct grid_main_callbacks sqlx_service_callbacks =
 	.configure = sqlx_service_configure,
 	.usage = sqlx_service_usage,
 	.specific_stop = sqlx_service_specific_stop,
+	.configure_overrides = sqlx_service_configure_overrides,
 };
 
 // repository hooks ------------------------------------------------------------
@@ -489,6 +491,13 @@ sqlx_service_configure(int argc, char **argv)
 }
 
 static void
+sqlx_service_configure_overrides(GHashTable *overrides)
+{
+	g_hash_table_ref(overrides);
+	SRV.cfg_overrides = overrides;
+}
+
+static void
 sqlx_service_set_defaults(void)
 {
 	SRV.open_timeout = 20000;
@@ -595,6 +604,10 @@ sqlx_service_specific_fini(void)
 		g_string_free(SRV.url, TRUE);
 	if (SRV.zk_url)
 		metautils_str_clean(&SRV.zk_url);
+	if (SRV.cfg_overrides) {
+		g_hash_table_unref(SRV.cfg_overrides);
+		SRV.cfg_overrides = NULL;
+	}
 
 	namespace_info_clear(&SRV.nsinfo);
 }
@@ -811,6 +824,7 @@ _task_reload_nsinfo(gpointer p)
 				PSRV(p)->ns_name, err->code, err->message);
 		g_clear_error(&err);
 	} else {
+		namespace_info_update_options(ni, PSRV(p)->cfg_overrides);
 		namespace_info_copy(ni, &(PSRV(p)->nsinfo), NULL);
 		namespace_info_free(ni);
 	}

@@ -25,9 +25,10 @@ static struct stat pidfile_stat;
 
 /* ------------------------------------------------------------------------- */
 
-static inline const char*
-_set_opt(gchar **tokens)
+static const char*
+_set_opt(gchar **tokens, gpointer unused)
 {
+	(void) unused;
 	static gchar errbuff[1024];
 	struct grid_main_option_s *opt;
 	gint64 i64;
@@ -105,13 +106,34 @@ _set_opt(gchar **tokens)
 }
 
 static const char*
-grid_main_set_option(const gchar *str_opt)
+_save_in_hash(gchar **tokens, gpointer udata)
+{
+	static gchar errbuff[1024];
+	GHashTable *hash = udata;
+
+	memset(errbuff, 0, sizeof(errbuff));
+
+	if (!tokens || tokens[0] == NULL || tokens[1] == NULL) {
+		g_snprintf(errbuff, sizeof(errbuff),
+				"Invalid option format, expected 'Key=Value'");
+		return errbuff;
+	}
+
+	g_hash_table_insert(hash, g_strdup(tokens[0]),
+			metautils_gba_from_string(tokens[1]));
+	return NULL;
+}
+
+static const char*
+grid_main_set_option(const gchar *str_opt,
+		const char *(*set_opt)(gchar **tokens, gpointer udata),
+		gpointer udata)
 {
 	gchar **tokens;
 	const gchar *result;
 
 	tokens = g_strsplit(str_opt, "=", 2);
-	result = _set_opt(tokens);
+	result = set_opt(tokens, udata);
 	if (tokens)
 		g_strfreev(tokens);
 	return result;
@@ -169,15 +191,16 @@ grid_main_usage(void)
 	g_printerr("Usage: %s [OPTIONS...] EXTRA_ARGS\n", g_get_prgname());
 
 	g_printerr("\nOPTIONS:\n");
-	g_printerr("  -h         help, displays this section\n");
-	g_printerr("  -d         daemonizes the process (default FALSE)\n");
-	g_printerr("  -q         quiet mode, supress output on stdout stderr \n");
-	g_printerr("  -v         verbose mode, this activates stderr traces (default FALSE)\n");
-	g_printerr("  -p PATH    pidfile path, no pidfile if unset\n");
-	g_printerr("  -l PATH    activates the log4c emulation and load PATH as a log4c file\n");
-	g_printerr("  -s TOKEN   activates syslog traces (default FALSE)\n"
-			   "             with the given identifier\n");
-	g_printerr("  -O XOPT    set extra options.\n");
+	g_printerr("  -h          help, displays this section\n");
+	g_printerr("  -d          daemonizes the process (default FALSE)\n");
+	g_printerr("  -q          quiet mode, supress output on stdout stderr \n");
+	g_printerr("  -v          verbose mode, this activates stderr traces (default FALSE)\n");
+	g_printerr("  -p PATH     pidfile path, no pidfile if unset\n");
+	g_printerr("  -l PATH     activates the log4c emulation and load PATH as a log4c file\n");
+	g_printerr("  -s TOKEN    activates syslog traces (default FALSE)\n"
+			   "              with the given identifier\n");
+	g_printerr("  -O XOPT     set extra options.\n");
+	g_printerr("  -o key=val  override a namespace option (normally gotten from conscience).\n");
 
 	g_printerr("\nXOPT'S with default value:\n");
 	_dump_xopts();
@@ -354,17 +377,22 @@ grid_main_init(int argc, char **args)
 {
 	memset(syslog_id, 0, sizeof(syslog_id));
 	memset(pidfile_path, 0, sizeof(pidfile_path));
+	GHashTable *opts_overrides = g_hash_table_new_full(g_str_hash, g_str_equal,
+			g_free, metautils_gba_unref);
 
 	for (;;) {
-		int c = getopt(argc, args, "O:hdvl:qp:s:");
+		int c = getopt(argc, args, "O:o:hdvl:qp:s:");
 		if (c == -1)
 			break;
 		switch (c) {
+			case 'o':
 			case 'O':
 				do {
-					const char *errmsg = grid_main_set_option(optarg);
+					const char *errmsg = grid_main_set_option(optarg,
+							(c == 'O')? _set_opt : _save_in_hash,
+							(c == 'O')? NULL : opts_overrides);
 					if (errmsg) {
-						GRID_WARN("Invalid option : %s", errmsg);
+						GRID_WARN("Invalid option: %s", errmsg);
 						grid_main_usage();
 						return FALSE;
 					}
@@ -386,7 +414,7 @@ grid_main_init(int argc, char **args)
 			case 'p':
 				memset(pidfile_path, 0, sizeof(pidfile_path));
 				if (sizeof(pidfile_path) <= g_strlcpy(pidfile_path, optarg, sizeof(pidfile_path)-1)) {
-					GRID_WARN("Invalid '-p' argument : too long");
+					GRID_WARN("Invalid '-p' argument: too long");
 					grid_main_usage();
 					return FALSE;
 				}
@@ -399,7 +427,7 @@ grid_main_init(int argc, char **args)
 			case 's':
 				memset(syslog_id, 0, sizeof(syslog_id));
 				if (sizeof(syslog_id) <= g_strlcpy(syslog_id, optarg, sizeof(syslog_id)-1)) {
-					GRID_WARN("Invalid '-s' argument : too long");
+					GRID_WARN("Invalid '-s' argument: too long");
 					grid_main_usage();
 					return FALSE;
 				}
@@ -427,6 +455,11 @@ grid_main_init(int argc, char **args)
 	}
 
 	flag_running = TRUE;
+
+	if (user_callbacks->configure_overrides) {
+		user_callbacks->configure_overrides(opts_overrides);
+	}
+	g_hash_table_unref(opts_overrides);
 
 	if (!user_callbacks->configure(argc-optind, args+optind)) {
 		flag_running = FALSE;
@@ -518,7 +551,8 @@ grid_main_cli_init(int argc, char **args)
 		switch (c) {
 			case 'O':
 				do {
-					const char *errmsg = grid_main_set_option(optarg);
+					const char *errmsg = grid_main_set_option(optarg,
+							_set_opt, NULL);
 					if (errmsg) {
 						GRID_WARN("Invalid option : %s", errmsg);
 						grid_main_cli_usage();
