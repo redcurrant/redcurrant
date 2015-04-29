@@ -48,7 +48,7 @@ static void _task_garbage_collect(gpointer p);
 static void _task_expire_resolver(gpointer p);
 static void _task_retry_elections(gpointer p);
 static void _task_reload_nsinfo(gpointer p);
-static void _task_reload_workers(gpointer p);
+static void _task_reload_config(gpointer p);
 static gpointer _worker_clients(gpointer p);
 
 // Static variables
@@ -145,12 +145,19 @@ _configure_with_arguments(struct sqlx_service_s *ss, int argc, char **argv)
 }
 
 static gboolean
-_configure_limits(struct sqlx_service_s *ss)
+_configure_limits(struct sqlx_service_s *ss, guint max_passive,
+		guint max_active, guint max_bases)
 {
-#define CONFIGURE_LIMIT(cfg,real) do { \
-	real = (cfg > 0 && cfg < real) ? cfg : (limit.rlim_cur - 20) / 3; \
-} while (0)
+	guint newval = 0, max = 0;
+	gboolean changed = FALSE;
 	struct rlimit limit = {0,0};
+
+#define CONFIGURE_LIMIT(cfg,real) do { \
+	max = (limit.rlim_cur - 20) / 3;\
+	newval = (cfg > 0 && cfg < max) ? cfg : max; \
+	changed |= newval != real;\
+	real = newval;\
+} while (0)
 
 	if (0 != getrlimit(RLIMIT_NOFILE, &limit)) {
 		GRID_ERROR("Max file descriptor unknown : getrlimit error "
@@ -163,12 +170,13 @@ _configure_limits(struct sqlx_service_s *ss)
 		return FALSE;
 	}
 
-	GRID_INFO("Limits set to ACTIVES[%u] PASSIVES[%u] BASES[%u]",
-			SRV.max_active, SRV.max_passive, SRV.max_bases);
+	CONFIGURE_LIMIT(max_passive, ss->max_passive);
+	CONFIGURE_LIMIT(max_active, ss->max_active);
+	CONFIGURE_LIMIT(max_bases, ss->max_bases);
 
-	CONFIGURE_LIMIT(ss->cfg_max_passive, ss->max_passive);
-	CONFIGURE_LIMIT(ss->cfg_max_active, ss->max_active);
-	CONFIGURE_LIMIT(ss->cfg_max_bases, ss->max_bases);
+	if (changed)
+		GRID_INFO("Limits set to ACTIVES[%u] PASSIVES[%u] BASES[%u]",
+				ss->max_active, ss->max_passive, ss->max_bases);
 
 	return TRUE;
 #undef CONFIGURE_LIMIT
@@ -316,8 +324,6 @@ _configure_backend(struct sqlx_service_s *ss)
 		return FALSE;
 	}
 
-	sqlx_repository_configure_open_timeout(ss->repository, ss->open_timeout);
-
 	GRID_TRACE("SQLX repository initiated");
 	return TRUE;
 }
@@ -328,7 +334,7 @@ _configure_tasks(struct sqlx_service_s *ss)
 	grid_task_queue_register(ss->gtq_register, 1, _task_register, NULL, ss);
 
 	grid_task_queue_register(ss->gtq_reload, 5, _task_reload_nsinfo, NULL, ss);
-	grid_task_queue_register(ss->gtq_reload, 5, _task_reload_workers, NULL, ss);
+	grid_task_queue_register(ss->gtq_reload, 5, _task_reload_config, NULL, ss);
 
 	grid_task_queue_register(ss->gtq_admin, 30, _task_garbage_collect, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_bases, NULL, ss);
@@ -477,7 +483,8 @@ sqlx_service_specific_stop(void)
 static gboolean
 sqlx_service_configure(int argc, char **argv)
 {
-	return _configure_limits(&SRV)
+	return _configure_limits(&SRV,
+			SRV.max_passive, SRV.max_active, SRV.cfg_max_bases)
 	    && _init_configless_structures(&SRV)
 	    && _configure_with_arguments(&SRV, argc, argv)
 		&& _configure_synchronism(&SRV)
@@ -493,21 +500,17 @@ sqlx_service_configure(int argc, char **argv)
 static void
 sqlx_service_configure_overrides(GHashTable *overrides)
 {
-	g_hash_table_ref(overrides);
-	SRV.cfg_overrides = overrides;
+	SRV.cfg_overrides = g_hash_table_ref(overrides);
 }
 
 static void
 sqlx_service_set_defaults(void)
 {
-	SRV.open_timeout = 20000;
 	SRV.cnx_backlog = 50;
 
 	SRV.cfg_max_bases = 0;
-	SRV.cfg_max_passive = 0;
-	SRV.cfg_max_active = 0;
-	SRV.cfg_max_workers = 200;
-	SRV.cfg_max_heap_free = 4 * 1024;
+	SRV.max_passive = 0;
+	SRV.max_active = 0;
 	SRV.flag_replicable = TRUE;
 	SRV.flag_autocreate = TRUE;
 	SRV.flag_autoupgrade = FALSE;
@@ -637,23 +640,8 @@ sqlx_service_get_options(void)
 			"SYNC mode to be applied on non-replicated bases after open "
 				"(0=NONE,1=NORMAL,2=FULL)"},
 
-		{"OpenTimeout", OT_INT64, {.i64=&SRV.open_timeout},
-			"Timeout when opening bases in use by another thread "
-				"(milliseconds). -1 means wait forever, 0 return "
-				"immediately." },
-		{"CnxBacklog", OT_INT64, {.i64=&SRV.cnx_backlog},
-			"Number of connections allowed when all workers are busy"},
-
 		{"MaxBases", OT_UINT, {.u = &SRV.cfg_max_bases},
 			"Limits the number of concurrent open bases" },
-		{"MaxPassive", OT_UINT, {.u = &SRV.cfg_max_passive},
-			"Limits the number of concurrent passive connections" },
-		{"MaxActive", OT_UINT, {.u = &SRV.cfg_max_active},
-			"Limits the number of concurrent active connections" },
-		{"MaxWorkers", OT_UINT, {.u=&SRV.cfg_max_workers},
-			"Limits the number of worker threads" },
-		{"MaxHeapFree", OT_UINT, {.u=&SRV.cfg_max_heap_free},
-			"Amount of free memory to keep for future allocations (kB)" },
 
 		{"CacheEnabled", OT_BOOL, {.b = &SRV.flag_cached_bases},
 			"If set, each base will be cached in a way it won't be accessed"
@@ -673,7 +661,14 @@ sqlx_service_get_options(void)
 static const char *
 sqlx_service_usage(void)
 {
-	return "NS VOLUME";
+	return "NS VOLUME\n\n"\
+"Namespace options recognized (can be prefixed by the service type):\n"\
+KEY_SQLX_TIMEOUT_OPEN"       Timeout when opening bases in use by another thread, -1 (infinite), 0 (immediate), or milliseconds\n"\
+KEY_SQLX_MAX_HEAP_FREE"      Amount of free memory to keep for future allocations (kB)\n"\
+KEY_SQLX_MAX_WORKERS"        Maximum number of worker threads\n"\
+KEY_SQLX_MAX_CNX_ACTIVE"     Maximum number of concurrent active connections\n"\
+KEY_SQLX_MAX_CNX_PASSIVE"    Maximum number of concurrent passive connections\n"\
+KEY_SQLX_MAX_CNX_IN_BACKLOG" Number of connections allowed when all workers are busy";
 }
 
 int
@@ -784,8 +779,11 @@ static void
 _task_garbage_collect(gpointer p)
 {
 	/* Force malloc to release memory to the system.
-	 * Allow cfg_max_heap_free kiB of unused but not released memory. */
-	malloc_trim(PSRV(p)->cfg_max_heap_free * 1024);
+	 * Allow max_heap_free kiB of unused but not released memory. */
+	gint64 max_heap_free = namespace_info_get_srv_param_i64(&(PSRV(p)->nsinfo),
+			NULL, PSRV(p)->service_config->srvtype, KEY_SQLX_MAX_HEAP_FREE,
+			4 * 1024);
+	malloc_trim(max_heap_free * 1024);
 }
 
 static void
@@ -831,11 +829,29 @@ _task_reload_nsinfo(gpointer p)
 }
 
 static void
-_task_reload_workers(gpointer p)
+_task_reload_config(gpointer p)
 {
-	gint64 max_workers = namespace_info_get_srv_param_i64(&(PSRV(p)->nsinfo),
-			NULL, PSRV(p)->service_config->srvtype, "max_workers",
-			SRV.cfg_max_workers);
+#define GET(var,key,def) \
+	gint64 (var) = namespace_info_get_srv_param_i64(&(PSRV(p)->nsinfo),\
+			NULL, PSRV(p)->service_config->srvtype, (key), (def));
+
+	/* If you add options, don't forget to update sqlx_service_usage() */
+
+	GET(max_workers, KEY_SQLX_MAX_WORKERS, 200)
+	GET(max_cnx_passive, KEY_SQLX_MAX_CNX_PASSIVE, PSRV(p)->max_passive)
+	GET(max_cnx_active, KEY_SQLX_MAX_CNX_ACTIVE, PSRV(p)->max_active)
+	GET(max_cnx_backlog, KEY_SQLX_MAX_CNX_IN_BACKLOG, PSRV(p)->cnx_backlog)
+	GET(timeout_open, KEY_SQLX_TIMEOUT_OPEN, 20000)
+
+#undef GET
+
+	_configure_limits(PSRV(p), max_cnx_passive, max_cnx_active,
+			SRV.cfg_max_bases);
+
 	network_server_set_max_workers(PSRV(p)->server, (guint) max_workers);
+	network_server_set_maxcnx(PSRV(p)->server, PSRV(p)->max_passive);
+	gridd_client_pool_set_max(PSRV(p)->clients_pool, PSRV(p)->max_active);
+	network_server_set_cnx_backlog(PSRV(p)->server, max_cnx_backlog);
+	sqlx_repository_configure_open_timeout(PSRV(p)->repository, timeout_open);
 }
 
