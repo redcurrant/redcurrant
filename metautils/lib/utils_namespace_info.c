@@ -405,10 +405,10 @@ namespace_info_init_json_object(struct json_object *obj,
 
 	GError *err;
 	if (NULL != (err = _load_hash(obj, "options", ni->options))
-			|| NULL != (err = _load_hash(obj, "storage_policy", ni->storage_policy))
-			|| NULL != (err = _load_hash(obj, "data_security", ni->data_security))
-			|| NULL != (err = _load_hash(obj, "data_treatments", ni->data_treatments))
-			|| NULL != (err = _load_hash(obj, "storage_class", ni->storage_class)))
+			|| NULL != (err = _load_hash(obj, CONF_KEY_STORAGE_POLICY, ni->storage_policy))
+			|| NULL != (err = _load_hash(obj, CONF_KEY_DATA_SECURITY, ni->data_security))
+			|| NULL != (err = _load_hash(obj, CONF_KEY_DATA_TREATMENTS, ni->data_treatments))
+			|| NULL != (err = _load_hash(obj, CONF_KEY_STORAGE_CLASS, ni->storage_class)))
 		return err;
 
 	return NULL;
@@ -479,13 +479,13 @@ namespace_info_encode_json(GString *out, struct namespace_info_s *ni)
 
 	_encode_json_properties(out, ni->options, "options");
 	g_string_append_c(out, ',');
-	_encode_json_properties(out, ni->storage_policy, "storage_policy");
+	_encode_json_properties(out, ni->storage_policy, CONF_KEY_STORAGE_POLICY);
 	g_string_append_c(out, ',');
-	_encode_json_properties(out, ni->storage_class, "storage_class");
+	_encode_json_properties(out, ni->storage_class, CONF_KEY_STORAGE_CLASS);
 	g_string_append_c(out, ',');
-	_encode_json_properties(out, ni->data_security, "data_security");
+	_encode_json_properties(out, ni->data_security, CONF_KEY_DATA_SECURITY);
 	g_string_append_c(out, ',');
-	_encode_json_properties(out, ni->data_treatments, "data_treatments");
+	_encode_json_properties(out, ni->data_treatments, CONF_KEY_DATA_TREATMENTS);
 	g_string_append_c(out, '}');
 }
 

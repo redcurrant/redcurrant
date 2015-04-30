@@ -663,12 +663,12 @@ sqlx_service_usage(void)
 {
 	return "NS VOLUME\n\n"\
 "Namespace options recognized (can be prefixed by the service type):\n"\
-KEY_SQLX_TIMEOUT_OPEN"       Timeout when opening bases in use by another thread, -1 (infinite), 0 (immediate), or milliseconds\n"\
-KEY_SQLX_MAX_HEAP_FREE"      Amount of free memory to keep for future allocations (kB)\n"\
-KEY_SQLX_MAX_WORKERS"        Maximum number of worker threads\n"\
-KEY_SQLX_MAX_CNX_ACTIVE"     Maximum number of concurrent active connections\n"\
-KEY_SQLX_MAX_CNX_PASSIVE"    Maximum number of concurrent passive connections\n"\
-KEY_SQLX_MAX_CNX_IN_BACKLOG" Number of connections allowed when all workers are busy";
+CONF_KEY_SQLX_TIMEOUT_OPEN"       Timeout when opening bases in use by another thread, -1 (infinite), 0 (immediate), or milliseconds\n"\
+CONF_KEY_SQLX_MAX_HEAP_FREE"      Amount of free memory to keep for future allocations (kB)\n"\
+CONF_KEY_SQLX_MAX_WORKERS"        Maximum number of worker threads\n"\
+CONF_KEY_SQLX_MAX_CNX_ACTIVE"     Maximum number of concurrent active connections\n"\
+CONF_KEY_SQLX_MAX_CNX_PASSIVE"    Maximum number of concurrent passive connections\n"\
+CONF_KEY_SQLX_MAX_CNX_IN_BACKLOG" Number of connections allowed when all workers are busy";
 }
 
 int
@@ -781,7 +781,7 @@ _task_garbage_collect(gpointer p)
 	/* Force malloc to release memory to the system.
 	 * Allow max_heap_free kiB of unused but not released memory. */
 	gint64 max_heap_free = namespace_info_get_srv_param_i64(&(PSRV(p)->nsinfo),
-			NULL, PSRV(p)->service_config->srvtype, KEY_SQLX_MAX_HEAP_FREE,
+			NULL, PSRV(p)->service_config->srvtype, CONF_KEY_SQLX_MAX_HEAP_FREE,
 			4 * 1024);
 	malloc_trim(max_heap_free * 1024);
 }
@@ -837,11 +837,11 @@ _task_reload_config(gpointer p)
 
 	/* If you add options, don't forget to update sqlx_service_usage() */
 
-	GET(max_workers, KEY_SQLX_MAX_WORKERS, 200)
-	GET(max_cnx_passive, KEY_SQLX_MAX_CNX_PASSIVE, PSRV(p)->max_passive)
-	GET(max_cnx_active, KEY_SQLX_MAX_CNX_ACTIVE, PSRV(p)->max_active)
-	GET(max_cnx_backlog, KEY_SQLX_MAX_CNX_IN_BACKLOG, PSRV(p)->cnx_backlog)
-	GET(timeout_open, KEY_SQLX_TIMEOUT_OPEN, 20000)
+	GET(max_workers, CONF_KEY_SQLX_MAX_WORKERS, 200)
+	GET(max_cnx_passive, CONF_KEY_SQLX_MAX_CNX_PASSIVE, PSRV(p)->max_passive)
+	GET(max_cnx_active, CONF_KEY_SQLX_MAX_CNX_ACTIVE, PSRV(p)->max_active)
+	GET(max_cnx_backlog, CONF_KEY_SQLX_MAX_CNX_IN_BACKLOG, PSRV(p)->cnx_backlog)
+	GET(timeout_open, CONF_KEY_SQLX_TIMEOUT_OPEN, 20000)
 
 #undef GET
 

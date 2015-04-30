@@ -1354,9 +1354,9 @@ grid_lbpool_reconfigure(struct grid_lbpool_s *glp,
 	gpointer k, v;
 	g_hash_table_iter_init(&iter, ni->options);
 	while (g_hash_table_iter_next(&iter, &k, &v)) {
-		if (!g_str_has_prefix((gchar*)k, "lb."))
+		if (!g_str_has_prefix((gchar*)k, CONF_KEY_PREFIX_LB))
 			continue;
-		GString *str = g_string_new((gchar*)k + (sizeof("lb.") -1));
+		GString *str = g_string_new((gchar*)k + (sizeof(CONF_KEY_PREFIX_LB) -1));
 		str = g_string_append_len(g_string_append(str, "="),
 				((char *)((GByteArray*)v)->data), ((GByteArray*)v)->len);
 		_configure_string(glp, str->str);

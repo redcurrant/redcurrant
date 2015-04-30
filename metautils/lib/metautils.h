@@ -25,6 +25,7 @@
 # include <metautils/lib/metatypes.h>
 
 # include <metautils/lib/metautils_bits.h>
+# include <metautils/lib/metautils_config.h>
 # include <metautils/lib/metautils_errors.h>
 # include <metautils/lib/metautils_strings.h>
 # include <metautils/lib/metautils_sockets.h>

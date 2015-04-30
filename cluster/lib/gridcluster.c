@@ -1192,7 +1192,8 @@ namespace_in_worm_mode(namespace_info_t* ns_info)
 gint64
 namespace_container_max_size(namespace_info_t* ns_info)
 {
-	GByteArray *val = namespace_param_gba(ns_info, NULL, NS_CONTAINER_MAX_SIZE_NAME);
+	GByteArray *val = namespace_param_gba(ns_info, NULL,
+			CONF_KEY_MAX_CONTAINER_SIZE);
 	return _gba_to_int64(val, -1);
 }
 
@@ -1200,7 +1201,7 @@ gint64
 namespace_chunk_size(const namespace_info_t* ns_info, const char *ns_name)
 {
 	GByteArray *val = namespace_param_gba(ns_info, ns_name,
-			NS_CHUNK_SIZE_NAME);
+			CONF_KEY_CHUNK_SIZE);
 	return _gba_to_int64(val, ns_info->chunk_size);
 }
 
@@ -1618,12 +1619,14 @@ gridcluster_get_container_max_versions(struct namespace_info_s *nsinfo)
 {
 	/* For backward compatibility, versioning is disabled by default
 	 */
-	return gridcluster_get_nsinfo_int64(nsinfo, "meta2_max_versions", 0);
+	return namespace_info_get_srv_param_i64(nsinfo, NULL, NAME_SRVTYPE_META2,
+			CONF_KEY_MAX_VERSIONS, 0);
 }
 
 gint64
 gridcluster_get_keep_deleted_delay(struct namespace_info_s *nsinfo)
 {
-	return gridcluster_get_nsinfo_int64(nsinfo, "meta2_keep_deleted_delay", -1);
+	return namespace_info_get_srv_param_i64(nsinfo, NULL, NAME_SRVTYPE_META2,
+			CONF_KEY_KEEP_DELETED_DELAY, -1);
 }
 

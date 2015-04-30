@@ -2,7 +2,7 @@
 # define HC_META2_V1__H 1
 
 # ifndef  META2_TYPE_NAME
-#  define META2_TYPE_NAME "meta2"
+#  define META2_TYPE_NAME NAME_SRVTYPE_META2
 # endif
 
 # include <meta2v2/meta2_utils.h>
