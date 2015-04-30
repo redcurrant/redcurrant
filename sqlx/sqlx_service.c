@@ -842,6 +842,7 @@ _task_reload_config(gpointer p)
 	GET(max_cnx_active, CONF_KEY_SQLX_MAX_CNX_ACTIVE, PSRV(p)->max_active)
 	GET(max_cnx_backlog, CONF_KEY_SQLX_MAX_CNX_IN_BACKLOG, PSRV(p)->cnx_backlog)
 	GET(timeout_open, CONF_KEY_SQLX_TIMEOUT_OPEN, 20000)
+	GET(max_waiting, CONF_KEY_SQLX_MAX_WAITING, 8)
 
 #undef GET
 
@@ -853,5 +854,6 @@ _task_reload_config(gpointer p)
 	gridd_client_pool_set_max(PSRV(p)->clients_pool, PSRV(p)->max_active);
 	network_server_set_cnx_backlog(PSRV(p)->server, max_cnx_backlog);
 	sqlx_repository_configure_open_timeout(PSRV(p)->repository, timeout_open);
+	sqlx_repository_configure_max_waiting(PSRV(p)->repository, max_waiting);
 }
 

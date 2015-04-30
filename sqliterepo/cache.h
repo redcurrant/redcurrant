@@ -22,6 +22,12 @@
  */
 #define DEFAULT_CACHE_OPEN_TIMEOUT 15000
 
+/**
+ * Default maximum number of threads trying to open
+ * a base currently in use at the same time.
+ */
+#define DEFAULT_CACHE_MAX_WAITING 8
+
 struct hashstr_s;
 
 /**
@@ -75,6 +81,16 @@ sqlx_cache_t * sqlx_cache_set_max_bases(sqlx_cache_t *cache, guint max);
  * @return the cache.
  */
 sqlx_cache_t * sqlx_cache_set_open_timeout(sqlx_cache_t *cache, glong timeout);
+
+/**
+ * Set the maximum number of threads concurrently trying to open
+ * a base currently in use.
+ *
+ * @param cache A valid sqlx_cache_t pointer.
+ * @param max_waiting the number to set (negative means unlimited)
+ * @return the cache.
+ */
+sqlx_cache_t * sqlx_cache_set_max_waiting(sqlx_cache_t *cache, gint max_waiting);
 
 /**
  * @param cache
