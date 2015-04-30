@@ -80,7 +80,8 @@ m2b_max_versions(struct meta2_backend_s *m2b, const gchar *vns)
 {
 	gint64 max_versions;
 	_M2B_GET_VNS_INFO(m2b, vns, nsinfo)
-	max_versions = gridcluster_get_container_max_versions(&nsinfo);
+	max_versions = namespace_info_get_srv_param_i64(&nsinfo, vns,
+			NAME_SRVTYPE_META2, CONF_KEY_MAX_VERSIONS, 0);
 	namespace_info_clear(&nsinfo);
 
 	return max_versions;

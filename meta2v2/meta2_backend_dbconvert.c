@@ -1861,12 +1861,13 @@ m2_convert_db(sqlite3 *db)
 		if(!l->data)
 			continue;
 		t_m2v2_sqlite3_result *r = g_slist_nth_data(l->data, 0);
-		if(0 == g_ascii_strncasecmp((const char *)r->value->data, "storage_policy", r->value->len)) {
+		if(0 == g_ascii_strncasecmp((const char *)r->value->data,
+				CONF_KEY_STORAGE_POLICY, r->value->len)) {
 			t_m2v2_sqlite3_result *v = g_slist_nth_data(l->data, 1);
 			char tmp[256];
 			memset(tmp, '\0', 256);
 			memcpy(tmp, v->value->data, v->value->len);
-			_exec_adm(db, "sys.storage_policy", tmp);
+			_exec_adm(db, M2V2_PROP_PREFIX_SYS""CONF_KEY_STORAGE_POLICY, tmp);
 		} else if (0 == g_ascii_strncasecmp((const char *)r->value->data, "container_size", r->value->len)) {
 			t_m2v2_sqlite3_result *v = g_slist_nth_data(l->data, 1);
 			char tmp[256];
@@ -1874,7 +1875,7 @@ m2_convert_db(sqlite3 *db)
 			memcpy(tmp, v->value->data, v->value->len);
 			if(0 == strlen(tmp))
 				tmp[0] = '0';
-			_exec_adm(db, "sys.container_size", tmp);
+			_exec_adm(db, M2V2_PROP_PREFIX_SYS"container_size", tmp);
 		}
 	}
 	_exec_adm(db, META2_INIT_FLAG, "1");

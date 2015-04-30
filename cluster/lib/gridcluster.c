@@ -1618,7 +1618,8 @@ gridcluster_get_container_max_versions(struct namespace_info_s *nsinfo)
 {
 	/* For backward compatibility, versioning is disabled by default
 	 */
-	return gridcluster_get_nsinfo_int64(nsinfo, "meta2_max_versions", 0);
+	return namespace_info_get_srv_param_i64(nsinfo, NULL, NAME_SRVTYPE_META2,
+			CONF_KEY_MAX_VERSIONS, 0);
 }
 
 gint64
