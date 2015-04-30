@@ -113,7 +113,7 @@ _post_config(struct sqlx_service_s *ss)
 static void
 _set_defaults(struct sqlx_service_s *ss)
 {
-	ss->flag_cached_bases = FALSE;
+	ss->flag_cached_bases = TRUE;
 }
 
 int
