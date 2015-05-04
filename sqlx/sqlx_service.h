@@ -3,6 +3,22 @@
 
 #define PSRV(P) ((struct sqlx_service_s*)(P))
 
+
+/** Timeout when opening bases in use by another thread
+ * -1 (infinite), 0 (immediate), or milliseconds */
+#define KEY_SQLX_TIMEOUT_OPEN       "timeout_open"
+/** Limits the number of worker threads */
+#define KEY_SQLX_MAX_WORKERS        "max_workers"
+/** Amount of free memory to keep for future allocations (kB) */
+#define KEY_SQLX_MAX_HEAP_FREE      "max_heap_free"
+/** Limits the number of concurrent active connections */
+#define KEY_SQLX_MAX_CNX_ACTIVE     "max_cnx_active"
+/** Limits the number of concurrent passive connections */
+#define KEY_SQLX_MAX_CNX_PASSIVE    "max_cnx_passive"
+/** Number of connections allowed when all workers are busy */
+#define KEY_SQLX_MAX_CNX_IN_BACKLOG "max_cnx_in_backlog"
+
+
 struct sqlx_service_config_s;
 struct sqlx_service_s;
 
@@ -90,7 +106,6 @@ struct sqlx_service_s
 
 	// This is configured during the "configure" step, and can be overriden
 	// in the _post_config hook.
-	gint64 open_timeout;
 	gint64 cnx_backlog;
 	guint max_bases;
 	guint max_passive;
@@ -106,11 +121,6 @@ struct sqlx_service_s
 	GSList *custom_tags;
 
 	guint cfg_max_bases;
-	guint cfg_max_passive;
-	guint cfg_max_active;
-	guint cfg_max_workers;
-	// Maximum free heap kilobytes (see malloc_trim)
-	guint cfg_max_heap_free;
 
 	guint sync_mode_repli;
 	guint sync_mode_solo;
