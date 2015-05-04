@@ -77,6 +77,10 @@ struct sqlx_service_s
 	// Conscience registration
 	struct grid_single_rrd_s *gsr_reqcounter;
 	struct grid_single_rrd_s *gsr_reqtime;
+	struct grid_single_rrd_s *gsr_readreqcounter;
+	struct grid_single_rrd_s *gsr_readreqtime;
+	struct grid_single_rrd_s *gsr_writereqcounter;
+	struct grid_single_rrd_s *gsr_writereqtime;
 	struct service_info_s *si;
 	struct grid_task_queue_s *gtq_register;
 	GThread *thread_register;
