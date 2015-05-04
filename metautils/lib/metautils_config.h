@@ -32,6 +32,10 @@
  * -1 (infinite), 0 (immediate), or milliseconds */
 #define CONF_KEY_SQLX_TIMEOUT_OPEN       "timeout_open"
 
+/** The maximum number of threads concurrently trying to open
+ * a base currently in use. */
+#define CONF_KEY_SQLX_MAX_WAITING        "max_threads_waiting_on_open"
+
 /** Limits the number of worker threads */
 #define CONF_KEY_SQLX_MAX_WORKERS        "max_workers"
 

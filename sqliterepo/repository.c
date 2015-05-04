@@ -517,6 +517,18 @@ sqlx_repository_configure_open_timeout(sqlx_repository_t *repo,
 }
 
 void
+sqlx_repository_configure_max_waiting(sqlx_repository_t *repo,
+		gint64 max_waiting)
+{
+	struct sqlx_cache_s *cache = sqlx_repository_get_cache(repo);
+	if (cache) {
+		sqlx_cache_set_max_waiting(cache, (gint)max_waiting);
+	} else {
+		GRID_INFO("Not setting 'max_waiting' since there is no cache");
+	}
+}
+
+void
 sqlx_repository_configure_close_callback(sqlx_repository_t *repo,
 		sqlx_repo_close_hook cb, gpointer cb_data)
 {

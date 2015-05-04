@@ -59,6 +59,7 @@ struct sqlx_base_s
 
 	guint32 count_open; /*!< Counts the number of times this base has been
 						  explicitely opened and locked by the user. */
+	gint count_waiting; /*!< Counts the threads waiting for this base */
 
 	gint index; /*!< self reference */
 
@@ -78,6 +79,7 @@ struct sqlx_cache_s
 	GCond **cond_array;
 	gsize cond_count;
 	glong open_timeout; // milliseconds
+	gint max_waiting; // Max number of threads waiting for a base
 
 	guint32 heat_threshold;
 	time_t cool_grace_delay;
@@ -507,6 +509,14 @@ sqlx_cache_set_open_timeout(sqlx_cache_t *cache, glong timeout)
 }
 
 sqlx_cache_t *
+sqlx_cache_set_max_waiting(sqlx_cache_t *cache, gint max_waiting)
+{
+	EXTRA_ASSERT(cache != NULL);
+	cache->max_waiting = max_waiting;
+	return cache;
+}
+
+sqlx_cache_t *
 sqlx_cache_init(void)
 {
 	guint i;
@@ -524,6 +534,7 @@ sqlx_cache_init(void)
 	cache->cond_count = SQLX_MAX_COND;
 	cache->cond_array = g_malloc0(cache->cond_count * sizeof(void*));
 	cache->open_timeout = DEFAULT_CACHE_OPEN_TIMEOUT;
+	cache->max_waiting = DEFAULT_CACHE_MAX_WAITING;
 	BEACON_RESET(&(cache->beacon_free));
 	BEACON_RESET(&(cache->beacon_idle));
 	BEACON_RESET(&(cache->beacon_idle_hot));
@@ -645,13 +656,30 @@ retry:
 				EXTRA_ASSERT(base->count_open > 0);
 				EXTRA_ASSERT(base->owner != NULL);
 				if (base->owner != g_thread_self()) {
+					// The lock is held by another thread/request
 					GRID_DEBUG("Base [%s] in use by another thread (%X), waiting...",
 							hashstr_str(hname), compute_thread_id(base->owner));
-					// The lock is held by another thread/request
+
+					/* This is to avoid server thread starvation,
+					 * due to all threads waiting on the same base. */
+					if (cache->max_waiting > 0 &&
+							base->count_waiting >= cache->max_waiting) {
+						err = NEWERROR(CODE_UNAVAILABLE,
+								"database currently in use by another request, "
+								"and %d others threads already waiting",
+								base->count_waiting);
+						break;
+					}
+					base->count_waiting++;
+
 					if (g_cond_timed_wait(base->cond, cache->lock, deadline)) {
+						// Thread was woken up before deadline
 						GRID_DEBUG("Retrying to open [%s]", hashstr_str(hname));
+						base->count_waiting--;
 						goto retry;
 					} else {
+						// Deadline has been reached
+						base->count_waiting--;
 						if (cache->open_timeout > 0) {
 							err = NEWERROR(CODE_UNAVAILABLE,
 								"database currently in use by another request"
