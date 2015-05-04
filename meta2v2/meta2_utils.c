@@ -2398,7 +2398,7 @@ _get_container_policy(struct sqlx_sqlite3_s *sq3, struct namespace_info_s *nsinf
 	g_assert(result != NULL);
 
 	*result = NULL;
-	pname = sqlx_admin_get_str(sq3, M2V2_PROP_PREFIX_SYS"storage_policy");
+	pname = sqlx_admin_get_str(sq3, M2V2_PROP_PREFIX_SYS""CONF_KEY_STORAGE_POLICY);
 	if (pname) {
 		*result = storage_policy_init(nsinfo, pname);
 		g_free(pname);
@@ -2435,7 +2435,7 @@ m2db_get_storage_policy(struct sqlx_sqlite3_s *sq3, struct hc_url_s *url,
 GError*
 m2db_set_storage_policy(struct sqlx_sqlite3_s *sq3, const gchar *polname, int replace)
 {
-	const gchar *k = M2V2_PROP_PREFIX_SYS"storage_policy";
+	const gchar *k = M2V2_PROP_PREFIX_SYS""CONF_KEY_STORAGE_POLICY;
 
 	if (!replace) {
 		gchar *s = sqlx_admin_get_str(sq3, k);

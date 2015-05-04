@@ -48,6 +48,7 @@ enum m2v2_open_type_e
 #define M2V2_OPEN_STATUS    0xF00
 };
 
+// FIXME: I don't like this macro doing memory copies
 #define _M2B_GET_VNS_INFO(m2b, vns, nsinfo) \
 	struct namespace_info_s nsinfo;\
 	memset(&nsinfo, 0, sizeof(nsinfo));\
@@ -80,7 +81,8 @@ m2b_max_versions(struct meta2_backend_s *m2b, const gchar *vns)
 {
 	gint64 max_versions;
 	_M2B_GET_VNS_INFO(m2b, vns, nsinfo)
-	max_versions = gridcluster_get_container_max_versions(&nsinfo);
+	max_versions = namespace_info_get_srv_param_i64(&nsinfo, vns,
+			NAME_SRVTYPE_META2, CONF_KEY_MAX_VERSIONS, 0);
 	namespace_info_clear(&nsinfo);
 
 	return max_versions;
@@ -91,7 +93,8 @@ m2b_keep_deleted_delay(struct meta2_backend_s *m2b, const gchar *vns)
 {
 	gint64 delay;
 	_M2B_GET_VNS_INFO(m2b, vns, nsinfo)
-	delay = gridcluster_get_keep_deleted_delay(&nsinfo);
+	delay = namespace_info_get_srv_param_i64(&nsinfo, vns,
+			NAME_SRVTYPE_META2, CONF_KEY_KEEP_DELETED_DELAY, -1);
 	namespace_info_clear(&nsinfo);
 
 	return delay;
