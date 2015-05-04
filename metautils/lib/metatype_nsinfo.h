@@ -76,7 +76,6 @@ gboolean namespace_info_copy(struct namespace_info_s* src,
 struct namespace_info_s* namespace_info_dup(struct namespace_info_s* src,
 		GError **error);
 
-
 /**
  * Clear a namespace_info content
  *
@@ -103,8 +102,17 @@ void namespace_info_free(struct namespace_info_s* ns_info);
  */
 void namespace_info_gclean(gpointer p1, gpointer p2);
 
+/**
+ * Update the ni->options hash table with values from
+ * overrides hash table.
+ *
+ * @param ni the namespace_info_t whose options to update
+ * @param overrides the hash table containing the new options
+ */
+void namespace_info_update_options(const namespace_info_t *ni,
+		GHashTable *overrides);
 
-/** 
+/**
  * Map the given list of struct namespace_info_s in a GHashTable
  * where the values are the list elements (not a copy!)
  * and where the keys are the "name" fields the the values.

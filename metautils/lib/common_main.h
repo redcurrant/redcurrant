@@ -75,6 +75,8 @@ struct grid_main_callbacks {
 	gboolean (*configure) (int argc, char **argv);
 	const char * (*usage) (void);
 	void (*specific_stop) (void);
+	/** Allow to override some global options on a per-service basis */
+	void (*configure_overrides) (GHashTable *overrides);
 };
 
 /** Uses sigprocmask to block a lot of signals */

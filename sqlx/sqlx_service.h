@@ -96,6 +96,8 @@ struct sqlx_service_s
 	guint max_passive;
 	guint max_active;
 
+	GHashTable *cfg_overrides;
+
 	//-------------------------------------------------------------------
 	// Variables used during the startup time of the server, but not used
 	// anymore after that.
