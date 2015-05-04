@@ -85,16 +85,16 @@ __gen_stats(const dav_resource *resource, apr_pool_t *pool)
 	stats = apr_shm_baseaddr_get(c->shm.handle);
 	apr_global_mutex_unlock(c->lock.handle);
 
-	apr_uint64_t req = rawx_stats_rrd_get_delta(&(stats->body.rrd_req_sec), 4);
-	apr_uint64_t reqavgtime = rawx_stats_rrd_get_delta(&(stats->body.rrd_duration), 4);
-	apr_uint64_t req_put = rawx_stats_rrd_get_delta(&(stats->body.rrd_req_put_sec), 4);
-	apr_uint64_t reqavgtime_put = rawx_stats_rrd_get_delta(&(stats->body.rrd_put_duration), 4);
-	apr_uint64_t req_get = rawx_stats_rrd_get_delta(&(stats->body.rrd_req_get_sec), 4);
-	apr_uint64_t reqavgtime_get = rawx_stats_rrd_get_delta(&(stats->body.rrd_get_duration), 4);
-	apr_uint64_t req_del = rawx_stats_rrd_get_delta(&(stats->body.rrd_req_del_sec), 4);
-	apr_uint64_t reqavgtime_del = rawx_stats_rrd_get_delta(&(stats->body.rrd_del_duration), 4);
+	apr_uint64_t req = rawx_stats_rrd_get_delta(&(stats->body.rrd_req_sec), c->stat_smoothing_delay);
+	apr_uint64_t reqavgtime = rawx_stats_rrd_get_delta(&(stats->body.rrd_duration), c->stat_smoothing_delay);
+	apr_uint64_t req_put = rawx_stats_rrd_get_delta(&(stats->body.rrd_req_put_sec), c->stat_smoothing_delay);
+	apr_uint64_t reqavgtime_put = rawx_stats_rrd_get_delta(&(stats->body.rrd_put_duration), c->stat_smoothing_delay);
+	apr_uint64_t req_get = rawx_stats_rrd_get_delta(&(stats->body.rrd_req_get_sec), c->stat_smoothing_delay);
+	apr_uint64_t reqavgtime_get = rawx_stats_rrd_get_delta(&(stats->body.rrd_get_duration), c->stat_smoothing_delay);
+	apr_uint64_t req_del = rawx_stats_rrd_get_delta(&(stats->body.rrd_req_del_sec), c->stat_smoothing_delay);
+	apr_uint64_t reqavgtime_del = rawx_stats_rrd_get_delta(&(stats->body.rrd_del_duration), c->stat_smoothing_delay);
 
-	apr_uint64_t r_time = 0, r_put_time = 0, r_get_time = 0, r_del_time = 0;
+	apr_uint64_t r_time = 1, r_put_time = 1, r_get_time = 1, r_del_time = 1;
 	if(req > 0)
 		r_time = reqavgtime / req;
 	if(req_put > 0)
@@ -105,12 +105,12 @@ __gen_stats(const dav_resource *resource, apr_pool_t *pool)
 		r_del_time = reqavgtime_del / req_del;
 
 	double r_rate = 0, r_put_rate = 0, r_get_rate = 0, r_del_rate = 0;
-	r_rate = (double)req / 4;
-	r_put_rate = (double)req_put / 4;
-	r_get_rate = (double)req_get / 4;
-	r_del_rate = (double)req_del / 4;
+	r_rate = req / (double)c->stat_smoothing_delay;
+	r_put_rate = req_put / (double)c->stat_smoothing_delay;
+	r_get_rate = req_get / (double)c->stat_smoothing_delay;
+	r_del_rate = req_del / (double)c->stat_smoothing_delay;
 
-	return apr_pstrcat(pool, 
+	return apr_pstrcat(pool,
 			STR_KV(req_all,       "req.all"),
 			STR_KV(req_chunk_put, "req.put"),
 			STR_KV(req_chunk_get, "req.get"),
