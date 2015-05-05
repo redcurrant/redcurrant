@@ -228,24 +228,29 @@ raw_print_list_task(GSList * tasks)
 	}
 }
 
+#pragma GCC diagnostic ignored "-Wformat"
 static int
 set_service_score(const char *service_desc, int score, GError ** error)
 {
 	int rc=0, nb_match;
 	struct service_info_s *si = NULL;
-	char ns_name[LIMIT_LENGTH_NSNAME] = {0};
-	char service_type[LIMIT_LENGTH_SRVTYPE] = {0};
-	char remaining[1024] = {0};
-	char service_ip[STRLEN_ADDRINFO] = {0};
+	char *ns_name = NULL;
+	char *service_type = NULL;
+	char *remaining = NULL;
+	char *service_ip = NULL;
 	int service_port = 0;
 	addr_info_t *cluster_addr = NULL;
 	GSList *list = NULL;
 	GHashTable *ns_hash = NULL;
 
-	nb_match = sscanf(service_desc, "%s[^|]|%s[^|]|%s[^:]:%i|%ss",
-			ns_name, service_type, service_ip, &service_port, remaining);
+	/* This line will cause a compilation warning because '%a[]' is a
+	 * non-standard GNU extension, this is why I added the pragma above. */
+	nb_match = sscanf(service_desc, "%a[^|]|%a[^|]|%a[^:]:%i|%as", &ns_name,
+			&service_type, &service_ip, &service_port, &remaining);
 	if (nb_match < 4) {
-		GSETERROR(error, "Failed to scan service desc in string [%s]: only %d patterns", service_desc, nb_match);
+		GSETERROR(error,
+				"Failed to scan service desc in string [%s]: only %d patterns",
+				service_desc, nb_match);
 		goto exit_label;
 	}
 
@@ -257,7 +262,8 @@ set_service_score(const char *service_desc, int score, GError ** error)
 
 	cluster_addr = g_hash_table_lookup(ns_hash, ns_name);
 	if (!cluster_addr) {
-		GSETERROR(error, "Could not find a cluster addr for namespace [%s]", ns_name);
+		GSETERROR(error, "Could not find a cluster addr for namespace [%s]",
+				ns_name);
 		goto exit_label;
 	}
 
@@ -268,7 +274,8 @@ set_service_score(const char *service_desc, int score, GError ** error)
 	}
 
 	if (!service_info_set_address(si, service_ip, service_port, error)) {
-		GSETERROR(error, "Invalid service address ip=%s port=%i", service_ip, service_port);
+		GSETERROR(error, "Invalid service address ip=%s port=%i", service_ip,
+				service_port);
 		goto exit_label;
 	}
 
@@ -286,6 +293,14 @@ set_service_score(const char *service_desc, int score, GError ** error)
 	if (!rc)
 		GSETERROR(error, "Failed to lock the service");
       exit_label:
+	if (remaining)
+		free(remaining);
+	if (ns_name)
+		free(ns_name);
+	if (service_type)
+		free(service_type);
+	if (service_ip)
+		free(service_ip);
 	if (si)
 		service_info_clean(si);
 	if (ns_hash)
