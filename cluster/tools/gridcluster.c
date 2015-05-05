@@ -242,7 +242,7 @@ set_service_score(const char *service_desc, int score, GError ** error)
 	GSList *list = NULL;
 	GHashTable *ns_hash = NULL;
 
-	nb_match = sscanf(service_desc, "%s[^|]|%s[^|]|%s[^:]:%i|%ss",
+	nb_match = sscanf(service_desc, "%[^|]|%[^|]|%[^:]:%i|%s",
 			ns_name, service_type, service_ip, &service_port, remaining);
 	if (nb_match < 4) {
 		GSETERROR(error, "Failed to scan service desc in string [%s]: only %d patterns", service_desc, nb_match);
@@ -257,7 +257,8 @@ set_service_score(const char *service_desc, int score, GError ** error)
 
 	cluster_addr = g_hash_table_lookup(ns_hash, ns_name);
 	if (!cluster_addr) {
-		GSETERROR(error, "Could not find a cluster addr for namespace [%s]", ns_name);
+		GSETERROR(error, "Could not find a cluster addr for namespace [%s]",
+				ns_name);
 		goto exit_label;
 	}
 
@@ -268,7 +269,8 @@ set_service_score(const char *service_desc, int score, GError ** error)
 	}
 
 	if (!service_info_set_address(si, service_ip, service_port, error)) {
-		GSETERROR(error, "Invalid service address ip=%s port=%i", service_ip, service_port);
+		GSETERROR(error, "Invalid service address ip=%s port=%i", service_ip,
+				service_port);
 		goto exit_label;
 	}
 
@@ -285,7 +287,8 @@ set_service_score(const char *service_desc, int score, GError ** error)
 
 	if (!rc)
 		GSETERROR(error, "Failed to lock the service");
-      exit_label:
+
+exit_label:
 	if (si)
 		service_info_clean(si);
 	if (ns_hash)
