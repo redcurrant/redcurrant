@@ -1228,13 +1228,13 @@ load_chunk(const gchar *path, struct upload_info_s *info)
 				g_free(info->comp);
 				info->comp = g_strdup("true");
 
-				tmp = g_hash_table_lookup(compress_opt, NS_COMPRESS_ALGO_OPTION);
+				tmp = g_hash_table_lookup(compress_opt, CONF_KEY_RAWX_COMPRESSION_ALGORITHM);
 				if(tmp) {
 					g_free(info->algo);
 					info->algo = g_strdup(tmp);
 				}
 
-				tmp = g_hash_table_lookup(compress_opt, NS_COMPRESS_BLOCKSIZE_OPTION);
+				tmp = g_hash_table_lookup(compress_opt, CONF_KEY_RAWX_COMPRESSION_BLOCKSIZE);
 				if(tmp) {
 					g_free(info->blocksize);
 					info->blocksize = g_strdup(tmp);

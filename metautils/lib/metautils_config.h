@@ -51,4 +51,16 @@
 /** Number of connections allowed when all workers are busy */
 #define CONF_KEY_SQLX_MAX_CNX_IN_BACKLOG "max_cnx_in_backlog"
 
+//--------
+// RAWX
+//--------
+#define CONF_KEY_RAWX_COMPRESSION_BLOCKSIZE "rawx_compression_blocksize"
+#define CONF_KEY_RAWX_COMPRESSION_ALGORITHM "rawx_compression_algorithm"
+#define CONF_KEY_RAWX_HASH_WIDTH            "rawx_hash_width"
+#define CONF_KEY_RAWX_HEADER_SCHEME         "rawx_header_scheme"
+#define CONF_KEY_RAWX_FSYNC_ON_CLOSE        "rawx_fsync_on_close"
+#define CONF_KEY_RAWX_FILE_BUFFER_SIZE      "rawx_file_buffer_size"
+#define CONF_KEY_RAWX_FILE_SMOOTHING_DELAY  "rawx_file_smoothing_delay"
+#define CONF_KEY_RAWX_STREAM_BUFFER_SIZE    "rawx_stream_buffer_size"
+
 #endif

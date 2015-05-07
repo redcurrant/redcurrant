@@ -46,6 +46,16 @@ gint64 namespace_info_get_srv_param_i64(const namespace_info_t *ni,
 		gint64 def);
 
 /**
+ * Same as namespace_info_get_srv_param_gba but converts the result
+ * to gchar*. The result must be freed using g_free.
+ *
+ * @param def The value to return when parameter is not found
+ */
+gchar *namespace_info_get_srv_param_str(const namespace_info_t *ni,
+		const gchar *ns_name, const gchar *srv_type,
+		const gchar *param_name, const gchar *def);
+
+/**
  * Copy a namespace_info into another namespace_info
  *
  * The option hashtable is not copied. The old table's reference

@@ -25,11 +25,10 @@
 #define NS_RAWX_BUFSIZE_OPTION "rawx_bufsize"
 
 #define NS_COMPRESSION_OPTION "compression"
-#define NS_COMPRESS_ALGO_OPTION "compression_algorithm"
-#define NS_COMPRESS_BLOCKSIZE_OPTION "compression_blocksize"
 
+#define DEFAULT_COMPRESSION_ALGO "ZLIB"
+#define DEFAULT_BLOCK_SIZE "5242880"
 #define DEFAULT_STREAM_BUFF_SIZE 512000
-#define RAWX_CONF_TIMEOUT 10LLU
 #define NS_COMPRESSION_ON "on"
 
 typedef struct rawx_conf_s rawx_conf_t;

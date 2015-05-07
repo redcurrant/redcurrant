@@ -22,40 +22,23 @@ _addr_rule_gclean(gpointer data, gpointer udata)
 char *
 _get_compression_algorithm(apr_pool_t *p, namespace_info_t *ns_info)
 {
-	apr_size_t s_len;
-	GByteArray* algo;
+	gchar *found_algo;
+	char *res;
 
-	if (!ns_info || !ns_info->options)
-		return apr_pstrdup(p, "ZLIB");
+	found_algo = namespace_info_get_srv_param_str(ns_info, NULL, NAME_SRVTYPE_RAWX,
+			CONF_KEY_RAWX_COMPRESSION_ALGORITHM, DEFAULT_COMPRESSION_ALGO);
+	res = apr_pstrdup(p, found_algo);
+	g_free(found_algo);
 
-	algo = g_hash_table_lookup(ns_info->options, NS_COMPRESS_ALGO_OPTION);
-	if (!algo)
-		return apr_pstrdup(p, "ZLIB");
-
-	s_len = algo->len;
-	return apr_pstrndup(p, (char*)algo->data, s_len);
+	return res;
 }
 
 apr_int64_t
 _get_compression_block_size(apr_pool_t *p, namespace_info_t *ns_info)
 {
-	GByteArray* bsize = NULL;
-	gchar bsize_buff[256];
-	int i_len;
-
 	(void) p;
-	if (!ns_info || !ns_info->options)
-		return DEFAULT_STREAM_BUFF_SIZE;
-
-	bsize = g_hash_table_lookup(ns_info->options, NS_COMPRESS_BLOCKSIZE_OPTION);
-	if (!bsize)
-		return DEFAULT_STREAM_BUFF_SIZE;
-
-	i_len = bsize->len;
-	bzero(bsize_buff, sizeof(bsize_buff));
-	apr_snprintf(bsize_buff, sizeof(bsize_buff), "%.*s", i_len, ((char*)bsize->data));
-
-	return g_ascii_strtoll(bsize_buff, NULL, 10);
+	return namespace_info_get_srv_param_i64(ns_info, NULL, NAME_SRVTYPE_RAWX,
+			CONF_KEY_RAWX_COMPRESSION_BLOCKSIZE, DEFAULT_STREAM_BUFF_SIZE);
 }
 
 GSList*

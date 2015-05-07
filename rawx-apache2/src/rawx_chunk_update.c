@@ -273,8 +273,8 @@ _is_storage_policy_already_applied(const struct data_treatments_s *dt, GHashTabl
 				const char *current_bs = NULL;
 				pol_algo = data_treatments_get_param(dt, DT_KEY_ALGO);
 				pol_bs = data_treatments_get_param(dt, DT_KEY_BLOCKSIZE);
-				current_algo = g_hash_table_lookup(comp_opt, NS_COMPRESS_ALGO_OPTION);
-				current_bs = g_hash_table_lookup(comp_opt, NS_COMPRESS_BLOCKSIZE_OPTION);
+				current_algo = g_hash_table_lookup(comp_opt, CONF_KEY_RAWX_COMPRESSION_ALGORITHM);
+				current_bs = g_hash_table_lookup(comp_opt, CONF_KEY_RAWX_COMPRESSION_BLOCKSIZE);
 				if(NULL != pol_algo && NULL != current_algo && 0 == g_ascii_strcasecmp(pol_algo, current_algo)) {
 					if(NULL != pol_bs && NULL != current_bs && 0 == g_ascii_strcasecmp(pol_bs, current_bs)) {
 						return APR_SUCCESS;

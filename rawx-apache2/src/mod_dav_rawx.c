@@ -59,11 +59,6 @@ dav_rawx_create_server_config(apr_pool_t *p, server_rec *s)
 	conf = apr_pcalloc(p, sizeof(dav_rawx_server_conf));
 	conf->pool = p;
 	conf->cleanup = NULL;
-	conf->hash_depth = conf->hash_width = 2;
-	conf->headers_scheme = HEADER_SCHEME_V1;
-	conf->fsync_on_close = FSYNC_ON_CHUNK;
-	conf->FILE_buffer_size = 0;
-	conf->stat_smoothing_delay = 8;
 
 	return conf;
 }
@@ -199,7 +194,18 @@ dav_rawx_cmd_gridconfig_namespace(cmd_parms *cmd, void *config, const char *arg1
 	conf->rawx_conf->ni = ns_info;
 
 	conf->rawx_conf->acl = _get_acl(cmd->pool, ns_info);
-        conf->rawx_conf->last_update = time(0);
+	conf->rawx_conf->last_update = time(0);
+
+	conf->hash_width = conf->hash_depth = namespace_info_get_srv_param_i64(ns_info, NULL,
+			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_HASH_WIDTH, 2);
+	conf->headers_scheme = namespace_info_get_srv_param_i64(ns_info, NULL,
+			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_HEADER_SCHEME, HEADER_SCHEME_V1);
+	conf->fsync_on_close = namespace_info_get_srv_param_i64(ns_info, NULL,
+			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_FSYNC_ON_CLOSE, FSYNC_ON_CHUNK);
+	conf->FILE_buffer_size = namespace_info_get_srv_param_i64(ns_info, NULL,
+			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_FILE_BUFFER_SIZE, 0);
+	conf->stat_smoothing_delay = namespace_info_get_srv_param_i64(ns_info, NULL,
+			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_FILE_SMOOTHING_DELAY, 8);
 
 	if(local_error)
 		g_clear_error(&local_error);
@@ -589,10 +595,10 @@ label_error:
 
 static const command_rec dav_rawx_cmds[] =
 {
+    AP_INIT_TAKE1("grid_namespace",   dav_rawx_cmd_gridconfig_namespace,   NULL, RSRC_CONF, "namespace name"),
     AP_INIT_TAKE1("grid_hash_width",  dav_rawx_cmd_gridconfig_hash_width,  NULL, RSRC_CONF, "hash width on a chunk's name"),
     AP_INIT_TAKE1("grid_hash_depth",  dav_rawx_cmd_gridconfig_hash_depth,  NULL, RSRC_CONF, "hash depth on a chunk's name"),
     AP_INIT_TAKE1("grid_docroot",     dav_rawx_cmd_gridconfig_docroot,     NULL, RSRC_CONF, "chunks docroot"),
-    AP_INIT_TAKE1("grid_namespace",   dav_rawx_cmd_gridconfig_namespace,   NULL, RSRC_CONF, "namespace name"),
     AP_INIT_TAKE1("grid_dir_run",     dav_rawx_cmd_gridconfig_dirrun,      NULL, RSRC_CONF, "run directory"),
     AP_INIT_TAKE1("grid_fsync",       dav_rawx_cmd_gridconfig_fsync,       NULL, RSRC_CONF, "do fsync on file close"),
     AP_INIT_TAKE1("grid_fsync_dir",   dav_rawx_cmd_gridconfig_fsync_dir,   NULL, RSRC_CONF, "do fsync on chunk direcory after renaming .pending"),
