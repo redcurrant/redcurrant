@@ -56,8 +56,8 @@ init_compression_ctx(struct compression_ctx_s* comp_ctx, const gchar* algo_name)
 		status = TRUE;
 		goto end;
 	}
-	if(g_ascii_strcasecmp(algo_name,"ZLIB") == 0) {
-		DEBUG("Algo ZLIB used");
+	if(g_ascii_strcasecmp(algo_name, DEFAULT_COMPRESSION_ALGO) == 0) {
+		DEBUG("Algo "DEFAULT_COMPRESSION_ALGO" used");
 		comp_ctx->chunk_initiator = zlib_compressed_chunk_init;
 		comp_ctx->checksum_initiator = zlib_init_compress_checksum;
 		comp_ctx->header_writer = zlib_write_compress_header;
@@ -233,8 +233,8 @@ set_compress_attr(gchar* tmp_path, const gchar* algo, gint64 blocksize, GError *
 	g_snprintf(bs_str, sizeof(bs_str), "%"G_GINT64_FORMAT, blocksize);
 	
 	metadata_compress = g_strconcat(NS_COMPRESSION_OPTION, "=", NS_COMPRESSION_ON, ";",
-			NS_COMPRESS_ALGO_OPTION,"=", algo, ";",
-			NS_COMPRESS_BLOCKSIZE_OPTION, "=", bs_str, NULL);
+			CONF_KEY_RAWX_COMPRESSION_ALGORITHM, "=", algo, ";",
+			CONF_KEY_RAWX_COMPRESSION_BLOCKSIZE, "=", bs_str, NULL);
 
 	DEBUG("Compression metadata to add : [%s]\n",metadata_compress);
 
@@ -561,7 +561,7 @@ uncompress_chunk2(const gchar* path, gboolean preserve, gboolean keep_pending,
 
 	/* init compression method according to algo choice */
 	comp_ctx = g_malloc0(sizeof(struct compression_ctx_s));
-	init_compression_ctx(comp_ctx, g_hash_table_lookup(compress_opt, NS_COMPRESS_ALGO_OPTION));
+	init_compression_ctx(comp_ctx, g_hash_table_lookup(compress_opt, CONF_KEY_RAWX_COMPRESSION_ALGORITHM));
 	cp_chunk = g_malloc0(sizeof(struct compressed_chunk_s));
 
 	if (comp_ctx->chunk_initiator(cp_chunk, path) != 0) {

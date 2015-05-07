@@ -312,23 +312,35 @@ namespace_info_get_srv_param_i64(const namespace_info_t *ni,
 		const gchar *param_name, gint64 def)
 {
 	gint64 res;
-	gchar *end = NULL;
-	GByteArray *value;
+	gchar *end, *found_val_str;
 
-	if (!ni || !ni->options)
+	found_val_str = namespace_info_get_srv_param_str(ni, ns_name, srv_type, param_name, NULL);
+	if (!found_val_str)
 		return def;
 
-	value = namespace_info_get_srv_param_gba(ni, ns_name, srv_type, param_name);
-	if (!value)
-		return def;
-
-	gchar *v = g_strndup((gchar*)value->data, value->len);
-	res = g_ascii_strtoll(v, &end, 10);
-	if (end == v) // Conversion failed
+	res = g_ascii_strtoll(found_val_str, &end, 10);
+	if (end == found_val_str) // Conversion failed
 		res = def;
-	g_free(v);
+	g_free(found_val_str);
 
 	return res;
+}
+
+gchar *
+namespace_info_get_srv_param_str(const namespace_info_t *ni,
+		const gchar *ns_name, const gchar *srv_type,
+		const gchar *param_name, const gchar *def)
+{
+	GByteArray *found_val;
+
+	if (!ni || !ni->options)
+		return g_strdup(def);
+
+	found_val = namespace_info_get_srv_param_gba(ni, ns_name, srv_type, param_name);
+	if (!found_val)
+		return g_strdup(def);
+
+	return g_strndup((gchar*)found_val->data, found_val->len);
 }
 
 void

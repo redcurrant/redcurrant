@@ -22,9 +22,6 @@
 #include "rawx_internals.h"
 
 
-#define DEFAULT_BLOCK_SIZE "5242880"
-#define DEFAULT_COMPRESSION_ALGO "ZLIB"
-
 /******************** INTERNALS METHODS **************************/
 
 
@@ -221,7 +218,7 @@ resource_init_decompression(dav_resource *resource, dav_rawx_server_conf *conf)
 
 	if(resource->info->compression){
 		// init compression method according to algo choice
-		char *algo = g_hash_table_lookup(comp_opt, NS_COMPRESS_ALGO_OPTION);
+		char *algo = g_hash_table_lookup(comp_opt, CONF_KEY_RAWX_COMPRESSION_ALGORITHM);
 		bzero(resource->info->compress_algo, sizeof(resource->info->compress_algo));
 		memcpy(resource->info->compress_algo, algo, MIN(strlen(algo), sizeof(resource->info->compress_algo)));
 		init_compression_ctx(&(resource->info->comp_ctx), algo); 
@@ -760,8 +757,8 @@ rawx_repo_stream_create(const dav_resource *resource, dav_stream **result)
 			ds->blocksize = g_ascii_strtoll(bs, NULL, 10);
 
 			metadata_compress = apr_pstrcat(p, NS_COMPRESSION_OPTION, "=", NS_COMPRESSION_ON, ";", 
-					NS_COMPRESS_ALGO_OPTION,"=", algo, ";", 
-					NS_COMPRESS_BLOCKSIZE_OPTION, "=", bs, NULL);  
+					CONF_KEY_RAWX_COMPRESSION_ALGORITHM, "=", algo, ";",
+					CONF_KEY_RAWX_COMPRESSION_BLOCKSIZE, "=", bs, NULL);
 
 			init_compression_ctx(&(ds->comp_ctx), algo); 
 		} else {
@@ -774,8 +771,8 @@ rawx_repo_stream_create(const dav_resource *resource, dav_stream **result)
 			ds->blocksize = strtol(ctx->forced_cp_bs, NULL, 10);
 
 			metadata_compress = apr_pstrcat(p, NS_COMPRESSION_OPTION, "=", NS_COMPRESSION_ON, ";", 
-					NS_COMPRESS_ALGO_OPTION,"=", ctx->forced_cp_algo, ";", 
-					NS_COMPRESS_BLOCKSIZE_OPTION, "=", ctx->forced_cp_bs, NULL);	
+					CONF_KEY_RAWX_COMPRESSION_ALGORITHM, "=", ctx->forced_cp_algo, ";",
+					CONF_KEY_RAWX_COMPRESSION_BLOCKSIZE, "=", ctx->forced_cp_bs, NULL);
 
 			init_compression_ctx(&(ds->comp_ctx), ctx->forced_cp_algo); 
 		}

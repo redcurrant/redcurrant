@@ -17,6 +17,9 @@
 #include <rawx-lib/src/rawx.h>
 #include <rainx/rainx_stats_rrd.h>
 
+#define DEFAULT_COMPRESSION_ALGO "ZLIB"
+#define DEFAULT_BLOCK_SIZE "5242880"
+
 struct rainx_stats_s {
 	apr_uint32_t req_all;
 	apr_uint32_t req_chunk_get;

@@ -17,6 +17,7 @@
 #include <signal.h>
 
 #include <metautils/lib/metautils.h>
+#include <rawx-lib/src/rawx.h>
 #include "gs_rawx_tools.h"
 
 
@@ -91,8 +92,8 @@ parse_opt(int argc, char **args)
 	}
 
 	if(!algo) {
-		DEBUG("No compression algorithm in args, using ZLIB (default)");
-		algo = g_strdup("ZLIB");
+		DEBUG("No compression algorithm in args, using "DEFAULT_COMPRESSION_ALGO" (default)");
+		algo = g_strdup(DEFAULT_COMPRESSION_ALGO);
 	}
 
 	return 1;
