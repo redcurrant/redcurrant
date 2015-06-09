@@ -209,10 +209,12 @@ __del_container_srvtype_properties(struct sqlx_sqlite3_s *sq3,
         if (tmp_name) {
 			g_snprintf(tmp_name, len, "%s.%%", srvtype);
 			(void) sqlite3_bind_blob(stmt, 1, cid, sizeof(container_id_t), NULL);
-			(void) sqlite3_bind_text(stmt, 2, tmp_name, strlen(tmp_name), NULL);
-			 do { rc = sqlite3_step(stmt); } while (rc == SQLITE_ROW);
-			 if (rc != SQLITE_OK && rc != SQLITE_DONE)
-			 	err = M1_SQLITE_GERROR(sq3->db, rc);
+			(void) sqlite3_bind_text(stmt, 2, tmp_name, strlen(tmp_name), g_free);
+			do {
+				rc = sqlite3_step(stmt);
+			} while (rc == SQLITE_ROW);
+			if (rc != SQLITE_OK && rc != SQLITE_DONE)
+				err = M1_SQLITE_GERROR(sq3->db, rc);
 			sqlite3_finalize_debug(rc, stmt);
 		}
 	}
@@ -296,7 +298,7 @@ __del_container_services(struct meta1_backend_s *m1,
 			errno = 0;
 			seq = g_ascii_strtoll(*urlv, &end, 10);
 			if ((end == *urlv) || (!seq && errno==EINVAL))
-				err = NEWERROR(400, "line %u : Invalid number", line);
+				err = NEWERROR(400, "line %u: Invalid number", line);
 			else
 				err = __del_container_one_service(sq3, cid, srvtype, seq);
 		}
@@ -308,7 +310,7 @@ __del_container_services(struct meta1_backend_s *m1,
 		// list all services type of cid
 		err = __get_container_all_services(sq3, cid, srvtype, &used);
 		if (err) {
-			g_prefix_error(&err, "Preliminary lookup error : ");
+			g_prefix_error(&err, "Preliminary lookup error: ");
 		} else {
 			if ((!used || !*used)){
 				// service type not used for this container_id...
@@ -316,6 +318,7 @@ __del_container_services(struct meta1_backend_s *m1,
 				__del_container_srvtype_properties(sq3, cid, srvtype);
 			}
 		}
+		free_urlv(used);
 		GError *err2 = __notify_services_by_cid(m1, sq3, cid);
 		if (err2 != NULL) {
 			gchar buf[128] = {0};
