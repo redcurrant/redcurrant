@@ -380,18 +380,16 @@ meta2_filter_action_list_contents(struct gridd_filter_ctx_s *ctx,
 	lp.type = DEFAULT;
 
 	if (NULL != fstr) {
-		//lp.flags = (guint32) g_ascii_strtoull(fstr, NULL, 10);
-        lp.flags = atoi(fstr);
-        lp.flags = g_ntohl(lp.flags);
+		lp.flags = atoi(fstr);
 	}
 	if(type && !g_ascii_strcasecmp(type, S3_LISTING_TYPE)) {
 		return _list_S3(ctx, reply, &lp);
 	} else if (type && !g_ascii_strcasecmp(type, REDC_LISTING_TYPE)) {
-			lp.type = REDC;
-			lp.params.redc.metadata_pattern = meta2_filter_ctx_get_param(ctx,
-					M2_KEY_METADATA_PATTERN);
-			lp.params.redc.name_pattern = meta2_filter_ctx_get_param(ctx,
-					M2_KEY_NAME_PATTERN);
+		lp.type = REDC;
+		lp.params.redc.metadata_pattern = meta2_filter_ctx_get_param(ctx,
+				M2_KEY_METADATA_PATTERN);
+		lp.params.redc.name_pattern = meta2_filter_ctx_get_param(ctx,
+				M2_KEY_NAME_PATTERN);
 	}
 	return _list_NORMAL(ctx, reply, &lp);
 }
