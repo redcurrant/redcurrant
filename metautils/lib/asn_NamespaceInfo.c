@@ -20,6 +20,7 @@ list_conversion(
 		GHashTable **ht,
 		GHashTable* (*conv_func)(GSList * pairs, gboolean copy, GError ** err))
 {
+	GError *error = NULL;
 	void _free(GSList *valuelist) {
 		if (valuelist) {
 			g_slist_foreach(valuelist, key_value_pair_gclean, NULL);
@@ -31,7 +32,6 @@ list_conversion(
 	if (nsinfo_vlist->list.count > 0) {
 		int i;
 		GSList* valuelist = NULL;
-		GError *error = NULL;
 
 		for (i = 0; i < nsinfo_vlist->list.count; i++) {
 			Parameter_t* asn_prop;
@@ -62,6 +62,9 @@ list_conversion(
 			g_clear_error(&error);
 			return FALSE;
 		}
+	} else {
+		*ht = conv_func(NULL, TRUE, &error);
+		g_clear_error(&error);
 	}
 
 	return TRUE;
