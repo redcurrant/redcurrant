@@ -88,6 +88,48 @@ asn1_error_handler(worker_t *worker, GError **error)
         return 0;
 }
 
+static gboolean
+brk_content_is_container(struct broken_content_s *brk_content)
+{
+	return brk_content != NULL && strlen(brk_content->content_path) == 0;
+}
+
+static guint64
+count_broken_containers_in_m2(struct broken_meta2_s *broken_meta2)
+{
+	GHashTableIter it;
+	gpointer _cid = NULL, _brk_content = NULL;
+	guint64 count = 0;
+
+	if (broken_meta2 == NULL)
+		return 0;
+
+	g_hash_table_iter_init(&it, broken_meta2->broken_containers);
+	while (g_hash_table_iter_next(&it, &_cid, &_brk_content)) {
+		if (brk_content_is_container(_brk_content))
+			count++;
+	}
+
+	return count;
+}
+
+static guint64
+count_all_broken_containers(GHashTable *broken_meta2s)
+{
+	GHashTableIter it;
+	gpointer _addr_info = NULL, _brk_m2 = NULL;
+	guint64 count = 0;
+
+	if (broken_meta2s == NULL)
+		return 0;
+
+	g_hash_table_iter_init(&it, broken_meta2s);
+	while (g_hash_table_iter_next(&it, &_addr_info, &_brk_m2))
+		count += count_broken_containers_in_m2(_brk_m2);
+
+	return count;
+}
+
 static int
 asn1_final_handler(worker_t *worker, GError **error)
 {
@@ -95,6 +137,7 @@ asn1_final_handler(worker_t *worker, GError **error)
 	struct conscience_s *conscience;
 	struct namespace_data_s *ns_data;
 	struct session_data_s *sdata;
+	guint64 brkc = 0;
 	
 	TRACE_POSITION();
 	
@@ -128,7 +171,12 @@ asn1_final_handler(worker_t *worker, GError **error)
 	}
 	g_slist_free(sdata->broken_elements);
 	sdata->broken_elements = NULL;
-	
+
+	brkc = count_all_broken_containers(conscience->broken_elements->ht_meta2);
+	if (brkc > 0)
+		INFO("Number of broken containers in ns [%s]: %"G_GUINT64_FORMAT,
+				sdata->ns, brkc);
+
 	DEBUG("[task_id=%s] Request successful", sdata->task_id);
 	return 1;
 error_label:
