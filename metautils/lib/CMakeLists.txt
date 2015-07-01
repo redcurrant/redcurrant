@@ -470,8 +470,10 @@ install(FILES
 			metatype_v140.h
 			metautils_bits.h
 			metautils_containers.h
+			metautils_config.h
 			metautils-doc.h
 			metautils_errors.h
+			metautils_fd.h
 			metautils_gba.h
 			metautils.h
 			metautils_hashstr.h
