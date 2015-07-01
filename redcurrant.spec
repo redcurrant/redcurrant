@@ -469,6 +469,8 @@ rm -rf $RPM_BUILD_ROOT
 %{prefix}/include/metautils/lib/metautils-doc.h
 %{prefix}/include/metautils/lib/metautils_containers.h
 %{prefix}/include/metautils/lib/metautils_bits.h
+%{prefix}/include/metautils/lib/metautils_fd.h
+%{prefix}/include/metautils/lib/metautils_config.h
 %{prefix}/include/metautils/lib/metatype_v140.h
 %{prefix}/include/metautils/lib/metatype_srvinfo.h
 %{prefix}/include/metautils/lib/metatypes.h
