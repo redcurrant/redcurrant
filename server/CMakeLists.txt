@@ -56,6 +56,7 @@ install(FILES
 			gridd_dispatcher_filters.h
 			network_server.h
 			slab.h
+			stats_holder.h
 			transport_gridd.h
 			transport_http.h
 		DESTINATION include/server
