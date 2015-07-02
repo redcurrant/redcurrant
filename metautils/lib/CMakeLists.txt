@@ -93,6 +93,15 @@ add_custom_command(
 
 #	ARGS -d -s -oexpr.lex.c ${CMAKE_CURRENT_SOURCE_DIR}/expr.lex.l
 
+add_library(metautils_fs STATIC
+	utils_fs.c
+	utils_loggers.c metautils_loggers.h
+	utils_errors.c metautils_errors.h
+)
+
+target_link_libraries(metautils_fs
+	${GLIB2_LIBRARIES})
+
 add_library(metautils SHARED
 		metautils_bits.h
 		metautils_macros.h
@@ -128,6 +137,7 @@ add_library(metautils SHARED
 		utils_container_event.c
 		utils_hash.c
 		utils_fd.c
+		utils_fs.c
 		utils_gba.c
 		utils_kv.c
 		utils_acl.c

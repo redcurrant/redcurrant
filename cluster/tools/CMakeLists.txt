@@ -27,6 +27,13 @@ target_link_libraries(gridcluster_dummy_service
 	metautils metacomm
 	${GLIB2_LIBRARIES})
 
+add_executable(get_io_idle
+	get_io_idle.c)
+bin_prefix(get_io_idle -get-io-idle)
+target_link_libraries(get_io_idle
+	metautils_fs
+	${GLIB2_LIBRARIES})
+
 install(
 	TARGETS
 		gridcluster_cli
