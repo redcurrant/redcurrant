@@ -1084,7 +1084,8 @@ hc_set_content_property(gs_content_t *content, char ** props, gs_error_t **e)
 			goto enderror;
 		}
 		PROPERTIES_set2_alias(bp, hc_url_get(url, HCURL_PATH));
-		PROPERTIES_set_alias_version(bp, (guint64)hc_url_get(url, HCURL_VERSION));
+		// The alias version will be set server-side
+		//PROPERTIES_set_alias_version(bp, 0);
 		PROPERTIES_set_key(bp, g_string_new(kv[0]));
 		PROPERTIES_set_value(bp, g_byte_array_append(g_byte_array_new(),
 				(guint8*)g_strdup(kv[1]), strlen(kv[1])));

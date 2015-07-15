@@ -1203,7 +1203,8 @@ static gs_status_t _gs_upload(gs_container_t *container,
 	if(mdusr &&  0 < strlen(mdusr)) {
 		struct bean_PROPERTIES_s *bp = _bean_create(&descr_struct_PROPERTIES);
 		PROPERTIES_set2_alias(bp, hc_url_get(url, HCURL_PATH));
-		PROPERTIES_set_alias_version(bp, (guint64)hc_url_get(url, HCURL_VERSION));
+		// The alias version will be set server-side
+		//PROPERTIES_set_alias_version(bp, 0);
 		PROPERTIES_set_key(bp, g_string_new("sys.m2v1_mdusr"));
 		PROPERTIES_set_value(bp, g_byte_array_append(g_byte_array_new(),
 					(guint8*)g_strdup(mdusr), strlen(mdusr)));
