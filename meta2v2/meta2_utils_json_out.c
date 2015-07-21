@@ -1,3 +1,7 @@
+#ifndef G_LOG_DOMAIN
+# define G_LOG_DOMAIN "m2v2.utils.json"
+#endif
+
 #include <glib.h>
 
 #include <metautils/lib/hc_url.h>
@@ -88,6 +92,26 @@ meta2_json_chunks_only(GString *gstr, GSList *l)
 }
 
 void
+meta2_json_props_only(GString *gstr, GSList *l)
+{
+	void code(GString *g, gpointer bean) {
+		/* Only support string values */
+		char value_str[4096] = {0};
+		GByteArray *value_gba = PROPERTIES_get_value(bean);
+		if (value_gba != NULL) {
+			memcpy(value_str, value_gba->data, MIN(value_gba->len,
+						sizeof(value_str)-1));
+		}
+		g_string_append_printf(g, "{\"version\":%"G_GINT64_FORMAT", \
+				\"key\":\"%s\",\"value\":\"%s\", \"deleted\":%s}",
+				PROPERTIES_get_alias_version(bean),
+				PROPERTIES_get_key(bean)->str, value_str,
+				PROPERTIES_get_deleted(bean) ? "true" : "false");
+	}
+	_json_BEAN_only(gstr, l, &descr_struct_PROPERTIES, code);
+}
+
+void
 meta2_json_dump_all_beans(GString *gstr, GSList *beans)
 {
 	g_string_append(gstr, "\"aliases\":[");
@@ -98,6 +122,8 @@ meta2_json_dump_all_beans(GString *gstr, GSList *beans)
 	meta2_json_contents_only(gstr, beans);
 	g_string_append(gstr, "],\"chunks\":[");
 	meta2_json_chunks_only(gstr, beans);
+	g_string_append(gstr, "],\"properties\":[");
+	meta2_json_props_only(gstr, beans);
 	g_string_append(gstr, "]");
 }
 
