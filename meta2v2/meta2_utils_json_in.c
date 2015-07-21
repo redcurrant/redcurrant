@@ -1,3 +1,7 @@
+#ifndef G_LOG_DOMAIN
+# define G_LOG_DOMAIN "m2v2.utils.json"
+#endif
+
 #include <glib.h>
 #include <json.h>
 
@@ -228,6 +232,53 @@ exit:
 	return err;
 }
 
+static GError*
+_prop2bean (struct json_object *j, gpointer *pbean)
+{
+	GError *err = NULL;
+	GByteArray *val = NULL;
+	struct bean_PROPERTIES_s *prop;
+	struct json_object *jversion, *jkey, *jvalue;
+
+	*pbean = NULL;
+	prop = _bean_create (&descr_struct_PROPERTIES);
+	jversion = json_object_object_get (j, "version");
+	jkey = json_object_object_get (j, "key");
+	jvalue = json_object_object_get (j, "value");
+
+	if (!jversion || !json_object_is_type(jversion, json_type_int)) {
+		err = NEWERROR(400, "Invalid json property version");
+		goto exit;
+	}
+	if (!jkey || !json_object_is_type(jkey, json_type_string)) {
+		err = NEWERROR(400, "Invalid json property key");
+		goto exit;
+	}
+	if (!jvalue || !json_object_is_type(jvalue, json_type_string)) {
+		err = NEWERROR(400, "Invalid json property value");
+		goto exit;
+	}
+
+	const char *val_str = json_object_get_string(jvalue);
+	val = g_byte_array_append(g_byte_array_new(),
+			(guint8*)val_str, strlen(val_str)+1);
+
+	PROPERTIES_set_alias_version(prop, json_object_get_int64(jversion));
+	PROPERTIES_set2_key(prop, json_object_get_string(jkey));
+	PROPERTIES_set2_value(prop, val->data, val->len);
+	*pbean = prop;
+	prop = NULL;
+
+exit:
+	if (val)
+		g_byte_array_unref (val);
+	if (prop) {
+		_bean_clean (prop);
+		prop = NULL;
+	}
+	return err;
+}
+
 static GError *
 _jarray_to_beans (GSList **out, struct json_object *jv, jbean_mapper map)
 {
@@ -253,9 +304,10 @@ _jarray_to_beans (GSList **out, struct json_object *jv, jbean_mapper map)
 GError *
 meta2_json_object_to_beans(GSList **beans, struct json_object *jbeans)
 {
-	static gchar* title[] = { "aliases", "headers", "contents", "chunks", NULL };
+	static gchar* title[] = { "aliases", "headers", "contents", "chunks",
+		"properties", NULL };
 	static jbean_mapper mapper[] = { _alias2bean, _header2bean, _content2bean,
-		_chunk2bean };
+		_chunk2bean, _prop2bean };
 
 	GError *err = NULL;
 	gchar **ptitle;
