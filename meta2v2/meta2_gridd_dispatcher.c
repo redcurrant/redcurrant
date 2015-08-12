@@ -1088,6 +1088,7 @@ static gridd_filter M2V2_FILTERS_replicatev2_v1[] =
 {
 	meta2_filter_extract_header_optional_ns,
 	meta2_filter_extract_body_rawcontentv2,
+	meta2_filter_extract_header_cid_f0,
 	meta2_filter_check_optional_ns_name,
 	meta2_filter_check_backend,
 	meta2_filter_action_has_container,
