@@ -345,7 +345,6 @@ hc_url_set(struct hc_url_s *u, enum hc_url_field_e f, const char *v)
 			return u;
 
 		case HCURL_HEXID:
-			metautils_str_clean(&(u->refname));
 			metautils_str_clean(&(u->whole));
 			u->hexid[0] = 0;
 
