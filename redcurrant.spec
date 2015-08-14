@@ -243,7 +243,7 @@ make DESTDIR=$RPM_BUILD_ROOT install
 
 # Install /etc/ld.so.conf.d/grid file
 mkdir -pv ${RPM_BUILD_ROOT}/etc/ld.so.conf.d
-echo "%{libdir}" >${RPM_BUILD_ROOT}/etc/ld.so.conf.d/grid.conf
+echo "%{libdir}" >${RPM_BUILD_ROOT}/etc/ld.so.conf.d/redcurrant.conf
 
 # Install et create configuration file
 %{__mkdir_p} ${RPM_BUILD_ROOT}/etc/gridstorage.conf.d
@@ -274,7 +274,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files common
 %defattr(-,root,root,-)
-/etc/ld.so.conf.d/grid.conf
+/etc/ld.so.conf.d/redcurrant.conf
 %dir %attr(755,admgrid,admgrid) %{_var}/run/redcurrant
 %dir %attr(755,admgrid,admgrid) %{_var}/log/redcurrant
 %dir %attr(755,admgrid,admgrid) %{_sysconfdir}/redcurrant
