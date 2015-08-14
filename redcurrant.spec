@@ -1,4 +1,4 @@
-%{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
+%{!?python_sitearch: %global python_sitearch %(%{__python}2.6 -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
 
 %define _unpackaged_files_terminate_build 0
 
@@ -239,11 +239,11 @@ rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
 
 # Install python
-(cd rules-motor/lib/python; %{__python}2.6 ./setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT)
+(cd rules-motor/lib/python; %{__python}2.6 ./setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT --install-lib=%{python_sitearch})
 
 # Install /etc/ld.so.conf.d/grid file
 mkdir -pv ${RPM_BUILD_ROOT}/etc/ld.so.conf.d
-echo "%{libdir}" >${RPM_BUILD_ROOT}/etc/ld.so.conf.d/grid.conf
+echo "%{libdir}" >${RPM_BUILD_ROOT}/etc/ld.so.conf.d/redcurrant.conf
 
 # Install et create configuration file
 %{__mkdir_p} ${RPM_BUILD_ROOT}/etc/gridstorage.conf.d
@@ -274,7 +274,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files common
 %defattr(-,root,root,-)
-/etc/ld.so.conf.d/grid.conf
+/etc/ld.so.conf.d/redcurrant.conf
 %dir %attr(755,admgrid,admgrid) %{_var}/run/redcurrant
 %dir %attr(755,admgrid,admgrid) %{_var}/log/redcurrant
 %dir %attr(755,admgrid,admgrid) %{_sysconfdir}/redcurrant
@@ -364,13 +364,8 @@ rm -rf $RPM_BUILD_ROOT
 %{prefix}/bin/zk-bootstrap.py*
 %{prefix}/bin/redis-monitor.py*
 %{prefix}/bin/rainx-monitor.py*
-%if %{?el6}0
-%{python_sitelib}/pymotor
-%{python_sitelib}/python_rules_motor*-py2.6.egg-info
-%else
-/usr/lib/python2.6/site-packages/pymotor
-/usr/lib/python2.6/site-packages/python_rules_motor*-py2.6.egg-info
-%endif
+%{python_sitearch}/pymotor
+%{python_sitearch}/python_rules_motor*-py2.6.egg-info
 
 %files client
 %defattr(755,root,root,-)
