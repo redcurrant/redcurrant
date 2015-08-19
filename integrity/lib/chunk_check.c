@@ -1145,19 +1145,35 @@ _overwrite_chunk_creation_date(struct meta2_ctx_s *ctx,
 	if (sysmd)
 		date_in_m2 = _extract_date_from_sysmd(sysmd->data, sysmd->len);
 
-	// overwrite creation date in metadata hashtable
-	unpacked = metadata_unpack_string(check_info->ct_info->system_metadata, &err);
-	if (!err) {
-		metadata_add_printf(unpacked, "creation-date", "%"G_GINT64_FORMAT, date_in_m2);
+	if (check_info->ct_info->system_metadata) {
+		// overwrite creation date in metadata hashtable
+		unpacked = metadata_unpack_string(check_info->ct_info->system_metadata,
+				&err);
+		if (!err) {
+			metadata_add_printf(unpacked, "creation-date", "%"G_GINT64_FORMAT,
+					date_in_m2);
+		} else {
+			goto exit;
+		}
+
+		// replace metadata
+		g_free(check_info->ct_info->system_metadata);
+		pack = metadata_pack(unpacked, &err);
+		if (err)
+			goto exit;
+	} else if (sysmd) {
+		// Due to a bug, some chunks miss the system_metadata xattr,
+		// we have to take the one from the meta2 without modification.
+		pack = metautils_gba_dup(sysmd);
 	} else {
+		// Out of luck, we don't have any system metadata,
+		check_result_append_msg(cres, "No system metadata neither in chunk"
+				"attributes nor in meta2 database");
+		// But this is not a reason to fail.
+		ret = TRUE;
 		goto exit;
 	}
 
-	// replace metadata
-	g_free(check_info->ct_info->system_metadata);
-	pack = metadata_pack(unpacked, &err);
-	if (err)
-		goto exit;
 	check_info->ct_info->system_metadata = g_strndup((const gchar *)pack->data, pack->len);
 
 	// write xattr to disk
