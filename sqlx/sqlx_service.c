@@ -218,6 +218,11 @@ _build_zk_url(const gchar *ns_name)
 		g_clear_error(&err);
 		return NULL;
 	}
+
+	// No error, but there is no Zookeeper service
+	if (!zk_srvinfo_list)
+		return NULL;
+
 	zk_url = g_string_sized_new(64);
 	for (GSList *cur = zk_srvinfo_list; cur; cur = cur->next) {
 		gchar addr[64] = {0};
