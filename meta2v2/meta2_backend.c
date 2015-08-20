@@ -2329,8 +2329,7 @@ gboolean
 _restore_admin(gpointer u, key_value_pair_t *p)
 {
 	int skip(const gchar *key) {
-		return !g_ascii_strcasecmp(key, "namespace")
-			|| g_str_has_prefix(key, "sys.")
+		return g_str_has_prefix(key, "sys.")
 			|| g_str_has_prefix(key, "user.");
 	}
 	struct cb_data_s *cb_data = u;
@@ -2338,7 +2337,17 @@ _restore_admin(gpointer u, key_value_pair_t *p)
 	GRID_TRACE("%s(%p,%p)", __FUNCTION__, u, p);
 
 	if (p) {
-		if (!skip(p->key)) {
+		if (!strcmp(p->key, "namespace")) {
+			/* This is the real VNS. The namespace we currently have in URL
+			 * is from the meta2 backend, so doesn't have the VNS part. */
+			gchar ns[LIMIT_LENGTH_NSNAME] = {0};
+			strncpy(ns, (const char*)p->value->data, p->value->len);
+			hc_url_set(cb_data->url, HCURL_NS, ns);
+		} else if (!strcmp(p->key, "container_name")) {
+			gchar ref[LIMIT_LENGTH_CONTAINERNAME] = {0};
+			strncpy(ref, (const char*)p->value->data, p->value->len);
+			hc_url_set(cb_data->url, HCURL_REFERENCE, ref);
+		} else if (!skip(p->key)) {
 			sqlx_admin_set_gba(cb_data->sq3, p->key, metautils_gba_dup(p->value));
 		}
 		key_value_pair_clean(p);
@@ -2424,6 +2433,9 @@ _restore_container(struct meta2_backend_s *m2b, struct hc_url_s *url,
 			GRID_DEBUG("Dump...");
 			e = dump_cb(wrapper_data, &cb_data, &dump_hooks);
 			GRID_DEBUG("Dump done");
+			if (!e) {
+				m2db_set_container_name(sq3, url);
+			}
 		}
 		m2b_close(sq3);
 	}
