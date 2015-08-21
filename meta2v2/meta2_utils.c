@@ -1373,8 +1373,6 @@ m2db_real_put_alias(struct sqlx_sqlite3_s *sq3, struct put_args_s *args)
 			_patch_alias_metadata(bean);
 		}
 		else if (DESCR(bean) == &descr_struct_PROPERTIES) {
-			if (args->merge_only)
-				continue;
 			PROPERTIES_set_alias_version(bean, args->version+1);
 		}
 		else if (DESCR(bean) == &descr_struct_CONTENTS_HEADERS) {
