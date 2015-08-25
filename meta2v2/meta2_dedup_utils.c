@@ -178,12 +178,14 @@ substitute_content_header(sqlite3 *db, struct bean_CONTENTS_HEADERS_s *new_ch,
 					orig_ch_str->str, new_ch_str->str, ALIASES_get_alias(alias)->str);
 			g_string_free(orig_ch_str, TRUE);
 			g_string_free(new_ch_str, TRUE);
+			g_clear_error(&err2);
 		} else {
 			*impacted_aliases = g_slist_prepend(*impacted_aliases,
 					g_strdup(ALIASES_get_alias(alias)->str));
 			saved_space += CONTENTS_HEADERS_get_size(ch);
 		}
-		if (new_alias) _bean_clean(new_alias);
+		if (new_alias)
+			_bean_clean(new_alias);
 		_bean_clean(alias);
 	}
 
