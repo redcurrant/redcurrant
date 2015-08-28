@@ -236,7 +236,7 @@ static GError *_ask_reconstruct(struct rainx_rec_params_s *params,
 	ADD_HEADER("rawxlist", "%s", rawx_list);
 	ADD_HEADER("sparerawxlist", "%s", spare_rawx_list);
 	ADD_HEADER("containerid", "%s", hc_url_get(url, HCURL_HEXID));
-	ADD_HEADER("chunknb", "%d", 1);
+	ADD_HEADER("chunknb", "%u", params->metachunk_count);
 	ADD_HEADER("contentpath", "%s", ALIASES_get_alias(params->alias)->str);
 	ADD_HEADER("contentsize", "%ld",
 			CONTENTS_HEADERS_get_size(params->content_header));
@@ -463,6 +463,8 @@ struct rainx_rec_params_s *rainx_rec_params_build(GSList *beans,
 {
 	struct rainx_rec_params_s *params = g_malloc0(
 			sizeof(struct rainx_rec_params_s));
+	gint maxpos = 0;
+
 	params->metachunk_pos = position;
 	params->data_chunk_pairs = g_array_new(FALSE, TRUE,
 			sizeof(m2v2_chunk_pair_t));
@@ -490,6 +492,8 @@ struct rainx_rec_params_s *rainx_rec_params_build(GSList *beans,
 					g_array_append_val(params->data_chunk_pairs, pair);
 				}
 			}
+			if (pos > maxpos)
+				maxpos = pos;
 		} else if (DESCR(l->data) == &descr_struct_CHUNKS) {
 			g_hash_table_insert(chunks, CHUNKS_get_id(l->data)->str, l->data);
 		} else if (DESCR(l->data) == &descr_struct_ALIASES) {
@@ -498,6 +502,7 @@ struct rainx_rec_params_s *rainx_rec_params_build(GSList *beans,
 			params->content_header = l->data;
 		}
 	}
+	params->metachunk_count = maxpos + 1;
 
 	// Associate chunk beans to content data beans
 	for (guint i = 0; i < params->data_chunk_pairs->len; i++) {
