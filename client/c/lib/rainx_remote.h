@@ -7,6 +7,8 @@ struct rainx_rec_params_s
 {
 	/** Position of the metachunk in the content */
 	gint64 metachunk_pos;
+	/** Number of metachunks in the content */
+	guint mchunks_count;
 	/** Alias bean */
 	struct bean_ALIASES_s *alias;
 	/** Content header bean */
