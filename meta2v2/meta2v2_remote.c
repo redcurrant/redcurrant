@@ -214,6 +214,8 @@ m2v2_remote_pack_SUBST_CHUNKS(GByteArray *sid, struct hc_url_s *url,
 			M2_KEY_NEW_CHUNKS, new_chunks_gba,
 			M2_KEY_OLD_CHUNKS, old_chunks_gba,
 			NULL);
+	g_byte_array_unref(new_chunks_gba);
+	g_byte_array_unref(old_chunks_gba);
 	return message_marshall_gba_and_clean(msg);
 }
 
