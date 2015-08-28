@@ -409,6 +409,34 @@ _configure_network(struct sqlx_service_s *ss)
 	return TRUE;
 }
 
+static gboolean
+_register_default_config(gpointer p)
+{
+	GError *err = NULL;
+	GHashTable *params = g_hash_table_new_full(g_str_hash, g_str_equal,
+			NULL, g_free);
+	g_hash_table_insert(params, CONF_KEY_SQLX_MAX_WORKERS, g_strdup("200"));
+	g_hash_table_insert(params, CONF_KEY_SQLX_MAX_CNX_PASSIVE,
+			g_strdup_printf("%u", PSRV(p)->max_passive));
+	g_hash_table_insert(params, CONF_KEY_SQLX_MAX_CNX_ACTIVE,
+			g_strdup_printf("%u", PSRV(p)->max_active));
+	g_hash_table_insert(params, CONF_KEY_SQLX_MAX_CNX_IN_BACKLOG,
+			g_strdup_printf("%"G_GINT64_FORMAT, PSRV(p)->cnx_backlog));
+	g_hash_table_insert(params, CONF_KEY_SQLX_TIMEOUT_OPEN, g_strdup("20000"));
+	g_hash_table_insert(params, CONF_KEY_SQLX_MAX_WAITING, g_strdup("8"));
+	g_hash_table_insert(params, CONF_KEY_SQLX_MAX_HEAP_FREE,
+			g_strdup_printf("%d", 4 * 1024));
+
+	if (!register_namespace_params(PSRV(p)->ns_name,
+			NULL, params, &err)) {
+		GRID_WARN("Failed to register default parameters: %s", err->message);
+		g_clear_error(&err);
+	}
+
+	g_hash_table_unref(params);
+	return TRUE;
+}
+
 // common_main hooks -----------------------------------------------------------
 
 static void
@@ -490,16 +518,17 @@ sqlx_service_configure(int argc, char **argv)
 {
 	return _configure_limits(&SRV,
 			SRV.max_passive, SRV.max_active, SRV.cfg_max_bases)
-	    && _init_configless_structures(&SRV)
-	    && _configure_with_arguments(&SRV, argc, argv)
+		&& _init_configless_structures(&SRV)
+		&& _configure_with_arguments(&SRV, argc, argv)
 		&& _configure_synchronism(&SRV)
-	    && _configure_replication(&SRV)
-	    && _configure_backend(&SRV)
-	    && _configure_tasks(&SRV)
-	    && _configure_registration(&SRV)
-	    && _configure_network(&SRV)
+		&& _configure_replication(&SRV)
+		&& _configure_backend(&SRV)
+		&& _configure_tasks(&SRV)
+		&& _configure_registration(&SRV)
+		&& _configure_network(&SRV)
 		&& (!SRV.service_config->post_config
-				|| SRV.service_config->post_config(&SRV));
+				|| SRV.service_config->post_config(&SRV))
+		&& _register_default_config(&SRV);
 }
 
 static void
@@ -671,6 +700,7 @@ sqlx_service_usage(void)
 CONF_KEY_SQLX_TIMEOUT_OPEN"       Timeout when opening bases in use by another thread, -1 (infinite), 0 (immediate), or milliseconds\n"\
 CONF_KEY_SQLX_MAX_HEAP_FREE"      Amount of free memory to keep for future allocations (kB)\n"\
 CONF_KEY_SQLX_MAX_WORKERS"        Maximum number of worker threads\n"\
+CONF_KEY_SQLX_MAX_WAITING" Maximum number of workers trying to open the same base\n"\
 CONF_KEY_SQLX_MAX_CNX_ACTIVE"     Maximum number of concurrent active connections\n"\
 CONF_KEY_SQLX_MAX_CNX_PASSIVE"    Maximum number of concurrent passive connections\n"\
 CONF_KEY_SQLX_MAX_CNX_IN_BACKLOG" Number of connections allowed when all workers are busy";

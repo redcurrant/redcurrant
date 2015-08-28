@@ -141,6 +141,19 @@ GSList* list_namespace_service_types(const char *ns_name, GError **error);
 int register_namespace_service(const struct service_info_s *si, GError **error);
 
 /**
+ * Register namespace parameters without overwriting anything.
+ *
+ * @param ns_name The namespace name.
+ * @param srv_type An optional service type, used to prefix param keys.
+ * @param params A hash table with the parameters and their default values.
+ * @param error A pointer to a GError*.
+ *
+ * @return 0 on failure
+ */
+int register_namespace_params(const gchar *ns_name, const gchar *srv_type,
+		GHashTable *params, GError **error);
+
+/**
  * List all services running locally on the server
  *
  * @param error
@@ -188,7 +201,7 @@ int store_erroneous_container( const char *ns_name, const container_id_t cID,
  * Store an erroneous content alert in the conecience of a namespace
  *
  * @param ns_name the namespace name
- * @param cID the container id 
+ * @param cID the container id
  * @param src_addr the address of the META2 which hosts the container
  * @param error
  * @param path the content name
@@ -280,7 +293,7 @@ gboolean event_send_to_agent( const gchar *ns_name, gridcluster_event_t *event, 
  * type will fallback on a DROP action.
  *
  * @param ns_name the namespace name
- * @param err 
+ * @param err
  *
  * @return a list of service types names or NULL if an error occured (err is set)
  */

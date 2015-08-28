@@ -64,6 +64,7 @@
 #define CONF_KEY_RAWX_COMPRESSION_BLOCKSIZE "compression_blocksize"
 #define CONF_KEY_RAWX_COMPRESSION_ALGORITHM "compression_algorithm"
 #define CONF_KEY_RAWX_HASH_WIDTH            "hash_width"
+#define CONF_KEY_RAWX_HASH_DEPTH            "hash_depth"
 #define CONF_KEY_RAWX_HEADER_SCHEME         "header_scheme"
 
 /** Do an fsync syscall when closing a just created chunk.
@@ -78,7 +79,7 @@
 
 /** Delay (in seconds) for rawx stat smoothing, and request rate
  * computation. Can be set from 1 to 60. */
-#define CONF_KEY_RAWX_FILE_SMOOTHING_DELAY  "file_smoothing_delay"
+#define CONF_KEY_RAWX_STAT_SMOOTHING_DELAY  "stat_smoothing_delay"
 
 #define CONF_KEY_RAWX_STREAM_BUFFER_SIZE    "stream_buffer_size"
 

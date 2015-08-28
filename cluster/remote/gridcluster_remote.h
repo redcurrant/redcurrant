@@ -49,6 +49,21 @@ meta0_info_t * gcluster_get_meta0_2tos(addr_info_t * addr,
 
 
 /**
+ * Add, remove or update namespace parameters. Only works with
+ * octopus-type conscience.
+ *
+ * @param addr The conscience addr.
+ * @param timeout The timeout in milliseconds.
+ * @param srv_type An optional service type, used to prefix param keys.
+ * @param params The parameters. Use empty values to remove parameters.
+ * @param no_overwrite Set to TRUE to avoid overwriting an existing parameter.
+ * @param error A pointer to a GError*.
+ */
+void gcluster_update_conf(addr_info_t * addr, long timeout,
+		const gchar *srv_type, GHashTable *params,
+		gboolean no_overwrite, GError **error);
+
+/**
  * Push a list of broken containers to the conscience
  *
  * @param addr the conscience addr
