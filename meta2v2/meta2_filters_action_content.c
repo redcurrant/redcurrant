@@ -371,8 +371,7 @@ meta2_filter_action_put_content(struct gridd_filter_ctx_s *ctx,
 	reply->did_write = TRUE;
 
 	if(NULL != copy_source) {
-		reply->subject("%s|%s|COPY(%s)", hc_url_get(url, HCURL_WHOLE),
-				hc_url_get(url, HCURL_HEXID), copy_source);
+		reply->subject("COPY(%s)", copy_source);
 		return _copy_alias(ctx, reply, copy_source);
 	}
 
@@ -1100,8 +1099,7 @@ meta2_filter_action_generate_beans(struct gridd_filter_ctx_s *ctx,
 
 	// Spare beans request
 	if (spare_type != NULL) {
-		reply->subject("%s|%s|%s", hc_url_get(url, HCURL_WHOLE),
-				hc_url_get(url, HCURL_HEXID), spare_type);
+		reply->subject("%s", spare_type);
 		if (strcmp(spare_type, M2V2_SPARE_BY_BLACKLIST) == 0) {
 			e = _spare_with_blacklist(m2b, ctx, obc, url, policy_str);
 		} else if (strcmp(spare_type, M2V2_SPARE_BY_STGPOL) == 0) {
