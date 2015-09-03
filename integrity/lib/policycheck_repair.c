@@ -517,14 +517,36 @@ _tell_content_is_lost(struct policy_check_s *pc, struct m2v2_check_error_s *flaw
 	GRID_WARN("ALIAS CORRUPTED");
 }
 
+static guint
+_count_metachunks(GPtrArray *contents_beans)
+{
+	gint maxpos = 0;
+	void _cb(gpointer _cbean, gpointer _unused)
+	{
+		(void) _unused;
+		GString *pos = CONTENTS_get_position((struct bean_CONTENTS_s *) _cbean);
+		gint metapos = 0, par = 0, sub = 0;
+		if (m2v2_parse_chunk_position(pos->str, &metapos, &par, &sub)) {
+			if (metapos > maxpos)
+				maxpos = metapos;
+		} else {
+			GRID_WARN("CONTENTS corrupted: incorrect chunk position: %s", pos->str);
+		}
+	}
+	g_ptr_array_foreach(contents_beans, _cb, NULL);
+	return maxpos + 1;
+}
+
 static void
 _repair_missing_rain_chunks(struct policy_check_s *pc,
 		struct m2v2_check_error_s *flaw)
 {
 	GRID_INFO("Starting RAIN reconstruction");
 	GError *err = NULL;
+	guint mchunks_count = _count_metachunks(pc->check->contents);
 	struct rainx_rec_params_s params = {
 			flaw->param.rain_toofew.metachunk_pos,
+			mchunks_count,
 			flaw->alias,
 			flaw->header,
 			flaw->param.rain_toofew.pairs_data,
