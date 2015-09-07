@@ -191,6 +191,9 @@ struct lb_next_opt_simple_s
 	/** Is it allowed to choose several times the same service */
 	gboolean duplicates;
 
+	/** Shuffle the output service array */
+	gboolean shuffle;
+
 	 /** Wanted rawx storage class */
 	const struct storage_class_s *stgclass;
 

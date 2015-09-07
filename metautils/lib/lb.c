@@ -1190,8 +1190,16 @@ grid_lb_iterator_next_set(struct grid_lb_iterator_s *iter,
 		return FALSE;
 	}
 
+	GPtrArray *pre_result = metautils_gtree_to_gpa(polled, TRUE);
+	if (opt->req.shuffle) {
+		for (guint i = 0; i < pre_result->len - 1; i++) {
+			gpointer element = g_ptr_array_remove_index_fast(pre_result,
+					g_random_int_range(0, pre_result->len - 1));
+			g_ptr_array_add(pre_result, element);
+		}
+	}
 	*result = (struct service_info_s**) metautils_gpa_to_array(
-			metautils_gtree_to_gpa(polled, TRUE), TRUE);
+			pre_result, TRUE);
 	return TRUE;
 }
 
