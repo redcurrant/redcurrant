@@ -1053,7 +1053,7 @@ step_WatchMaster_change(zhandle_t *handle, int type, int state,
 
 	member = d;
 	if (member && MMANAGER(member) && MMANAGER(member)->exiting) {
-		GRID_INFO("ZK callback triggered during exit");
+		GRID_INFO("ZK 'master change' callback triggered during exit, ignored");
 		return;
 	}
 	member_trace(__FUNCTION__, "CHANGE", member);
@@ -1083,7 +1083,7 @@ step_WatchNode_change(zhandle_t *handle, int type, int state,
 
 	member = d;
 	if (member && MMANAGER(member) && MMANAGER(member)->exiting) {
-		GRID_INFO("ZK callback triggered during exit");
+		GRID_INFO("ZK 'node change' callback triggered during exit, ignored");
 		return;
 	}
 	MEMBER_CHECK(member);
