@@ -2218,6 +2218,9 @@ _m2_generate_RAIN(struct gen_ctx_s *ctx)
 		opt.req.distance = distance;
 		opt.req.stgclass = stgclass;
 		opt.req.strict_stgclass = FALSE; // Accept ersatzes
+		/* Ensure that parity chunks are not always
+		 * uploaded on the last servers. */
+		opt.req.shuffle = TRUE;
 
 		if (!grid_lb_iterator_next_set(ctx->iter, &siv, &opt)) {
 			if ( pos == 0 )
