@@ -549,8 +549,6 @@ _client_error(struct gridd_client_s *client)
 
 	if (!client || !client->error)
 		return NULL;
-	if (NULL == client->error)
-		return NULL;
 	return NEWERROR(client->error->code, client->error->message);
 }
 
