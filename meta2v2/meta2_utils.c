@@ -1153,8 +1153,10 @@ m2db_flush_property(struct sqlx_sqlite3_s *sq3, const gchar *k)
 /* DELETE ------------------------------------------------------------------- */
 
 static GError*
-_real_delete(struct sqlx_sqlite3_s *sq3, GSList *beans, GSList **deleted_beans)
+_real_delete(struct sqlx_sqlite3_s *sq3, GSList *beans, GSList **deleted_beans,
+		gboolean del_chunks)
 {
+	g_assert(deleted_beans != NULL);
 	// call the purge to know which beans must be really deleted
 	GSList *deleted = NULL;
 	GError *err = m2db_purge_alias_being_deleted(sq3, beans, &deleted);
@@ -1177,7 +1179,7 @@ _real_delete(struct sqlx_sqlite3_s *sq3, GSList *beans, GSList **deleted_beans)
 	// Now really delete the beans
 	for (GSList *l = deleted; l ;l=l->next) {
 		GError *e = NULL;
-		if (DESCR(l->data) == &descr_struct_CHUNKS && !deleted_beans) {
+		if (DESCR(l->data) == &descr_struct_CHUNKS && !del_chunks) {
 			// Client won't delete chunks from rawx (async delete),
 			// so the chunk stays in the database,
 			// and will be deleted later by a purge crawler.
@@ -1186,9 +1188,7 @@ _real_delete(struct sqlx_sqlite3_s *sq3, GSList *beans, GSList **deleted_beans)
 			// Do not notify aliases with delete flag
 			e = _db_delete_bean(sq3->db, l->data);
 		} else {
-			if (deleted_beans) {
-				*deleted_beans = g_slist_prepend(*deleted_beans, l->data);
-			}
+			*deleted_beans = g_slist_prepend(*deleted_beans, l->data);
 			e = _db_delete_bean(sq3->db, l->data);
 		}
 		if (e != NULL) {
@@ -1208,8 +1208,8 @@ _real_delete(struct sqlx_sqlite3_s *sq3, GSList *beans, GSList **deleted_beans)
 		}
 	}
 
-	if (deleted_beans)
-		*deleted_beans = g_slist_reverse(*deleted_beans);
+	// We want alias and content_header at the beginning
+	*deleted_beans = g_slist_reverse(*deleted_beans);
 
 	g_slist_free(deleted);
 	deleted = NULL;
@@ -1263,7 +1263,7 @@ m2db_delete_alias(struct sqlx_sqlite3_s *sq3, gint64 max_versions,
 		GSList *deleted_beans = NULL;
 		/* If versions disabled/suspended or version specified
 		 * or marked as deleted -> delete alias permanently */
-		err = _real_delete(sq3, beans, del_chunks? &deleted_beans : NULL);
+		err = _real_delete(sq3, beans, &deleted_beans, del_chunks);
 		/* Client asked to remove no-more referenced beans, we tell him which */
 		for (GSList *bean = deleted_beans; bean; bean = bean->next) {
 			if (cb)
@@ -2221,6 +2221,9 @@ _m2_generate_RAIN(struct gen_ctx_s *ctx)
 		opt.req.distance = distance;
 		opt.req.stgclass = stgclass;
 		opt.req.strict_stgclass = FALSE; // Accept ersatzes
+		/* Ensure that parity chunks are not always
+		 * uploaded on the last servers. */
+		opt.req.shuffle = TRUE;
 
 		if (!grid_lb_iterator_next_set(ctx->iter, &siv, &opt)) {
 			if ( pos == 0 )

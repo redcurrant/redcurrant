@@ -443,6 +443,7 @@ rm -rf $RPM_BUILD_ROOT
 %{prefix}/include/server/network_server.h
 %{prefix}/include/server/gridd_dispatcher_filters.h
 %{prefix}/include/server/grid_daemon.h
+%{prefix}/include/server/stats_holder.h
 %{prefix}/include/metautils/lib/volume_lock.h
 %{prefix}/include/metautils/lib/tree.h
 %{prefix}/include/metautils/lib/test_addr.h

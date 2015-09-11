@@ -669,6 +669,19 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 		}
 		body = b;
 	}
+	void _subject(const gchar *fmt, ...) {
+		va_list args;
+		va_start(args, fmt);
+		gchar *tail = g_strdup_vprintf(fmt, args);
+		va_end(args);
+
+		metautils_str_reuse(&req_ctx->subject, g_strconcat(
+				req_ctx->subject? req_ctx->subject:"",
+				req_ctx->subject? " ":"",
+				tail,
+				NULL));
+		g_free(tail);
+	}
 	void _send_reply(gint code, gchar *msg) {
 		gsize answer_size = 0;
 		struct message_s *answer = NULL;
@@ -721,6 +734,8 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 		}
 		else {
 			_add_body(NULL);
+			_subject("%s%s",
+					e->code == CODE_REDIRECT? "Redirect to ":"", e->message);
 			if (code)
 				e->code = code;
 			if (e->code < 300)
@@ -733,12 +748,6 @@ _client_call_handler(struct req_ctx_s *req_ctx)
 		va_list args;
 		va_start(args, fmt);
 		metautils_str_reuse(&req_ctx->uid, g_strdup_vprintf(fmt, args));
-		va_end(args);
-	}
-	void _subject(const gchar *fmt, ...) {
-		va_list args;
-		va_start(args, fmt);
-		metautils_str_reuse(&req_ctx->subject, g_strdup_vprintf(fmt, args));
 		va_end(args);
 	}
 	void _register_cnx_data(const gchar *key, gpointer data,
