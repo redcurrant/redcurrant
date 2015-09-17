@@ -492,13 +492,13 @@ static void
 sqlx_service_set_defaults(void)
 {
 	SRV.open_timeout = 20000;
-	SRV.cnx_backlog = 50;
+	SRV.cnx_backlog = 100;
 
 	SRV.cfg_max_bases = 0;
 	SRV.cfg_max_passive = 0;
 	SRV.cfg_max_active = 0;
 	SRV.cfg_max_workers = 200;
-	SRV.cfg_max_heap_free = 4 * 1024;
+	SRV.cfg_max_heap_free = 16 * 1024;
 	SRV.flag_replicable = TRUE;
 	SRV.flag_autocreate = TRUE;
 	SRV.flag_autoupgrade = FALSE;
