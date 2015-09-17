@@ -187,7 +187,8 @@ _cnx_notify_accept(struct network_server_s *srv)
 	g_mutex_lock(srv->lock_threads);
 	++ srv->cnx_accept;
 	++ srv->cnx_clients;
-	inxs = 1 + srv->workers_active > srv->workers_maximum + srv->cnx_backlog ;
+	inxs = 1 + srv->cnx_clients > srv->workers_maximum + srv->cnx_backlog ;
+	inxs |= srv->cnx_clients > srv->cnx_max;
 	g_mutex_unlock(srv->lock_threads);
 	return inxs;
 }
@@ -804,8 +805,14 @@ retry:
 		return NULL;
 	}
 
-	if (_cnx_notify_accept(srv))
-		clt->current_error = NEWERROR(CODE_UNAVAILABLE, "Server overloaded.");
+	if (_cnx_notify_accept(srv)) {
+		clt->current_error = NEWERROR(CODE_UNAVAILABLE, "Server overloaded");
+		GRID_DEBUG(
+				"Server overloaded, workers_active: %u/%u, cnx_clients: %u/%u/%u",
+				srv->workers_active, srv->workers_maximum,
+				srv->cnx_clients, srv->cnx_backlog + srv->workers_maximum,
+				srv->cnx_max);
+	}
 
 	clt->main_stats = srv->stats;
 	clt->server = srv;
