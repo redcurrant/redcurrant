@@ -129,7 +129,6 @@ sqlx_pack_USE(struct sqlx_name_s *name)
 	return gba;
 }
 
-
 GByteArray*
 sqlx_pack_STATUS(struct sqlx_name_s *name)
 {

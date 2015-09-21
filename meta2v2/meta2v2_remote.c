@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <strings.h>
 
+#include <glib.h>
+
 #include <metautils/lib/metautils.h>
 #include <metautils/lib/metacomm.h>
 
@@ -13,6 +15,8 @@
 #include <meta2v2/meta2_bean.h>
 #include <meta2v2/generic.h>
 #include <meta2v2/autogen.h>
+
+#include <sqliterepo/sqlx_remote_ex.h>
 
 #define GBA_POOL_CLEAN(P) g_slist_free_full((P), (GDestroyNotify)metautils_gba_unref)
 
@@ -488,43 +492,14 @@ GError*
 m2v2_remote_execute_DESTROY_many(gchar **targets, GByteArray *sid,
 		struct hc_url_s *url, guint32 flags)
 {
-	GError *err = NULL;
 	GByteArray *req = NULL;
 
 	if (!targets) {
-		err = NEWERROR(CODE_INTERNAL_ERROR, "invalid target array (NULL)");
-		return err;
+		return NEWERROR(CODE_INTERNAL_ERROR, "invalid target array (NULL)");
 	}
 
 	req = m2v2_remote_pack_DESTROY(sid, url, flags | M2V2_DESTROY_LOCAL);
-
-	// TODO: factorize with sqlx_remote_execute_DESTROY_many
-	struct client_s **clients = gridd_client_create_many(targets, req,
-			NULL, NULL);
-	metautils_gba_unref(req);
-	req = NULL;
-
-	if (clients == NULL) {
-		err = NEWERROR(0, "Failed to create gridd clients");
-		return err;
-	}
-
-	gridd_clients_start(clients);
-	err = gridd_clients_loop(clients);
-
-	for (struct client_s **p = clients; !err && p && *p ;p++) {
-		if (!(err = gridd_client_error(*p)))
-			continue;
-		GRID_DEBUG("Database destruction attempts failed: (%d) %s",
-				err->code, err->message);
-		if (err->code == CODE_CONTAINER_NOTFOUND || err->code == 404) {
-			g_clear_error(&err);
-			continue;
-		}
-	}
-
-	gridd_clients_free(clients);
-	return err;
+	return sqlx_remote_execute_packed_DESTROY_many(targets, sid, req);
 }
 
 GError*
