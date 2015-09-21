@@ -1301,6 +1301,26 @@ do_destroy(struct gridd_reply_ctx_s *reply, struct sqlx_repository_s *repo,
 			container_id_hex2bin(end_seq + 1, strlen(end_seq + 1),
 					(container_id_t*)name.cid, NULL);
 			err = sqlx_remote_execute_DESTROY_many(peers, NULL, &name);
+			if (err) {
+				// Destroy has failed on some peer, try a rollback
+				// on other peers by asking them to restore the base.
+				GError *local_err = NULL;
+				GByteArray *dump = NULL;
+				struct sqlx_name_s bname = {
+						"", sq3->logical_name, sq3->logical_type};
+				local_err = sqlx_repository_dump_base_gba(sq3, &dump);
+				if (!local_err) {
+					local_err = sqlx_remote_execute_RESTORE_many(peers,
+							NULL, &bname, dump);
+				}
+				if (local_err) {
+					g_prefix_error(&err, "Restoration failed (%s) "
+							"after partial destroy: ",
+							local_err->message);
+				}
+				metautils_gba_unref(dump);
+				g_clear_error(&local_err);
+			}
 			g_free(name.cid);
 			g_strfreev(peers);
 			peers = NULL;
