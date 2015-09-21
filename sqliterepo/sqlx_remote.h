@@ -39,6 +39,8 @@ struct sqlxsrv_name_s {
 
 GByteArray* sqlx_pack_USE(struct sqlx_name_s *name);
 
+GByteArray* sqlx_pack_RESYNC(struct sqlx_name_s *name);
+
 /**
  * @param name
  * @return

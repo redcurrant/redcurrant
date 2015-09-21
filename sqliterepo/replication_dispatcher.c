@@ -1301,6 +1301,18 @@ do_destroy(struct gridd_reply_ctx_s *reply, struct sqlx_repository_s *repo,
 			container_id_hex2bin(end_seq + 1, strlen(end_seq + 1),
 					(container_id_t*)name.cid, NULL);
 			err = sqlx_remote_execute_DESTROY_many(peers, NULL, &name);
+			if (err) {
+				struct sqlx_name_s bname = {"", sq3->logical_name,
+						sq3->logical_type};
+				// The base is locked by us, the operation will finish in
+				// the background, when we will close our local base,
+				// hence the short timeouts.
+				GError *local_err = sqlx_remote_execute_PIPEFROM_many(
+						peers, NULL, &bname,
+						sqlx_repository_get_local_addr(repo),
+						0.5, 2.0);
+				g_clear_error(&local_err);
+			}
 			g_free(name.cid);
 			g_strfreev(peers);
 			peers = NULL;

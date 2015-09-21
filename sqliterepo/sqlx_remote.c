@@ -129,6 +129,17 @@ sqlx_pack_USE(struct sqlx_name_s *name)
 	return gba;
 }
 
+GByteArray*
+sqlx_pack_RESYNC(struct sqlx_name_s *name)
+{
+	MESSAGE req;
+	GByteArray *gba;
+
+	req = make_request("SQLX_RESYNC", name);
+	gba = message_marshall_gba(req, NULL);
+	(void) message_destroy(req, NULL);
+	return gba;
+}
 
 GByteArray*
 sqlx_pack_STATUS(struct sqlx_name_s *name)

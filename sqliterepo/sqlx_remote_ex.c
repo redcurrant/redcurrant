@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <stdlib.h>
 
+#include <glib.h>
+
 #include <metautils/lib/metautils.h>
 #include <metautils/lib/metacomm.h>
 #include <sqliterepo/sqlite_utils.h>
@@ -46,12 +48,12 @@ sqlx_remote_execute_DESTROY(const gchar *target, GByteArray *sid,
 }
 
 GError*
-sqlx_remote_execute_DESTROY_many(gchar **targets, GByteArray *sid,
-		struct sqlxsrv_name_s *name)
+sqlx_remote_execute_packed_DESTROY_many(gchar **targets, GByteArray *sid,
+		GByteArray *req)
 {
 	(void) sid;
-	GError *err = NULL;
-	GByteArray *req = sqlx_pack_DESTROY(name, TRUE);
+	GError *err = NULL, *local_err = NULL;
+	GPtrArray *targets_ok = g_ptr_array_new();
 
 	struct client_s **clients = gridd_client_create_many(targets, req,
 			NULL, NULL);
@@ -66,15 +68,77 @@ sqlx_remote_execute_DESTROY_many(gchar **targets, GByteArray *sid,
 	gridd_clients_start(clients);
 	err = gridd_clients_loop(clients);
 
-	for (struct client_s **p = clients; !err && p && *p ;p++) {
-		if (!(err = gridd_client_error(*p)))
-			continue;
-		GRID_DEBUG("Database destruction attempts failed: (%d) %s",
-				err->code, err->message);
-		if (err->code == CODE_CONTAINER_NOTFOUND || err->code == 404) {
-			g_clear_error(&err);
+	for (gchar **cursor = targets; cursor && *cursor; cursor++) {
+		metautils_str_clean(cursor);
+	}
+
+	if (err)
+		goto end;
+
+	for (struct client_s **p = clients; p && *p; p++) {
+		if (!(local_err = gridd_client_error(*p))) {
+			g_ptr_array_add(targets_ok, g_strdup(gridd_client_url(*p)));
 			continue;
 		}
+		if (local_err->code == CODE_CONTAINER_NOTFOUND ||
+					local_err->code == CODE_NOT_FOUND) {
+			g_clear_error(&local_err);
+			g_ptr_array_add(targets_ok, g_strdup(gridd_client_url(*p)));
+			continue;
+		}
+		GRID_DEBUG("Database destruction attempts failed: (%d) %s",
+				local_err->code, local_err->message);
+		if (!err)
+			g_propagate_prefixed_error(&err, local_err,
+					"Failed to destroy base on %s: ",
+					gridd_client_url(*p));
+		else
+			g_clear_error(&local_err);
+	}
+
+	for (guint i = 0; i < targets_ok->len; i++) {
+		targets[i] = g_ptr_array_index(targets_ok, i);
+	}
+
+end:
+	g_ptr_array_free(targets_ok, TRUE);
+	gridd_clients_free(clients);
+	return err;
+}
+
+GError*
+sqlx_remote_execute_DESTROY_many(gchar **targets, GByteArray *sid,
+		struct sqlxsrv_name_s *name)
+{
+	GByteArray *req = sqlx_pack_DESTROY(name, TRUE);
+	return sqlx_remote_execute_packed_DESTROY_many(targets, sid, req);
+}
+
+GError*
+sqlx_remote_execute_PIPEFROM_many(gchar **targets, GByteArray *sid,
+		struct sqlx_name_s *name, const gchar *source,
+		gdouble to_step, gdouble to_overall)
+{
+	(void) sid;
+	GError *err = NULL;
+	GByteArray *req = sqlx_pack_PIPEFROM(name, source);
+	struct client_s **clients = gridd_client_create_many(targets, req,
+			NULL, NULL);
+	metautils_gba_unref(req);
+	req = NULL;
+
+	if (clients == NULL) {
+		err = NEWERROR(0, "Failed to create gridd clients");
+		return err;
+	}
+
+	gridd_clients_set_timeout(clients, to_step, to_overall);
+
+	gridd_clients_start(clients);
+	err = gridd_clients_loop(clients);
+
+	for (struct client_s **p = clients; !err && p && *p; p++) {
+		err = gridd_client_error(*p);
 	}
 
 	gridd_clients_free(clients);

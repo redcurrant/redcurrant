@@ -24,6 +24,7 @@
 #include <meta2v2/meta2_backend_internals.h>
 
 #include <meta2/remote/meta2_remote.h>
+#include <sqliterepo/sqlx_remote_ex.h>
 
 #include <resolver/hc_resolver.h>
 
@@ -918,6 +919,20 @@ meta2_backend_destroy_container(struct meta2_backend_s *m2,
 			if (!err && peers != NULL && g_strv_length(peers) > 0) {
 				err = m2v2_remote_execute_DESTROY_many(
 						peers, NULL, url, flags);
+				if (err) {
+					// Destroy has failed on some peer, try a rollback
+					// on other peers by asking them to fetch the base.
+					struct sqlx_name_s bname = {"", sq3->logical_name,
+							sq3->logical_type};
+					// The base is locked by us, the operation will finish in
+					// the background, when we will close our local base,
+					// hence the short timeouts.
+					GError *local_err = sqlx_remote_execute_PIPEFROM_many(
+							peers, NULL, &bname,
+							sqlx_repository_get_local_addr(m2->backend.repo),
+							0.5, 2.0);
+					g_clear_error(&local_err);
+				}
 				g_strfreev(peers);
 				peers = NULL;
 			}

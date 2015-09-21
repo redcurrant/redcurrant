@@ -21,10 +21,30 @@ GError* sqlx_remote_execute_DESTROY(const gchar *target, GByteArray *sid,
  * @param targets An array of services managing the database.
  * @param sid Unused
  * @param name The name of the database
- * @param local
  */
 GError* sqlx_remote_execute_DESTROY_many(gchar **targets, GByteArray *sid,
 		struct sqlxsrv_name_s *name);
+
+/**
+ * Locally destroy an SQLX database on several services.
+ *
+ * @param targets An array of services managing the database.
+ * @param sid Unused
+ * @param req an already packed DESTROY request (will be freed)
+*/
+GError* sqlx_remote_execute_packed_DESTROY_many(gchar **targets,
+		GByteArray *sid, GByteArray *req);
+
+/**
+ * Ask several services to fetch a base from a specific service.
+ *
+ * @param targets An array of services managing the database
+ * @param sid Unused
+ * @param name The name of the base
+ */
+GError* sqlx_remote_execute_PIPEFROM_many(gchar **targets, GByteArray *sid,
+		struct sqlx_name_s *name, const gchar *source,
+		gdouble to_step, gdouble to_overall);
 
 /**
  * Get a value from 'admin' table.
