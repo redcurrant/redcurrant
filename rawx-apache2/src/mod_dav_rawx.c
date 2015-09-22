@@ -155,6 +155,28 @@ dav_rawx_cmd_gridconfig_docroot(cmd_parms *cmd, void *config, const char *arg1)
 	return NULL;
 }
 
+static void
+_register_default_config(dav_rawx_server_conf *conf)
+{
+	GError *err = NULL;
+	GHashTable *params = g_hash_table_new_full(g_str_hash, g_str_equal,
+			NULL, g_free);
+#define INSERT(K,V) g_hash_table_insert(params, K, g_strdup_printf("%d", V))
+	INSERT(CONF_KEY_RAWX_HASH_WIDTH, conf->hash_width);
+	INSERT(CONF_KEY_RAWX_HASH_DEPTH, conf->hash_depth);
+	INSERT(CONF_KEY_RAWX_FSYNC_ON_CLOSE, conf->fsync_on_close);
+	INSERT(CONF_KEY_RAWX_FILE_BUFFER_SIZE, conf->FILE_buffer_size);
+	INSERT(CONF_KEY_RAWX_STAT_SMOOTHING_DELAY, conf->stat_smoothing_delay);
+#undef INSERT
+	if (!register_namespace_params(conf->ns_name, NULL, params, &err)) {
+		DAV_DEBUG_POOL(conf->pool, 0,
+				"Failed to register default parameters: %s", err->message);
+		g_clear_error(&err);
+	}
+
+	g_hash_table_unref(params);
+}
+
 static const char *
 dav_rawx_cmd_gridconfig_namespace(cmd_parms *cmd, void *config, const char *arg1)
 {
@@ -196,8 +218,10 @@ dav_rawx_cmd_gridconfig_namespace(cmd_parms *cmd, void *config, const char *arg1
 	conf->rawx_conf->acl = _get_acl(cmd->pool, ns_info);
 	conf->rawx_conf->last_update = time(0);
 
-	conf->hash_width = conf->hash_depth = namespace_info_get_srv_param_i64(ns_info, NULL,
+	conf->hash_width = namespace_info_get_srv_param_i64(ns_info, NULL,
 			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_HASH_WIDTH, 2);
+	conf->hash_depth = namespace_info_get_srv_param_i64(ns_info, NULL,
+			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_HASH_DEPTH, 2);
 	conf->headers_scheme = namespace_info_get_srv_param_i64(ns_info, NULL,
 			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_HEADER_SCHEME, HEADER_SCHEME_V1);
 	conf->fsync_on_close = namespace_info_get_srv_param_i64(ns_info, NULL,
@@ -205,10 +229,12 @@ dav_rawx_cmd_gridconfig_namespace(cmd_parms *cmd, void *config, const char *arg1
 	conf->FILE_buffer_size = namespace_info_get_srv_param_i64(ns_info, NULL,
 			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_FILE_BUFFER_SIZE, 0);
 	conf->stat_smoothing_delay = namespace_info_get_srv_param_i64(ns_info, NULL,
-			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_FILE_SMOOTHING_DELAY, 8);
+			NAME_SRVTYPE_RAWX, CONF_KEY_RAWX_STAT_SMOOTHING_DELAY, 8);
 
-	if(local_error)
+	if (local_error)
 		g_clear_error(&local_error);
+
+	_register_default_config(conf);
 	return NULL;
 }
 

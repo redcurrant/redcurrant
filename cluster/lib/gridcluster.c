@@ -599,6 +599,20 @@ register_namespace_service(const struct service_info_s *si, GError **error)
 	return 1;
 }
 
+int
+register_namespace_params(const gchar *ns_name, const gchar *srv_type,
+		GHashTable *params, GError **error)
+{
+	addr_info_t *addr = _get_cs_addr(ns_name, error);
+	if (!addr)
+		return 0;
+	gcluster_update_conf(addr, SOCKET_TIMEOUT, srv_type, params, TRUE, error);
+	g_free(addr);
+	if (error && *error)
+		return 0;
+	return 1;
+}
+
 GSList*
 list_local_services(GError **error)
 {

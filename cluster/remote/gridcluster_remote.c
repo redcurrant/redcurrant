@@ -6,7 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <unistd.h>
+
+#include <glib.h>
 
 #include <metautils/lib/metacomm.h>
 #include <cluster/module/module.h>
@@ -181,6 +182,47 @@ error_reply:
 error_buildreq:
 
 	return (NULL);
+}
+
+void
+gcluster_update_conf(addr_info_t * addr, long timeout, const gchar *srv_type,
+		GHashTable *options, gboolean no_overwrite, GError **error)
+{
+	static struct code_handler_s codes[] = {
+		{200, REPSEQ_FINAL, NULL, NULL},
+		{0, 0, NULL, NULL}
+	};
+	struct reply_sequence_data_s data = { NULL, 0, codes };
+	MESSAGE req = NULL;
+	GString *body = g_string_sized_new(64);
+	GHashTableIter iter;
+	gpointer key, value;
+	g_hash_table_iter_init(&iter, options);
+
+	while (g_hash_table_iter_next(&iter, &key, &value)) {
+		if (!value)
+			value = "";
+		if (srv_type)
+			g_string_append_printf(body, "%s_%s=%s\n",
+					srv_type, (gchar*)key, (gchar*)value);
+		else
+			g_string_append_printf(body, "%s=%s\n",
+					(gchar*)key, (gchar*)value);
+	}
+	req = build_request(NAME_MSGNAME_OCTO_CONF_UPDATE, body->str, body->len,
+			error);
+	if (!req) {
+		g_string_free(body, TRUE);
+		return;
+	}
+
+	if (no_overwrite)
+		message_add_fields_str(req, NAME_HEADER_NO_OVERWRITE, "True", NULL);
+
+	metaXClient_reply_sequence_run_from_addrinfo(error, req, addr,
+			timeout, &data);
+
+	message_destroy(req, NULL);
 }
 
 gint
