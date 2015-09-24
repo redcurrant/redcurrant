@@ -195,7 +195,7 @@ grid_main_usage(void)
 	g_printerr("  -d          daemonizes the process (default FALSE)\n");
 	g_printerr("  -q          quiet mode, supress output on stdout stderr \n");
 	g_printerr("  -v          verbose mode, this activates stderr traces (default FALSE)\n");
-	g_printerr("  -p PATH     pidfile path, no pidfile if unset\n");
+	g_printerr("  -p PATH     pidfile path, no pidfile if unset or process not daemonized\n");
 	g_printerr("  -l PATH     activates the log4c emulation and load PATH as a log4c file\n");
 	g_printerr("  -s TOKEN    activates syslog traces (default FALSE)\n"
 			   "              with the given identifier\n");

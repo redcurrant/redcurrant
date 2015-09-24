@@ -16,6 +16,8 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#include <glib.h>
+
 #include <neon/ne_basic.h>
 #include <neon/ne_request.h>
 #include <neon/ne_session.h>
@@ -82,11 +84,7 @@ struct filer_cfg_s {
 
 /* ------------------------------------------------------------------------- */
 
-static gboolean pidfile_written = FALSE;
-static gchar pidfile_path[PATH_MAXLEN] = {0,0,0};
-static struct stat pidfile_stat;
-
-static volatile int flag_daemon = 0;
+static const char *progname = NULL;
 
 static volatile int flag_continue = ~0;
 
@@ -95,6 +93,31 @@ static struct service_cfg_s service;
 static struct volume_cfg_s fs_info;
 
 static struct filer_cfg_s filer_info;
+
+static GThread *monit_thread = NULL;
+static struct service_info_s *monit_srvinfo = NULL;
+
+/* ------------------------------------------------------------------------- */
+
+static struct grid_main_option_s *rawx_monitor_get_options(void);
+static void rawx_monitor_action(void);
+static void rawx_monitor_set_defaults(void);
+static void rawx_monitor_specific_fini(void);
+static gboolean rawx_monitor_configure(int argc, char **argv);
+static const char *rawx_monitor_usage(void);
+static void rawx_monitor_specific_stop(void);
+
+static struct grid_main_callbacks rawx_monitor_callbacks =
+{
+	.options = rawx_monitor_get_options,
+	.action = rawx_monitor_action,
+	.set_defaults = rawx_monitor_set_defaults,
+	.specific_fini = rawx_monitor_specific_fini,
+	.configure = rawx_monitor_configure,
+	.usage = rawx_monitor_usage,
+	.specific_stop = rawx_monitor_specific_stop,
+	.configure_overrides = NULL,
+};
 
 /* ------------------------------------------------------------------------- */
 
@@ -125,8 +148,8 @@ _srvinfo_populate_with_rawx_stats(struct service_info_s *si)
 {
 	/* execute rawx stat request and extract stats */
 
-	ne_session *session=NULL;
-	ne_request *request=NULL;
+	ne_session *session = NULL;
+	ne_request *request = NULL;
 	GError *local_error = NULL;
 	gdouble reqpersec = 0;
 	gint64 reqavgtime = 0;
@@ -193,14 +216,14 @@ _srvinfo_populate_with_rawx_stats(struct service_info_s *si)
        guint16 port = 0;
 
        if (!addr_info_get_addr(&(si->addr), dst, sizeof(dst), &port)) {
-	       DEBUG("Failed to extract address info from rawx");
+	       GRID_DEBUG("Failed to extract address info from rawx");
 	       goto end;
        }
 
        session = ne_session_create("http", dst, port);
 
        if (!session) {
-	       DEBUG("Failed to create neon session");
+	       GRID_DEBUG("Failed to create neon session");
 	       goto end;
        }
 
@@ -209,14 +232,14 @@ _srvinfo_populate_with_rawx_stats(struct service_info_s *si)
 
        request = ne_request_create (session, "GET", "/stat");
        if(!request) {
-	       DEBUG("Failed to create neon request");
+	       GRID_DEBUG("Failed to create neon request");
 	       goto end;
        }
 
        ne_add_response_body_reader(request, ne_accept_2xx, stat_extractor, NULL);
        ne_request_dispatch(request);
 
-       DEBUG("Stats from rawx : reqpersec = %f | reqavgtime = %"G_GINT64_FORMAT,
+       GRID_DEBUG("Stats from rawx : reqpersec = %f | reqavgtime = %"G_GINT64_FORMAT,
 			reqpersec, reqavgtime);
 
        service_tag_set_value_float(service_info_ensure_tag(si->tags, "stat.total_reqpersec"), reqpersec);
@@ -248,24 +271,24 @@ _srvinfo_populate_with_filer_info(struct service_info_s *si, struct filer_s *fil
 	error_local = NULL;
 	enterprise = filer->enterprise;
 
-	XTRACE("Monitoring round...");
+	GRID_TRACE("Monitoring round...");
 
 	if (!enterprise->refresh_filer(filer, &error_local)) {
-		WARN("Filer refresh failure for [%s] : %s", filer->str_addr,
+		GRID_WARN("Filer refresh failure for [%s]: %s", filer->str_addr,
 			gerror_get_message(error_local));
 		_srvinfo_set_down(si);
 	}
 	else {
 		vol = enterprise->get_named_volume(filer, filer_volume, &error_local);
 		if (!vol) {
-			ERROR("Volume not found [%s]:[%s] : %s", filer->str_addr, filer_volume,
+			GRID_ERROR("Volume not found [%s]: [%s]: %s", filer->str_addr, filer_volume,
 					gerror_get_message(error_local));
 			_srvinfo_set_down(si);
 		}
 		else {
 			bzero(&vol_stats, sizeof(vol_stats));
 			if (!enterprise->monitor_volume(vol, &vol_stats, &error_local)) {
-				ERROR("Failed to monitor [%s]:[%s] : %s", filer->str_addr, filer_volume,
+				GRID_ERROR("Failed to monitor [%s]: [%s]: %s", filer->str_addr, filer_volume,
 						gerror_get_message(error_local));
 				_srvinfo_set_down(si);
 			}
@@ -300,25 +323,25 @@ thread_function_monitor(gpointer p)
 	timer = g_timer_new();
 
 	if (strlen(fs_info.docroot) > 0) {
-		INFO("Starting the monitoring of %s at [%s] in [%s]", service.type_name,
+		GRID_INFO("Starting the monitoring of %s at [%s] in [%s]", service.type_name,
 				service.str_addr, fs_info.docroot);
 	} else {
-		INFO("Starting the monitoring of %s at [%s]", service.type_name,
+		GRID_INFO("Starting the monitoring of %s at [%s]", service.type_name,
 		                service.str_addr);
 	}
 
 	/* Prepare the filer monitoring if necessary */
 	if (!FILER_CONFIGURED())
-		INFO("No need to monitor a filer");
+		GRID_INFO("No need to monitor a filer");
 	else {
-		INFO("Initiating the filer monitoring");
+		GRID_INFO("Initiating the filer monitoring");
 		while (flag_continue && !filer) {
 			GError *error_local = NULL;
 
 			filer = filer_init(filer_info.host, &(filer_info.auth.snmp),
 				&(filer_info.auth.filer), &error_local);
 			if (!filer) {
-				ERROR("Failed to init the filer : %s", gerror_get_message(error_local));
+				GRID_ERROR("Failed to init the filer: %s", gerror_get_message(error_local));
 				_srvinfo_set_down(si);
 				sleep_at_most(timer, 1.0);
 			}
@@ -335,7 +358,7 @@ thread_function_monitor(gpointer p)
 		 * child is still up. */
 		if (!supervisor_children_killall(0)) {
 			/* The RAWX service is down, nevermind its filer's state */
-			DEBUG("%s service is down", service.type_name);
+			GRID_DEBUG("%s service is down", service.type_name);
 			service_tag_set_value_boolean(service_info_ensure_tag(si->tags, TAGNAME_UP), FALSE);
 			register_namespace_service(si, NULL);
 		}
@@ -351,7 +374,7 @@ thread_function_monitor(gpointer p)
 			_srvinfo_populate_with_rawx_stats(si);
 
 			if (!register_namespace_service(si, &error_local)) {
-				WARN("Failed to register the %s: %s", service.type_name,
+				GRID_WARN("Failed to register the %s: %s", service.type_name,
 						gerror_get_message(error_local));
 			}
 
@@ -439,7 +462,7 @@ _path_get_mountpoint(const gchar *path, struct volume_cfg_s *mfs, GError **error
 		GSETERROR(error, "Failed to dereference symlinks for [%s]", path);
 		return FALSE;
 	}
-	INFO("Docroot real path is [%s]", mfs->docroot);
+	GRID_INFO("Docroot real path is [%s]", mfs->docroot);
 
 
 	stream_proc = fopen("/proc/mounts", "r");
@@ -462,7 +485,7 @@ _path_get_mountpoint(const gchar *path, struct volume_cfg_s *mfs, GError **error
 
 		/*TODO we could ensure /proc/mounts only contains names with*/
 		if (g_str_has_prefix(mfs->docroot, mp)) {
-			DEBUG("potential match : [%s] <- [%s]", mp, dev);
+			GRID_DEBUG("potential match : [%s] <- [%s]", mp, dev);
 			if (!*(mfs->mount_point) || strlen(mp) > strlen(mfs->mount_point)) {
 				/* new best-match found */
 
@@ -480,7 +503,8 @@ _path_get_mountpoint(const gchar *path, struct volume_cfg_s *mfs, GError **error
 	}
 	fclose(stream_proc);
 
-	DEBUG("Volume config : docroot=%s mountpoint=%s device=%s", mfs->docroot, mfs->mount_point, mfs->device_path);
+	GRID_DEBUG("Volume config: docroot=%s mountpoint=%s device=%s",
+			mfs->docroot, mfs->mount_point, mfs->device_path);
 	return TRUE;
 }
 
@@ -513,17 +537,6 @@ _cfg_check(GError **error)
 }
 
 static gboolean
-_cfg_value_is_true(const gchar *val)
-{
-	return val && (
-		   0==g_ascii_strcasecmp(val,"true")
-		|| 0==g_ascii_strcasecmp(val,"yes")
-		|| 0==g_ascii_strcasecmp(val,"enable")
-		|| 0==g_ascii_strcasecmp(val,"enabled")
-		|| 0==g_ascii_strcasecmp(val,"on"));
-}
-
-static gboolean
 _cfg_section_volume(GKeyFile *kf, const gchar *section, GError **error)
 {
 	gchar *str, docroot[PATH_MAXLEN];
@@ -539,13 +552,13 @@ _cfg_section_volume(GKeyFile *kf, const gchar *section, GError **error)
 	g_free(str);
 
 	/* ... then investigate about a possible filer mount */
-	INFO("Configured docroot [%s]", docroot);
+	GRID_INFO("Configured docroot [%s]", docroot);
 	if (!_path_get_mountpoint(docroot, &fs_info, error)) {
 		GSETERROR(error, "No mount point found for %s", docroot);
 		return FALSE;
 	}
 
-	INFO("Docroot mountpoint is [%s]", fs_info.docroot);
+	GRID_INFO("Docroot mountpoint is [%s]", fs_info.docroot);
 	return TRUE;
 }
 
@@ -575,10 +588,11 @@ _cfg_section_child(GKeyFile *kf, const gchar *section, GError **error)
 	supervisor_preserve_env(CHILD_KEY);
 
 	/* Should the rawx-monitor make the Service respawn ?
-	 * Default : NO ! Remember the rawx-monitor will exit
+	 * Default: NO ! Remember the rawx-monitor will exit
 	 * if the underlying service stops and is not respawned */
 	if (NULL != (str = g_key_file_get_value(kf, section, "respawn", NULL))) {
-		supervisor_children_set_respawn(CHILD_KEY, _cfg_value_is_true(str));
+		supervisor_children_set_respawn(CHILD_KEY,
+				metautils_cfg_get_bool(str, FALSE));
 		g_free(str);
 	}
 
@@ -677,45 +691,6 @@ _cfg_section_service(GKeyFile *kf, const gchar *section, GError **error)
 }
 
 static gboolean
-_cfg_section_default(GKeyFile *kf, const gchar *section, GError **error)
-{
-	gchar *str;
-
-	(void) error;
-
-	str = g_key_file_get_value(kf, section, "daemon", NULL);
-	if (str) {
-		flag_daemon = ((0 == g_ascii_strcasecmp(str, "true"))
-			|| (0 == g_ascii_strcasecmp(str, "on"))
-			|| (0 == g_ascii_strcasecmp(str, "yes"))
-			|| (0 == g_ascii_strcasecmp(str, "enable"))
-			|| (0 == g_ascii_strcasecmp(str, "enabled")));
-		g_free(str);
-	}
-	INFO("Daemonize set to [%s]", flag_daemon?"ENABLED":"DISABLED");
-
-	str = g_key_file_get_value(kf, section, "pidfile", NULL);
-	if (!str) {
-		bzero(pidfile_path, sizeof(pidfile_path));
-	}
-	else {
-		/* Removes a preceeding pidfile if it changed */
-		if (*pidfile_path && g_ascii_strcasecmp(pidfile_path, str)
-			&& g_file_test(pidfile_path, G_FILE_TEST_IS_REGULAR|G_FILE_TEST_EXISTS))
-				g_remove(pidfile_path);
-
-		/* Save the latest */
-		bzero(pidfile_path, sizeof(pidfile_path));
-		g_strlcpy(pidfile_path, str, sizeof(pidfile_path)-1);
-		g_free(str);
-
-		INFO("Pidfile path set to [%s]", pidfile_path);
-	}
-
-	return TRUE;
-}
-
-static gboolean
 _cfg_read(const gchar *cfg_path, GError **error)
 {
 	GKeyFile *kf = NULL;
@@ -731,23 +706,16 @@ _cfg_read(const gchar *cfg_path, GError **error)
 
 	sections = g_key_file_get_groups(kf, NULL);
 	if (sections) {
-		for (p_section=sections; *p_section ;p_section++) {
-			if (!g_ascii_strcasecmp(*p_section, "default")) {
-				INFO("Loading main configuration from section [%s]", *p_section);
-				if (!_cfg_section_default(kf, *p_section, error)) {
-					GSETERROR(error, "Error in section [%s]", *p_section);
-					goto label_exit;
-				}
-			}
-			else if (!g_ascii_strcasecmp(*p_section, "service")) {
-				INFO("Loading service configuration from section [%s]", *p_section);
+		for (p_section=sections; *p_section; p_section++) {
+			if (!g_ascii_strcasecmp(*p_section, "service")) {
+				GRID_INFO("Loading service configuration from section [%s]", *p_section);
 				if (!_cfg_section_service(kf, *p_section, error)) {
 					GSETERROR(error, "Error in section [%s]", *p_section);
 					goto label_exit;
 				}
 			}
 			else if (!g_ascii_strcasecmp(*p_section, "volume")) {
-				INFO("Loading volume configuration from section [%s]", *p_section);
+				GRID_INFO("Loading volume configuration from section [%s]", *p_section);
 				if (!_cfg_section_volume(kf, *p_section, error)) {
 					GSETERROR(error, "Error in section [%s]", *p_section);
 					NOTICE("If you are running a rainx, please don't set [Volume] section.");
@@ -755,7 +723,7 @@ _cfg_read(const gchar *cfg_path, GError **error)
 				}
 			}
 			else if (!g_ascii_strcasecmp(*p_section, "child")) {
-				INFO("Loading child configuration from section [%s]", *p_section);
+				GRID_INFO("Loading child configuration from section [%s]", *p_section);
 				if (!_cfg_section_child(kf, *p_section, error)) {
 					GSETERROR(error, "Error in section [%s]", *p_section);
 					goto label_exit;
@@ -772,50 +740,6 @@ _cfg_read(const gchar *cfg_path, GError **error)
 label_exit:
 	g_key_file_free(kf);
 	return rc;
-}
-
-static void
-main_write_pid_file(void)
-{
-	FILE *stream_pidfile;
-
-	if (!*pidfile_path)
-		return ;
-
-	stream_pidfile = fopen(pidfile_path, "w+");
-	if (!stream_pidfile)
-		return ;
-
-	fprintf(stream_pidfile, "%d", getpid());
-	fclose(stream_pidfile);
-	stat(pidfile_path, &pidfile_stat);
-	pidfile_written = TRUE;
-}
-
-static void
-delete_pid_file(void)
-{
-	struct stat current_pidfile_stat;
-
-	if (!pidfile_written) {
-		INFO("No pidfile to delete");
-		return;
-	}
-	if (-1 == stat(pidfile_path, &current_pidfile_stat)) {
-		WARN("Unable to remove pidfile at [%s] : %s", pidfile_path, strerror(errno));
-		return;
-	}
-	if (current_pidfile_stat.st_ino != pidfile_stat.st_ino) {
-		WARN("Current and old pidfile differ, it is unsafe to delete it");
-		return;
-	}
-
-	if (-1 == unlink(pidfile_path))
-		WARN("Failed to unlink [%s] : %s", pidfile_path, strerror(errno));
-	else {
-		NOTICE("Deleted [%s]", pidfile_path);
-		pidfile_written = FALSE;
-	}
 }
 
 static void
@@ -854,7 +778,8 @@ main_prepare_srvinfo(void)
 
 	si->tags = g_ptr_array_sized_new(6U);
 
-	service_tag_set_value_macro(service_info_ensure_tag(si->tags,NAME_MACRO_CPU_NAME),
+	service_tag_set_value_macro(
+			service_info_ensure_tag(si->tags, NAME_MACRO_CPU_NAME),
 			NAME_MACRO_CPU_TYPE, NULL);
 	if (strlen(fs_info.docroot) > 0) {
 		service_tag_set_value_macro(
@@ -889,7 +814,7 @@ service_info_down_and_clean(service_info_t *si)
 		return;
 	_srvinfo_set_down(si);
 	if (!register_namespace_service(si, &error_local))
-		WARN("Failed to register the %s: %s", service.type_name,
+		GRID_WARN("Failed to register the %s: %s", service.type_name,
 				gerror_get_message(error_local));
 	if (error_local)
 		g_clear_error(&error_local);
@@ -899,12 +824,6 @@ service_info_down_and_clean(service_info_t *si)
 static void
 _main_init(void)
 {
-	bzero(pidfile_path, sizeof(pidfile_path));
-	bzero(&pidfile_stat, sizeof(pidfile_stat));
-	bzero(&fs_info, sizeof(fs_info));
-	bzero(&filer_info, sizeof(filer_info));
-	bzero(&service, sizeof(service));
-
 	freopen( "/dev/null", "r", stdin);
 
 	signal(SIGTERM, main_sighandler);
@@ -916,11 +835,6 @@ _main_init(void)
 	signal(SIGUSR1, main_sighandler);
 	signal(SIGUSR2, main_sighandler);
 	signal(SIGCHLD, main_sighandler);
-
-	if (!g_thread_supported ())
-		g_thread_init (NULL);
-	if (log4c_init())
-		g_printerr("No log4c available : %s\n", strerror(errno));
 }
 
 static void
@@ -938,54 +852,89 @@ _main_ignore_signals(void)
 	metautils_ignore_signals();
 }
 
-int
-main(int argc, char ** argv)
+static struct grid_main_option_s *
+rawx_monitor_get_options(void)
 {
-	int rc = -1;
-	struct service_info_s *si = NULL;
-	GThread *th = NULL;
-	GError *error_local = NULL;
+	static struct grid_main_option_s options[] = {{NULL, 0, {.i=0}, NULL}};
+	return options;
+}
+
+static void
+rawx_monitor_set_defaults(void)
+{
+	bzero(&fs_info, sizeof(fs_info));
+	bzero(&filer_info, sizeof(filer_info));
+	bzero(&service, sizeof(service));
+}
+
+static const char *
+rawx_monitor_usage(void)
+{
+	return "monitor_config [old_log4c_config]\n\n"\
+		"old_log4c_config is for backward compatibility and should not be used";
+}
+
+static void
+rawx_monitor_specific_stop(void)
+{
+	flag_continue = 0;
+}
+
+static void
+rawx_monitor_specific_fini(void)
+{
+	flag_continue = 0;
+	if (monit_thread)
+		(void) g_thread_join(monit_thread);
+	service_info_down_and_clean(monit_srvinfo);
+
+	_main_ignore_signals();
+	(void) supervisor_children_stopall(1);
+	(void) supervisor_children_catharsis(NULL, NULL);
+
+	supervisor_children_cleanall();
+	supervisor_children_fini();
+}
+
+static gboolean
+rawx_monitor_configure(int argc, char **argv)
+{
+	GError *err = NULL;
+	if (argc < 1)
+		return FALSE;
+	if (argc > 1) {
+		// For backward compatibility
+		log4c_init();
+		log4c_load(argv[1]);
+	}
 
 	_main_init();
 	enterprises_init();
 	supervisor_children_init();
-	init_snmp(argv[0]);
+	init_snmp(progname);
 	(void) supervisor_rights_init("root", "root", NULL);/* nevermind it fails */
-
-	/* Loads the logging capabilities then the config */
-	if (argc < 2) {
-		g_printerr("Usage: %s CFGPATH [LOG4CPATH]\n", argv[0]);
-		return -1;
-	}
-	else if (argc == 3) {
-		if (log4c_load(argv[2]))
-			g_printerr("Could not load the log4crc at [%s] : %s\n",
-				argv[2], strerror(errno));
-	}
-
-	if (!_cfg_read(argv[1], &error_local)) {
-		GSETERROR(&error_local, "Invalid configuration in file [%s]", argv[1]);
-		goto label_error;
-	}
-	if (!_cfg_check(&error_local)) {
-		GSETERROR(&error_local, "Invalid configuration for the grid version this progra was compiled for");
-		goto label_error;
-	}
-
-	if (flag_daemon) {
-		close(2);
-		daemon(1,0);
-		main_write_pid_file();
-	}
 
 #ifdef HAVE_NETAPP
 	enterprises_register(&enterprise_NETAPP);
 #endif
 
+	GRID_INFO("Reading configuration %s", argv[0]);
+	if (!(_cfg_read(argv[0], &err) && _cfg_check(&err)))
+		return FALSE;
+
+	return TRUE;
+}
+
+static void
+rawx_monitor_action(void)
+{
+	int rc = -1;
+	GError *error_local = NULL;
+
 	/* start the filer monitoring */
-	si = main_prepare_srvinfo();/* Does not return if it fails (ENOMEM) */
-	th = g_thread_create(thread_function_monitor, si, TRUE, &error_local);
-	if (!th) {
+	monit_srvinfo = main_prepare_srvinfo();/* Does not return if it fails (ENOMEM) */
+	monit_thread = g_thread_create(thread_function_monitor, monit_srvinfo, TRUE, &error_local);
+	if (!monit_thread) {
 		GSETERROR(&error_local, "Failed to start the monitoring thread");
 		goto label_error;
 	}
@@ -1003,7 +952,7 @@ main(int argc, char ** argv)
 			break;
 
 		alarm(1);
-		select(0,NULL,NULL,NULL, NULL);
+		select(0, NULL, NULL, NULL, NULL);
 	}
 
 	rc = 0;
@@ -1011,29 +960,23 @@ main(int argc, char ** argv)
 label_error:
 	if (error_local) {
 		GSETERROR(&error_local, "An error occured");
-		ERROR("error : %s", gerror_get_message(error_local));
+		GRID_ERROR("error: %s", gerror_get_message(error_local));
 		g_error_free(error_local);
 		error_local = NULL;
 	}
 
 	/* wait for the monitoring thread's termination */
 	flag_continue = 0;
-	if(th)
-		(void) g_thread_join(th);
-	service_info_down_and_clean(si);
-
-	_main_ignore_signals();
-        (void) supervisor_children_stopall(1);
-	(void) supervisor_children_catharsis(NULL, NULL);
-
-	supervisor_children_cleanall();
-	supervisor_children_fini();
-
-	INFO("Exiting!");
-	log4c_fini();
-	delete_pid_file();
+	GRID_INFO("Exiting!");
 	if (error_local)
 		g_error_free(error_local);
-	return rc;
+
+	grid_main_set_status(rc);
 }
 
+int
+main(int argc, char ** argv)
+{
+	progname = argv[0];
+	return grid_main(argc, argv, &rawx_monitor_callbacks);
+}
