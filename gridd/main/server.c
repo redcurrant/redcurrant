@@ -62,6 +62,27 @@ guint32 gridd_flags = GRIDD_FLAG_NOLINGER | GRIDD_FLAG_SHUTDOWN
 		| GRIDD_FLAG_QUICKACK | GRIDD_FLAG_KEEPALIVE;
 
 
+static struct grid_main_option_s *gridd_get_options(void);
+static void gridd_action(void);
+static void gridd_set_defaults(void);
+static void gridd_specific_fini(void);
+static gboolean gridd_configure(int argc, char **argv);
+static const char *gridd_usage(void);
+static void gridd_specific_stop(void);
+
+static struct grid_main_callbacks gridd_callbacks =
+{
+	.options = gridd_get_options,
+	.action = gridd_action,
+	.set_defaults = gridd_set_defaults,
+	.specific_fini = gridd_specific_fini,
+	.configure = gridd_configure,
+	.usage = gridd_usage,
+	.specific_stop = gridd_specific_stop,
+	.configure_overrides = NULL,
+};
+
+
 /* NEW WAY INFORMATIONS ----------------------------------------------------- */
 
 
@@ -134,11 +155,10 @@ gridd_set_flag(enum gridd_flag_e flag, int onoff)
 		gridd_flags = gridd_flags & ~flag;
 
 	if (old_flags != gridd_flags) {
-		NOTICE("GRIDD flags changed (%08X) : [%08X] -> [%08X]",
+		GRID_NOTICE("GRIDD flags changed (%08X): [%08X] -> [%08X]",
 				flag, old_flags, gridd_flags);
-	}
-	else {
-		DEBUG("GRIDD flags unchanged (%08X) : [%08X]", flag, gridd_flags);
+	} else {
+		GRID_DEBUG("GRIDD flags unchanged (%08X): [%08X]", flag, gridd_flags);
 	}
 }
 
@@ -170,33 +190,33 @@ _expand_gridd_macro(service_info_t *si, const service_tag_t *tag)
 	/* NAME_MACRO_SPECIAL_GRIDD param = type:map_entry */
 	params = g_strsplit(tag->value.macro.param, ":", 2);
 	if (g_strv_length(params) != 2) {
-		ERROR("Failed to parse gridd special macro param : [%s]",tag->value.macro.param);
+		GRID_ERROR("Failed to parse gridd special macro param: [%s]",tag->value.macro.param);
 		g_strfreev(params);
 		return;
-	}	
-	else {	
+	}
+	else {
 		if (g_ascii_strncasecmp(params[0], "i64", strlen(params[0])) == 0) {
 			gint64 value = 0;
 			if(!srvstat_get_i64(params[1], &value))
-				NOTICE("Failed to get param [%s] in gridd stats map (int64).", params[1]);
+				GRID_NOTICE("Failed to get param [%s] in gridd stats map (int64).", params[1]);
 			service_tag_set_value_i64(service_info_ensure_tag(si->tags, tag->name), value);
 		}
 		else if (g_ascii_strncasecmp(params[0], "bool", strlen(params[0])) == 0) {
 			gboolean value = FALSE;
 			if (!srvstat_get_bool(params[1], &value))
-				NOTICE("Failed to get param [%s] in gridd stats map (bool).", params[1]);
+				GRID_NOTICE("Failed to get param [%s] in gridd stats map (bool).", params[1]);
 			service_tag_set_value_boolean(service_info_ensure_tag(si->tags, tag->name), value);
 		}
 		else if (g_ascii_strncasecmp(params[0], "double", strlen(params[0])) == 0) {
 			gdouble value = FALSE;
 			if (!srvstat_get_double(params[1], &value))
-				NOTICE("Failed to get param [%s] in gridd stats map (double).", params[1]);
+				GRID_NOTICE("Failed to get param [%s] in gridd stats map (double).", params[1]);
 			service_tag_set_value_float(service_info_ensure_tag(si->tags, tag->name), value);
 		}
 		else if (g_ascii_strncasecmp(params[0], "str", strlen(params[0])) == 0) {
 			gchar *value = NULL;
 			if (!srvstat_get_string(params[1], &value)) {
-				NOTICE("Failed to get param [%s] in gridd stats map (str).", params[1]);
+				GRID_NOTICE("Failed to get param [%s] in gridd stats map (str).", params[1]);
 				value = g_strdup("");
 			}
 			service_tag_set_value_string(service_info_ensure_tag(si->tags, tag->name), value);
@@ -206,26 +226,26 @@ _expand_gridd_macro(service_info_t *si, const service_tag_t *tag)
 	}
 }
 
-static gboolean 
+static gboolean
 self_register_in_cluster(GError **err)
 {
 	service_info_t *si;
 
 	TRACE("Registering in cluster...");
-		
+
 	/* Init the service header */
 	si = g_malloc0(sizeof(service_info_t));
 	memcpy(&(si->addr), serv_addr, sizeof(addr_info_t));
         g_strlcpy(si->ns_name, ns_info->name, sizeof(si->ns_name));
         g_strlcpy(si->type, service_type, sizeof(si->type));
         si->tags = g_ptr_array_new();
-	
-	if (first) 
+
+	if (first)
 		service_tag_set_value_boolean(service_info_ensure_tag(si->tags, NAME_TAGNAME_RAWX_FIRST), first);
-	
+
 	/* Copy the service tags */
 	if (!serv_tags)
-		DEBUG("No tag found in gridd to set in service info");
+		GRID_DEBUG("No tag found in gridd to set in service info");
 	else {
 		gsize i;
 		for (i=0; i<serv_tags->len ;i++) {
@@ -243,7 +263,7 @@ self_register_in_cluster(GError **err)
 
 	/* Register nw in the conscience */
 	if (!register_namespace_service(si, err)) {
-		ERROR("Failed to register service in cluster : %s", gerror_get_message(*err));
+		GRID_ERROR("Failed to register service in cluster: %s", gerror_get_message(*err));
 		g_clear_error(err);
 	}
 	else if (TRACE_ENABLED()) {
@@ -263,7 +283,7 @@ srv_periodic_register (gpointer d)
 	(void)d;
 	GError *err = NULL;
 	if(!self_register_in_cluster(&err))
-		NOTICE("Failed to register service in cluster : %s", gerror_get_message(err));
+		GRID_NOTICE("Failed to register service in cluster: %s", gerror_get_message(err));
 	if(err)
 		g_clear_error(&err);
 }
@@ -279,7 +299,7 @@ srv_periodic_refresh_ns_info (gpointer d)
 	(void) d;
 
 	if (!(nsinfo = get_namespace_info(ns_name, &error))) {
-		NOTICE("Failed to refresh the Namespace info from the gridagent");
+		GRID_NOTICE("Failed to refresh the Namespace info from the gridagent");
 		if(error)
 			g_clear_error(&error);
 		return;
@@ -302,11 +322,11 @@ static void
 server_notify_alert( struct server_s *srv )
 {
 	register time_t now;
-	
+
 	if (!srv) return;
 
 	now = time(0);
-	
+
 	g_static_rec_mutex_lock (&(srv->recMutex));
 	srv->alert_cfg.last_sent = now;
 	g_static_rec_mutex_unlock (&(srv->recMutex));
@@ -316,7 +336,7 @@ static gboolean
 server_alert_possible( struct server_s *srv )
 {
 	register time_t last, now, freq;
-	
+
 	if (!srv)
 		return FALSE;
 
@@ -326,7 +346,7 @@ server_alert_possible( struct server_s *srv )
 	g_static_rec_mutex_unlock (&(srv->recMutex));
 
 	now = time(0);
-	
+
 	return (last<=0 || now-last>freq);
 }
 
@@ -377,7 +397,7 @@ thread_start(struct server_s *srv)
 	if (NULL != (th = g_thread_create(main_thread, srv, FALSE, &gErr)))
 		return TRUE;
 
-	ERROR("Cannot start a worker thread : %s", gErr?gErr->message:"?");
+	GRID_ERROR("Cannot start a worker thread: %s", gErr?gErr->message:"?");
 	if (gErr)
 		g_error_free(gErr);
 
@@ -437,12 +457,12 @@ thread_monitoring_release (struct server_s *srv)
 {
 	gboolean rc = TRUE;
 	gchar *str_dbg = NULL;
-	
+
 	/* XXX start of locked section */
 	g_static_rec_mutex_lock (&(srv->recMutex));
-	
+
 	srv->mon.used_workers --;
-	
+
 	gint spare_workers = srv->mon.nb_workers - srv->mon.used_workers;
 	gboolean too_few_workers = srv->mon.nb_workers < srv->mon.min_workers;
 	gboolean too_many_workers = srv->mon.nb_workers > srv->mon.max_workers;
@@ -458,7 +478,7 @@ thread_monitoring_release (struct server_s *srv)
 			}
 		}
 	}
-	
+
 	g_static_rec_mutex_unlock (&(srv->recMutex));
 	/* XXX end of locked section */
 
@@ -476,7 +496,7 @@ thread_monitoring_periodic_debug (struct server_s *srv)
 	struct thread_monitoring_s mon, mon0;
 	gchar str_pool[512];
 	gsize str_pool_size;
-	
+
 	/* XXX locked section */
 	g_static_rec_mutex_lock (&(srv->recMutex));
 	memcpy(&mon, &(srv->mon), sizeof(struct thread_monitoring_s));
@@ -523,7 +543,7 @@ thread_monitoring_periodic_stats (struct server_s *srv)
 {
 	struct thread_monitoring_s mon;
 	gchar keyTab[256];
-	
+
 	/* XXX end od locked section */
 	g_static_rec_mutex_lock (&(srv->recMutex));
 	memcpy(&mon, &(srv->mon), sizeof( struct thread_monitoring_s));
@@ -539,7 +559,7 @@ thread_monitoring_periodic_stats (struct server_s *srv)
 
 	g_snprintf(keyTab, sizeof(keyTab), "server.%s.threads.gauge.idle", srv->name);
 	srvstat_set_int(keyTab, (mon.nb_workers - mon.used_workers));
-	
+
 	g_snprintf(keyTab, sizeof(keyTab), "server.%s.threads.gauge.max_spare", srv->name);
 	srvstat_set_int(keyTab, mon.max_spare_workers);
 
@@ -552,7 +572,7 @@ thread_monitoring_periodic_stats (struct server_s *srv)
 	g_snprintf(keyTab, sizeof(keyTab), "server.%s.threads.gauge.min", srv->name);
 	srvstat_set_int(keyTab, mon.min_workers);
 
-	/* counters : 64 bits */
+	/* counters: 64 bits */
 	g_snprintf(keyTab, sizeof(keyTab), "server.%s.threads.counter.max_reached", srv->name);
 	srvstat_set_u64(keyTab, mon.max_reached);
 
@@ -585,7 +605,7 @@ get_network_socket (message_handler_f h, char **addr, int *port, GError **error)
 				for (id = 0; id < ap->count; id++) {
 					memset(&sock_name, 0, sizeof(struct sockaddr));
 					if (!getsockname(ap->srv[id], (struct sockaddr*)&sock_name, &sock_len) &&
-					   (sock_name.ss_family == PF_INET || sock_name.ss_family == PF_INET6)) {
+							(sock_name.ss_family == PF_INET || sock_name.ss_family == PF_INET6)) {
 						if (format_addr((struct sockaddr*)&sock_name, host, sizeof(host), str_port, sizeof(str_port), error)) {
 							*addr = strdup(host);
 							*port = atoi(str_port);
@@ -626,9 +646,9 @@ trace_message (MESSAGE m)
 		g_strlcpy(nameStr, ptr, sizeof(nameStr)-1);
 	}
 
-	DEBUG("message received : NAME='%s' ID='%s'", nameStr, idStr);
+	GRID_DEBUG("message received: NAME='%s' ID='%s'", nameStr, idStr);
 	if (err) {
-		DEBUG("failed to retrieved the {id,name} of the message : %s", err->message ? err->message : "unknown error");
+		GRID_DEBUG("failed to retrieved the {id,name} of the message: %s", err->message ? err->message : "unknown error");
 		g_error_free(err);
 	}
 }
@@ -728,7 +748,7 @@ main_thread (gpointer arg)
 		/*accept a new connection*/
 		if (0 > (clt = accept_do(srv->ap, &clt_addr, &gErr))) {
 			if (gErr) {
-				ERROR("Cannot accept a new connection : %s", gErr->message);
+				GRID_ERROR("Cannot accept a new connection: %s", gErr->message);
 				g_clear_error(&gErr);
 			}
 			continue;
@@ -784,12 +804,12 @@ main_thread (gpointer arg)
 					TRACE ("Connection CLOSED/RESET fd=%i [%s]", clt, str_addr_src);
 					break;
 				case ERRCODE_CONN_TIMEOUT:
-					DEBUG ("Connection TIMEOUT fd=%i [%s]", clt, str_addr_src);
+					GRID_DEBUG ("Connection TIMEOUT fd=%i [%s]", clt, str_addr_src);
 					break;
 				default:
-					DEBUG ("Connection ERROR fd=%i [%s]", clt, str_addr_src);
+					GRID_DEBUG ("Connection GRID_ERROR fd=%i [%s]", clt, str_addr_src);
 					if (gErr->message)
-						DEBUG ("cause:\n\t%s", gErr->message);
+						GRID_DEBUG ("cause:\n\t%s", gErr->message);
 					break;
 			}
 			g_clear_error (&gErr);
@@ -830,14 +850,14 @@ pid_write (const char *path, GError **err)
 		case ENOMEM:
 		case EBADF:
 		case ENAMETOOLONG:
-			GSETERROR(err,"Cannot stat %s : %s\r\n", path, strerror(errno));
+			GSETERROR(err,"Cannot stat %s: %s\r\n", path, strerror(errno));
 			return 0;
 		}
 	}
-	
+
 	fStream = fopen (path, "w");
 	if (!fStream) {
-		GSETERROR (err,"Cannot open %s : %s\r\n", path, strerror(errno));
+		GSETERROR (err,"Cannot open %s: %s\r\n", path, strerror(errno));
 		return 0;
 	}
 
@@ -900,8 +920,8 @@ prepare_plugins_reload (GKeyFile *cfgFile, GError **err)
 		goto errorLabel;
 	}
 
-	DEBUG ("Start loading all the plugins found in the configuration");
-	
+	GRID_DEBUG ("Start loading all the plugins found in the configuration");
+
 	/*run the key's list and keep those mathing Plugin~*/
 	groups = g_key_file_get_groups (cfgFile, &nbgroups);
 	if (!groups || nbgroups<=0)
@@ -951,17 +971,17 @@ prepare_plugins_reload (GKeyFile *cfgFile, GError **err)
 
 			/*load the main exported symbol*/
 			if (plugin_holder_update_config (mod, params, err))
-				DEBUG ("updated %s", fileName);
+				GRID_DEBUG ("updated %s", fileName);
 			else {
 				GSETERROR(err, "cannot update %s", fileName);
 				goto errorLabel;
 			}
-			
+
 			if (fileName) {
 				g_free(fileName);
 				fileName=NULL;
 			}
-			
+
 			/*the hash table has not been copied, just its pointers*/
 			params=NULL;
 		}
@@ -978,7 +998,7 @@ errorLabel:
 
 	if (fileName)
 		g_free (fileName);
-	
+
 	if (params)
 		g_hash_table_destroy (params);
 	return 0;
@@ -999,8 +1019,8 @@ preload_plugins (GKeyFile *cfgFile, GError **err)
 		goto errorLabel;
 	}
 
-	DEBUG ("Start loading all the plugins found in the configuration");
-	
+	GRID_DEBUG ("Start loading all the plugins found in the configuration");
+
 	/*run the key's list and keep those mathing Plugin~*/
 	groups = g_key_file_get_groups (cfgFile, &nbgroups);
 	if (!groups || nbgroups<=0)
@@ -1051,19 +1071,19 @@ preload_plugins (GKeyFile *cfgFile, GError **err)
 			/*load the main exported symbol*/
 			if (plugin_holder_keep(mod, params, err))
 			{
-				DEBUG ("loaded %s", fileName);
+				GRID_DEBUG ("loaded %s", fileName);
 			}
 			else
 			{
 				GSETERROR(err, "cannot load %s", fileName);
 				goto errorLabel;
 			}
-			
+
 			if (fileName) {
 				g_free(fileName);
 				fileName=NULL;
 			}
-			
+
 			/*the hash table has not been copied, just its pointers*/
 			params=NULL;
 		}
@@ -1080,14 +1100,14 @@ errorLabel:
 
 	if (fileName)
 		g_free (fileName);
-	
+
 	if (params)
 		g_hash_table_destroy (params);
 	return 0;
 }
 
 
-static void 
+static void
 set_srv_addr(const gchar* url)
 {
 	gchar str_addr[STRLEN_ADDRINFO];
@@ -1098,12 +1118,12 @@ set_srv_addr(const gchar* url)
 
 	newaddr = g_malloc0(sizeof(addr_info_t));
 	if (!l4_address_init_with_url(newaddr, url, &local_error))
-		ERROR("Failed to init the server address to [%s] : %s", url, gerror_get_message(local_error));
+		GRID_ERROR("Failed to init the server address to [%s]: %s", url, gerror_get_message(local_error));
 	if (local_error)
 		g_clear_error(&local_error);
 
 	addr_info_to_string(newaddr, str_addr, sizeof(str_addr));
-	NOTICE("Saving [%s] as main server address", str_addr);
+	GRID_NOTICE("Saving [%s] as main server address", str_addr);
 
 	if (serv_addr != NULL) {
 		addr_info_to_string(serv_addr, str_addr, sizeof(str_addr));
@@ -1127,8 +1147,8 @@ load_servers (GKeyFile *cfgFile, GError **err)
 		goto errorLabel;
 	}
 
-	DEBUG ("Start loading all the servers found in the configuration");
-	
+	GRID_DEBUG ("Start loading all the servers found in the configuration");
+
 	/*run the key's list and keep those mathing Plugin~*/
 	groups = g_key_file_get_groups (cfgFile, &nbgroups);
 	if (!groups || nbgroups<=0)
@@ -1171,7 +1191,7 @@ load_servers (GKeyFile *cfgFile, GError **err)
 				goto errorLabel;
 			}
 
-			/*prepare a new server structure, unshift it in the list*/	
+			/*prepare a new server structure, unshift it in the list*/
 			if (!(srv = g_try_malloc0(sizeof(struct server_s))))
 			{
 				GSETERROR(err, "Memory allocation error");
@@ -1224,7 +1244,7 @@ load_servers (GKeyFile *cfgFile, GError **err)
 
 			for (url=srvList; url && *url && *(*url); url++)
 			{
-				set_srv_addr(*url);		
+				set_srv_addr(*url);
 				if (!accept_add(srv->ap, *url, err))
 					goto errorLabel;
 			}
@@ -1255,7 +1275,7 @@ load_servers (GKeyFile *cfgFile, GError **err)
 					if (0 == strcmp (h->name, pluginList [nbPlugins-1]))
 					{
 						BEACON_SRV.next->handlers[nbPlugins-1] = h;
-						DEBUG ("The message handler '%s' has been prepended to the server '%s'", pluginList [nbPlugins-1], BEACON_SRV.next->name);
+						GRID_DEBUG ("The message handler '%s' has been prepended to the server '%s'", pluginList [nbPlugins-1], BEACON_SRV.next->name);
 						break;
 					}
 				}
@@ -1268,7 +1288,7 @@ load_servers (GKeyFile *cfgFile, GError **err)
 			}
 
 			/*debug the server structure*/
-			DEBUG ("New server created SRV=%s POOL=%p WORKER={min:%d max:%d min_spare:%d max_spare:%d} TO_CNX=%i TO_OP=%i",
+			GRID_DEBUG ("New server created SRV=%s POOL=%p WORKER={min:%d max:%d min_spare:%d max_spare:%d} TO_CNX=%i TO_OP=%i",
 				srv->name, (void*)srv->ap,
 				srv->mon.min_workers, srv->mon.max_workers,
 				srv->mon.min_spare_workers, srv->mon.max_spare_workers,
@@ -1297,10 +1317,10 @@ errorLabel:
 
 	if (srvList)
 		g_strfreev(srvList);
-		
+
 	if (pluginList)
 		g_strfreev(pluginList);
-		
+
 	return 0;
 }
 
@@ -1360,10 +1380,10 @@ load_defaults (GKeyFile *cfgFile, GError **err)
 			return 0;
 		} else {
 			metautils_pclose(&pid_fd);
-			DEBUG("no pidfile found in the configuration section=%s key=%s : %s", NAME_GENERAL, NAME_PIDFILE, pid_file);
+			GRID_DEBUG("no pidfile found in the configuration section=%s key=%s: %s", NAME_GENERAL, NAME_PIDFILE, pid_file);
 		}
 	} else {
-		DEBUG("pidfile found in the configuration section=%s key=%s : %s", NAME_GENERAL, NAME_PIDFILE, pid_file);
+		GRID_DEBUG("pidfile found in the configuration section=%s key=%s: %s", NAME_GENERAL, NAME_PIDFILE, pid_file);
 	}
 
 	return 1;
@@ -1401,14 +1421,14 @@ static int
 load_service_info (GKeyFile *cfgFile, GError **err)
 {
 	if (!g_key_file_has_group (cfgFile, NAME_SERVICE)) {
-		DEBUG("No '%s' group in configuration, Old style service declaration", NAME_SERVICE);
+		GRID_DEBUG("No '%s' group in configuration, Old style service declaration", NAME_SERVICE);
 		old_style = TRUE;
 		return 1;
 	}
 
-	
+
 	ns_name = g_key_file_get_string (cfgFile, NAME_SERVICE, NAME_NAMESPACE, err);
-	
+
 	service_type = g_key_file_get_string (cfgFile, NAME_SERVICE, NAME_SRV_TYPE, err);
 	/* TODO: service type ok */
 
@@ -1435,26 +1455,10 @@ load_service_info (GKeyFile *cfgFile, GError **err)
 	return 1;
 }
 
-/** @todo TODO code this! */
-static gboolean
-log_init (const gchar *path)
-{
-	log4c_init();
-	log4c_load(path);
-	return TRUE;
-}
-
 static int
-load_configuration (const char *cfg_path, const char *log_path, GError **err)
+load_configuration (const char *cfg_path, GError **err)
 {
 	GKeyFile *cfgFile = NULL;
-
-	if (!log_init( log_path)) {
-		GSETERROR(err, "Failed to init log4c");
-		goto errorLabel;
-	}
-
-	INFO("Logging facility configured!");
 
 	/*Parse the configuration*/
 	cfgFile = g_key_file_new ();
@@ -1476,10 +1480,10 @@ load_configuration (const char *cfg_path, const char *log_path, GError **err)
 	/*must become a daemon to continue*/
 	if (must_daemonize)
 	{
-		DEBUG("Ready to become a daemon");
+		GRID_DEBUG("Ready to become a daemon");
 		if (-1 == daemon(1,0))
 		{
-			GSETERROR (err, "cannot become a daemon : %s", strerror(errno));
+			GSETERROR (err, "cannot become a daemon: %s", strerror(errno));
 			goto errorLabel;
 		}
 	}
@@ -1489,7 +1493,7 @@ load_configuration (const char *cfg_path, const char *log_path, GError **err)
 	{
 		GSETERROR (err, "Failed to get all informations about the service");
                 goto errorLabel;
-		
+
 	}
 
 	/*preloads the plugins*/
@@ -1505,8 +1509,8 @@ load_configuration (const char *cfg_path, const char *log_path, GError **err)
 		GSETERROR (err, "an error occured during the plugins initialization");
 		goto errorLabel;
 	}
-	
-	INFO ("Plug-in's loaded!");
+
+	GRID_INFO ("Plug-in's loaded!");
 
 	/*then load the servers from the configuration file*/
 	if (!load_servers (cfgFile, err))
@@ -1515,15 +1519,15 @@ load_configuration (const char *cfg_path, const char *log_path, GError **err)
 		goto errorLabel;
 	}
 
-	INFO ("Server threads loaded!");
-	
+	GRID_INFO ("Server threads loaded!");
+
 	/*Write the process-ID*/
 	if (!pid_write (pid_file, err)) {
 		GSETERROR(err, "cannot write the pidfile");
 		goto errorLabel;
 	}
 
-	INFO("pid %i written to %s", getpid(), pid_file);
+	GRID_INFO("pid %i written to %s", getpid(), pid_file);
 
 	g_key_file_free (cfgFile);
 	return 1;
@@ -1557,14 +1561,14 @@ wait_for_workers(void)
 		for (srv=BEACON_SRV.next; !rc && srv ;srv=srv->next) {
 			if (0 < (i64 = server_has_thread(srv))) {
 				rc = TRUE;
-				INFO("Waiting for workers : still %"G_GINT64_FORMAT, i64);
+				GRID_INFO("Waiting for workers: still %"G_GINT64_FORMAT, i64);
 			}
 		}
 		if (rc)
 			sleep(1);
 	} while (rc);
 
-	NOTICE("No more workers detected");
+	GRID_NOTICE("No more workers detected");
 }
 
 static gboolean
@@ -1589,7 +1593,7 @@ start_server_threads(struct server_s *srv)
 		if (thread_start(srv)) {
 			nb++;
 		} else {
-			ERROR("Cannot start a worker thread for %s", srv->name);
+			GRID_ERROR("Cannot start a worker thread for %s", srv->name);
 			thread_monitoring_remove(srv, FALSE);
 		}
 	}
@@ -1605,9 +1609,9 @@ start_threads (void)
 
 	for (srv=BEACON_SRV.next ; srv ; srv=srv->next) {
 		if (start_server_threads(srv))
-			NOTICE("Some threads started for %s",srv->name);
+			GRID_NOTICE("Some threads started for %s",srv->name);
 		else {
-			ERROR("No threads started for %s",srv->name);
+			GRID_ERROR("No threads started for %s",srv->name);
 			all_done = FALSE;
 		}
 	}
@@ -1623,45 +1627,45 @@ _clean_all (void)
 
 
 	/*clears the registered servers*/
-	DEBUG("Stopping the servers");
+	GRID_DEBUG("Stopping the servers");
 	for (s=BEACON_SRV.next; s ;s=s->next)
 	{
-		DEBUG("Stopping %p", s);
+		GRID_DEBUG("Stopping %p", s);
 		if (s->handlers) {
 			g_free(s->handlers);
 			s->handlers = NULL;
 		}
 		g_static_rec_mutex_free(&(s->recMutex));
-		
+
 	}
-	DEBUG("Cleaning the servers");
+	GRID_DEBUG("Cleaning the servers");
 	for (s=BEACON_SRV.next; s ;)
 	{
 		struct server_s *sTmp;
-		DEBUG("Cleaning %p", s);
+		GRID_DEBUG("Cleaning %p", s);
 		sTmp = s->next;
 		g_free(s);
 		s = sTmp;
 	}
-	INFO("servers stopped and cleaned");
+	GRID_INFO("servers stopped and cleaned");
 
 
 	/*clears the message handlers*/
-	DEBUG("about to clean the message handlers");
+	GRID_DEBUG("about to clean the message handlers");
 	for (m=BEACON_MSGHANDLER.next; m ;)
 	{
 		struct message_handler_s *mTmp;
-		DEBUG("Cleaning %p", m);
+		GRID_DEBUG("Cleaning %p", m);
 		mTmp = m->next;
 		g_free(m);
 		m = mTmp;
 	}
-	INFO("Message handlers cleaned");
+	GRID_INFO("Message handlers cleaned");
 
-	
+
 	/*removes the pidfile*/
 	if (pid_file) {
-		DEBUG("about to clean the pidfile %s", pid_file);
+		GRID_DEBUG("about to clean the pidfile %s", pid_file);
 		unlink(pid_file);
 		g_free(pid_file);
 		pid_file = NULL;
@@ -1686,39 +1690,39 @@ reload_config(void)
 	GError *err= NULL;
 
 	/*Parse the configuration*/
-	g_key_file_set_list_separator (cfgFile, ',');
+	g_key_file_set_list_separator(cfgFile, ',');
 
-	if (!g_key_file_load_from_file (cfgFile, config_file, G_KEY_FILE_NONE, &err)) {
+	if (!g_key_file_load_from_file(cfgFile, config_file, G_KEY_FILE_NONE, &err)) {
 		if(err && err->message)
-			ERROR("Cannot parse the configuration : %s",err->message);
+			GRID_ERROR("Cannot parse the configuration: %s",err->message);
 		else
-			ERROR("Cannot parse the configuration : no error");
+			GRID_ERROR("Cannot parse the configuration: no error");
 		goto errorLabel;
 	}
 
 	/*loads the default values*/
-	if (!reload_defaults (cfgFile, &err)) {
+	if (!reload_defaults(cfgFile, &err)) {
 		if(err && err->message)
-			ERROR("Cannot set the default value from configuration: %s",err->message);
+			GRID_ERROR("Cannot set the default value from configuration: %s",err->message);
 		else
-			ERROR("Cannot set the default value from configuration: no error");
+			GRID_ERROR("Cannot set the default value from configuration: no error");
 		goto errorLabel;
 	}
 
 	if(!prepare_plugins_reload(cfgFile, &err)){
 		if(err && err->message)
-			ERROR("Cannot set the default value from configuration: %s",err->message);
+			GRID_ERROR("Cannot set the default value from configuration: %s",err->message);
 		else
-			ERROR("Cannot set the default value from configuration: no error");
+			GRID_ERROR("Cannot set the default value from configuration: no error");
 		goto errorLabel;
 	}
 
 	/*init all the loaded plugins*/
 	if (!plugin_holder_reload_all(&err)) {
 		if(err && err->message)
-			ERROR("Cannot update plugins configuration: %s",err->message);
+			GRID_ERROR("Cannot update plugins configuration: %s",err->message);
 		else
-			ERROR("Cannot update plugins configuration: no error");
+			GRID_ERROR("Cannot update plugins configuration: no error");
 		goto errorLabel;
 	}
 
@@ -1732,24 +1736,11 @@ errorLabel:
 
 
 static void
-signal_handler_NOOP (int s)
-{
-	signal( s, signal_handler_NOOP);
-}
-
-static void
 signal_handler_RELOAD (int s)
 {
 	if (!reload_config())
 		may_continue = FALSE;
 	signal( s, signal_handler_RELOAD);
-}
-
-static void
-signal_handler_QUIT (int s)
-{
-	may_continue = FALSE;
-	signal (s, signal_handler_QUIT);
 }
 
 static void
@@ -1764,7 +1755,7 @@ _close_servers(void)
 
 			nb = accept_close_servers( srv->ap, &error);
 			if (nb>0)
-				ERROR("%d server sockets could not be stopped : %s", nb, error?error->message:"?");
+				GRID_ERROR("%d server sockets could not be stopped: %s", nb, error?error->message:"?");
 			if (error)
 				g_clear_error( &error);
 		}
@@ -1784,122 +1775,149 @@ _clean_servers(void)
 	}
 }
 
-int
-main (int argc, char ** args)
+static struct grid_main_option_s *
+gridd_get_options(void)
 {
-	guint64 ticks;
-	GError *gErr = NULL;
-	int rc = 0;
+	static struct grid_main_option_s options[] = {{NULL, 0, {.i=0}, NULL}};
+	return options;
+}
 
-	HC_PROC_INIT(args,GRID_LOGLVL_INFO);
-
+static void
+gridd_set_defaults(void)
+{
 	memset(&stats_mutex, 0, sizeof(stats_mutex));
 	g_static_mutex_init(&stats_mutex);
 	memset(&BEACON_SRV, 0x00, sizeof(BEACON_SRV));
 	memset(&BEACON_MSGHANDLER, 0x00, sizeof(BEACON_MSGHANDLER));
 
-	if (!g_module_supported()) {
-		g_error("GLib MODULES are not supported on this platform!");
-		return 1;
-	}
-	
-	if (argc > 1) {
-		config_file = g_strdup( args[1]);
-		if (argc > 2)
-			log4c_file = g_strdup( args[2]);
-	} else {
-		g_printerr("Missing argument\n");
-		g_printerr("Usage: gridd <module_conf_file> <log4c_conf_file>\n");
-		return 0;
-	}
-	
-	/*loads the configuration*/	
-	if (!load_configuration (config_file, log4c_file, &gErr))
-	{
-		GSETERROR (&gErr, "Cannot load the configuration");
-		rc = 1;
-		goto errorLabel;
-	}
-
-	signal(SIGQUIT, signal_handler_QUIT);
-	signal(SIGINT,  signal_handler_QUIT);
-	signal(SIGTERM, signal_handler_QUIT);
-
-	signal(SIGPIPE, signal_handler_NOOP);
-	signal(SIGUSR2, signal_handler_NOOP);
-
-	signal(SIGUSR1, signal_handler_RELOAD);
-	signal(SIGHUP,  signal_handler_RELOAD);
-
 	memset(&stats_interval, 0x00, sizeof(stats_interval));
 	memset(&stats_total, 0x00, sizeof(stats_total));
+}
 
-	srvtimer_register_regular ("server core statistics", srv_inner_gauges_update, NULL, NULL, 1);
+static gboolean
+gridd_configure(int argc, char **argv)
+{
+	GError *err = NULL;
+
+	if (argc < 1) {
+		GRID_ERROR("Not enough arguments");
+		return FALSE;
+	}
+
+	config_file = argv[0];
+
+	if (argc > 1) {
+		log4c_init();
+		log4c_load(argv[1]);
+	}
+
+	if (!g_module_supported()) {
+		GRID_ERROR("GLib MODULES are not supported on this platform!");
+		return FALSE;
+	}
+
+	if (!load_configuration(config_file, &err)) {
+		GRID_ERROR("Could not load the configuration: %s", err->message);
+		g_clear_error(&err);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static void
+gridd_action(void)
+{
+	guint64 ticks;
+
+	signal(SIGHUP, signal_handler_RELOAD);
+
+	srvtimer_register_regular("server core statistics",
+			srv_inner_gauges_update, NULL, NULL, 1);
 
 	/*start the threads*/
 	if (!start_threads())
 	{
-		rc = 1;
-		ERROR("Cannot start threads for all the servers");
-		goto errorLabel;
+		grid_main_set_status(1);
+		GRID_ERROR("Cannot start threads for all the servers");
+		return;
 	}
-	else
-	{
-		/* Register service if needed */
-		if(rec_service) {
-			if (!self_register_in_cluster(&gErr)) {
-				ERROR("Failed to register service in cluster");
-			}
-			/* Periodic register in cluster */
-			srvtimer_register_regular(service_type, srv_periodic_register, NULL, NULL, PERIOD_REGISTER); 
-		}	
-		if(load_ns_info)
-			srvtimer_register_regular(service_type, srv_periodic_refresh_ns_info, NULL, NULL, PERIOD_REFRESH_NS_INFO);
-		/*Threads started, we start monitoring them*/
 
-		struct server_s *s = NULL;
-
-		for (s=BEACON_SRV.next; s && s!=&BEACON_SRV ;s=s->next) {
-			srvtimer_register_regular(s->name, (srvtimer_f)thread_monitoring_periodic_debug, NULL, s, PERIOD_DEBUG);
-			srvtimer_register_regular(s->name, (srvtimer_f)thread_monitoring_periodic_stats, NULL, s, PERIOD_STATS);
+	/* Register service if needed */
+	if (rec_service) {
+		GError *err = NULL;
+		if (!self_register_in_cluster(&err)) {
+			GRID_WARN("Failed to register service in cluster: %s",
+					err? err->message : "???");
 		}
+		/* Periodic register in cluster */
+		srvtimer_register_regular(service_type, srv_periodic_register, NULL,
+				NULL, PERIOD_REGISTER);
+	}
+	if (load_ns_info)
+		srvtimer_register_regular(service_type, srv_periodic_refresh_ns_info,
+				NULL, NULL, PERIOD_REFRESH_NS_INFO);
+
+	/*Threads started, we start monitoring them*/
+	struct server_s *s = NULL;
+	for (s = BEACON_SRV.next; s && s != &BEACON_SRV; s = s->next) {
+		srvtimer_register_regular(s->name,
+				(srvtimer_f)thread_monitoring_periodic_debug,
+				NULL, s, PERIOD_DEBUG);
+		srvtimer_register_regular(s->name,
+				(srvtimer_f)thread_monitoring_periodic_stats,
+				NULL, s, PERIOD_STATS);
 	}
 
 	/*wait forever and fire the registered timers*/
-	for (ticks=1; may_continue ;ticks++) {
-		srvtimer_fire (ticks);
+	for (ticks = 1; may_continue; ticks++) {
+		srvtimer_fire(ticks);
 		struct timeval tv = {1L,0};
-		select (0,NULL,NULL,NULL,&tv);
+		select (0, NULL, NULL, NULL, &tv);
 	}
+}
 
-errorLabel:
-
-	if (gErr) {
-		if (gErr->message)
-			ERROR("%s", gErr->message);
-		g_clear_error(&gErr);
-	}
-
+static void
+gridd_specific_stop(void)
+{
 	may_continue = FALSE;
+}
+
+static void
+gridd_specific_fini(void)
+{
+	GError *err = NULL;
+
 	wait_for_workers();
 	_close_servers();
 	_clean_servers();
 
 	/*closes the plugins*/
-	if (!plugin_holder_close_all(&gErr)) {
-		ERROR("Cannot close all the plugins");
-		if (gErr) {
-			ERROR("cause:\r\n\t%s", gErr->message);
-			g_clear_error (&gErr);
+	if (!plugin_holder_close_all(&err)) {
+		GRID_ERROR("Cannot close all the plugins");
+		if (err) {
+			GRID_ERROR("%s", err->message);
+			g_clear_error (&err);
 		}
 	}
 	else {
-		INFO("All the plugins have been closed!");
+		GRID_INFO("All the plugins have been closed!");
 	}
 
 	/*cleans all the structures*/
 	_clean_all();
+}
 
-	return rc;
+static const char *
+gridd_usage(void)
+{
+	return "<module_conf_file> [log4c_conf_file]\n\n"\
+			"log4c_conf_file is for backward compatibility and should not be used";
+}
+
+int
+main(int argc, char ** argv)
+{
+	return grid_main(argc, argv, &gridd_callbacks);
 }
 
