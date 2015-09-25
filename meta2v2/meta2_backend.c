@@ -823,6 +823,7 @@ meta2_backend_create_container(struct meta2_backend_s *m2,
 		struct hc_url_s *url, struct m2v2_create_params_s *params)
 {
 	GError *err = NULL;
+	gchar maxvers_str[32];
 	enum m2v2_open_type_e open_mode = 0;
 	struct sqlx_sqlite3_s *sq3 = NULL;
 
@@ -836,6 +837,15 @@ meta2_backend_create_container(struct meta2_backend_s *m2,
 	if (params->storage_policy) {
 		if (NULL != (err = _check_policy(m2, params->storage_policy)))
 			return err;
+	}
+
+	/* An undefined number of versions is dangerous, we must fix it. */
+	if (!params->version_policy) {
+		gint64 maxvers = m2b_max_versions(m2, hc_url_get(url, HCURL_NS));
+		g_snprintf(maxvers_str, sizeof(maxvers_str), "%"G_GINT64_FORMAT, maxvers);
+		params->version_policy = maxvers_str;
+		GRID_DEBUG("Forcing number of versions for [%s] to %"G_GINT64_FORMAT,
+				hc_url_get(url, HCURL_WHOLE), maxvers);
 	}
 
 	if (params->local) // NOREFCHECK: do not call get_peers()
