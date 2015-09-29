@@ -72,6 +72,8 @@ int period_get_broken = DEFAULT_BROKEN_FREQ;
 
 gchar str_opt_config[1024] = "/etc/redcurrant/gridagent.conf";
 gchar str_opt_log[1024] = "/etc/redcurrant/gridagent.log4crc";
+// Declared in metautils_loggers.h
+//extern gchar syslog_id[256];
 
 static int flag_help = FALSE;
 static gchar ns_name[LIMIT_LENGTH_NSNAME];
@@ -390,21 +392,24 @@ parse_configuration(const gchar *config, GError **error)
 static void
 usage(const char * prog_name)
 {
-	g_printerr("Usage: %s (--help|OPTIONS <path_config> <path_log>)\n", prog_name);
+	g_printerr("Usage: %s (--help|OPTIONS <path_config> [path_log])\n", prog_name);
 	g_printerr("OPTIONS:\n");
 	g_printerr("  --help               : display this help section\n");
-	g_printerr("  --child-req          : Starts a request agent.\n");
-	g_printerr("  --child-evt=<NS>     : start a processus only repsonsible for the event requests\n");
+	g_printerr("  --child-req (-r)     : Starts a request agent (conscience relay)\n");
+	g_printerr("  --child-evt=<NS> (-e): start a processus only repsonsible for the event requests\n");
+	g_printerr("  --supervisor (-S)    : start both child-req and child-evt as subprocesses\n");
+	g_printerr("  --syslog=ID (-s)     : activates syslog traces with the given identifier\n");
 }
 
 static int
 parse_options(int argc, char ** args, GError **error)
 {
 	static struct option long_options[] = {
-		{"help",             0, 0, 1},
-		{"child-req",        0, 0, 2},
-		{"child-evt",        1, 0, 3},
-		{"supervisor",       0, 0, 4},
+		{"help",             0, 0, 'h'},
+		{"child-req",        0, 0, 'r'},
+		{"child-evt",        1, 0, 'e'},
+		{"supervisor",       0, 0, 'S'},
+		{"syslog",           1, 0, 's'},
 		{0, 0, 0, 0}
 	};
 
@@ -418,28 +423,29 @@ parse_options(int argc, char ** args, GError **error)
 	memset(str_opt_config, 0x00, sizeof(str_opt_config));
 	memset(ns_name, 0x00, sizeof(ns_name));
 
-	log4c_init();
-
 	for (;;) {
 		int c, option_index;
 
-		c = getopt_long_only(argc, args, "", long_options, &option_index);
+		c = getopt_long(argc, args, "hrSs:e:", long_options, &option_index);
 		if (c == -1)
 			break;
 		switch (c) {
-		case 1:
+		case 'h':
 			flag_help = ~0;
 			break;
-		case 2:
+		case 'r':
 			agent_type = PT_REQ;
 			break;
-		case 3:
+		case 'e':
 			bzero(ns_name, sizeof(ns_name));
 			g_strlcpy(ns_name, optarg, sizeof(ns_name)-1);
 			agent_type = PT_EVT;
 			break;
-		case 4:
+		case 'S':
 			agent_type = PT_SUPERV;
+			break;
+		case 's':
+			g_strlcpy(syslog_id, optarg, sizeof(syslog_id));
 			break;
 		case '?':
 			break;
@@ -454,16 +460,23 @@ parse_options(int argc, char ** args, GError **error)
 		exit(0);
 	}
 
-	if (optind+1 >= argc) {
-		GSETERROR(error,"Configuration file missing (<config_file> and/or <log_config>)");
+	if (optind >= argc) {
+		GSETERROR(error,"Configuration file missing");
 		return 0;
 	}
 
 	g_set_prgname(args[0]);
 	g_strlcpy(str_opt_config, args[optind], sizeof(str_opt_config)-1);
-	g_strlcpy(str_opt_log, args[optind+1], sizeof(str_opt_log)-1);
+	if (optind+1 >= argc)
+		g_strlcpy(str_opt_log, args[optind+1], sizeof(str_opt_log)-1);
 
-	log4c_load(str_opt_log);
+	if (*syslog_id != 0) {
+		g_log_set_default_handler(logger_syslog, NULL);
+		logger_syslog_open();
+	} else if (*str_opt_log != 0) {
+		log4c_init();
+		log4c_load(str_opt_log);
+	}
 	return parse_configuration(str_opt_config, error);
 }
 
@@ -526,7 +539,8 @@ main(int argc, char **argv)
 	}
 
 	free_agent_structures();
-	log4c_fini();
+	if (*str_opt_log != 0)
+		log4c_fini();
 	return rc;
 }
 

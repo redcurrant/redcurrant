@@ -73,9 +73,9 @@ static struct service_def_s SRV_BEACON = {
 	0,
 	FALSE, FALSE,
 	{0}, {0},
-	
+
 	0L, 0L, 0L,
-	
+
 	-1, NULL, NULL,  NULL,
 
 	NULL
@@ -88,23 +88,23 @@ static void
 silo_service_copy(struct service_def_s *dst, struct service_def_s *src)
 {
 	guint i, max;
-	
+
 	memcpy(dst, src, sizeof(struct service_def_s));
 	if (src->command)
 		dst->command = g_strdup(src->command);
 	else
 		dst->command = g_strdup("/bin/false");
-	
+
 	if (src->full_command)
 		dst->full_command = g_strdup(src->full_command);
 	else
 		dst->full_command = g_strdup("/bin/false");
-	
+
 	max = src->args ? g_strv_length(src->args) : 0;
-	dst->args = g_try_malloc0(sizeof(gchar*)*(max+1));
+	dst->args = g_malloc0(sizeof(gchar*)*(max+1));
 	for (i=0; i<max ;i++)
 		dst->args[i] = g_strdup(src->args[i]);
-	
+
 	dst->next = NULL;
 }
 
@@ -186,6 +186,7 @@ silo_service_start(struct service_def_s *sd, GError **err)
 	
 	pid_father = getpid();
 	sd->last_start_attempt = time(0);
+	memset(&sd_copy, 0, sizeof(sd_copy));
 
 	switch (sd->pid = fork()) {
 
@@ -319,30 +320,40 @@ _ensure_internal_service(const gchar *ns, enum service_type_e type)
 	case ST_REQAGENT:
 		g_strlcpy(sd->type_name, "REQAGENT", sizeof(sd->type_name)-1);
 		sd->command = g_strdup(g_get_prgname());
-		sd->args = g_try_malloc0(5 * sizeof(gchar*));
+		sd->args = g_malloc0(6 * sizeof(gchar*));
 		sd->args[0] = g_strdup(g_get_prgname());
 		sd->args[1] = g_strdup("--child-req");
 		sd->args[2] = g_strdup(str_opt_config);
-		sd->args[3] = g_strdup(str_opt_log);
-		sd->args[4] = NULL;
+		if (*str_opt_log != 0) {
+			sd->args[3] = g_strdup(str_opt_log);
+			sd->args[4] = NULL;
+		} else if (*syslog_id != 0) {
+			sd->args[3] = g_strdup("-s");
+			sd->args[4] = g_strdup(syslog_id);
+		}
 		break;
 	case ST_EVT:
 		g_strlcpy(sd->type_name, "EVT", sizeof(sd->type_name)-1);
 		g_strlcpy(sd->ns_name, ns, sizeof(sd->ns_name)-1);
 		sd->command = g_strdup(g_get_prgname());
-		sd->args = g_try_malloc0(5 * sizeof(gchar*));
+		sd->args = g_malloc0(6 * sizeof(gchar*));
 		sd->args[0] = g_strdup(g_get_prgname());
 		sd->args[1] = g_strdup_printf("--child-evt=%s", ns);
 		sd->args[2] = g_strdup(str_opt_config);
-		sd->args[3] = g_strdup(str_opt_log);
-		sd->args[4] = NULL;
+		if (*str_opt_log != 0) {
+			sd->args[3] = g_strdup(str_opt_log);
+			sd->args[4] = NULL;
+		} else if (*syslog_id != 0) {
+			sd->args[3] = g_strdup("-s");
+			sd->args[4] = g_strdup(syslog_id);
+		}
 		break;
 	default:/*corruption*/
 		abort();
 	}
 
-	sd->full_command = g_strdup_printf("%s %s %s %s",
-		sd->args[0], sd->args[1], sd->args[2], sd->args[3]);
+	sd->full_command = g_strdup_printf("%s %s %s %s %s",
+		sd->args[0], sd->args[1], sd->args[2], sd->args[3], sd->args[4]);
 
 	/* ring insertion */
 	sd->next = SRV_BEACON.next;
