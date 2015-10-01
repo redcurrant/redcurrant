@@ -41,7 +41,17 @@ static GError *_fill_sorted_chunk_array(GArray *in, GArray *sorted_chunks,
 	return err;
 }
 
-static GError *_find_gaps_and_dispatch_chunks(struct rainx_rec_params_s *params,
+static void
+_make_dummy_content(m2v2_chunk_pair_t *pair, struct bean_ALIASES_s *alias,
+		gchar *s_pos)
+{
+	pair->content = _bean_create(&descr_struct_CONTENTS);
+	CONTENTS_set_content_id(pair->content, ALIASES_get_content_id(alias));
+	CONTENTS_set2_position(pair->content, s_pos);
+}
+
+static GError *
+_find_gaps_and_dispatch_chunks(struct rainx_rec_params_s *params,
 		gint k, gint m, GArray *sorted_chunks, gint64 *metachunk_size,
 		GSList **gap_positions, GSList **valid_chunks, GSList **broken_chunks)
 {
@@ -74,17 +84,21 @@ static GError *_find_gaps_and_dispatch_chunks(struct rainx_rec_params_s *params,
 				// Save the gap position (in numeric format)
 				*gap_positions = g_slist_prepend(*gap_positions, (gpointer)i);
 			} else {
-				if (i > 0 && i < k) {
+				m2v2_chunk_pair_t *next = (i+1 < k)?
+						&g_array_index(sorted_chunks, m2v2_chunk_pair_t, i+1)
+						: NULL;
+				// There is a gap in the database
+				// (not just a chunk missing on rawx).
+				if (i == 0 || (next && next->chunk)) {
+					GRID_DEBUG("-> not found, create dummy content");
+					GRID_WARN("Size of chunk at position %s will be guessed, "
+							"it may be wrong", s_pos);
+					// just make a content, chunk bean will be created later
+					_make_dummy_content(pair, params->alias, s_pos);
+					*gap_positions = g_slist_prepend(*gap_positions, (gpointer)i);
+				} else {
 					GRID_DEBUG("-> not found, metachunk was probably smaller"
 							" than (k-1)*rain_blocksize");
-				} else {
-					GRID_DEBUG("-> not found, create dummy content");
-					// just make a content, chunk bean will be created later
-					pair->content = _bean_create(&descr_struct_CONTENTS);
-					CONTENTS_set_content_id(pair->content,
-							ALIASES_get_content_id(params->alias));
-					CONTENTS_set2_position(pair->content, s_pos);
-					*gap_positions = g_slist_prepend(*gap_positions, (gpointer)i);
 				}
 			}
 			g_free(s_pos);

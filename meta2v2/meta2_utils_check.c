@@ -29,6 +29,7 @@ typedef struct header_check_s
 	struct storage_policy_s *stgpol;
 	GArray *chunks; // (chunk_pair_t)
 	GArray *unavail_chunks; // (chunk_pair_t)
+	gint metachunk_count;
 } header_check_t;
 
 
@@ -584,6 +585,7 @@ _check_dupli_alias(header_check_t *hc, guint replicas, guint distance)
 struct ctx_rain_stgpol_s
 {
 	gint64 size_total;
+	gint64 size_metachunk;
 	chunk_pair_t *last;
 	GPtrArray *chunks_data;
 	GPtrArray *chunks_parity;
@@ -601,8 +603,8 @@ _alert_for_invalid_rain_stgpol(header_check_t *hc, struct ctx_rain_stgpol_s *ctx
 	gint64 size_real = CONTENTS_HEADERS_get_size(hc->header);
 	gint64 ns_chunk_size = namespace_chunk_size(hc->check->ns_info,
 			hc_url_get(hc->check->url, HCURL_NS));
-	gint64 metachunk_size = ns_chunk_size;
 	struct rain_encoding_s rain_encoding;
+	gint prev_pos = -1, gaps = 0;
 
 	GRID_TRACE2("%s(%p,%u,%u)", __FUNCTION__, hc, lend, lenp);
 
@@ -621,18 +623,40 @@ _alert_for_invalid_rain_stgpol(header_check_t *hc, struct ctx_rain_stgpol_s *ctx
 		return;
 	}
 
-	// Last chunk can be smaller than namespace's chunk size
-	if (ctx->last->position.meta == (size_real / ns_chunk_size)) {
-		// This won't work if we allow first chunks to be smaller than
-		// namespace chunk size, but it's the only way (afaik) to get
-		// metachunk size.
-		// FIXME: the problem will occur if we append the content
-		// A solution could be to save metachunk size in position field
-		// of bean_CONTENTS_s structs.
-		metachunk_size = (size_real % ns_chunk_size);
+	// Look for gaps in content positions (already sorted).
+	void _find_gaps(gpointer data, gpointer udata)
+	{
+		(void) udata;
+		chunk_pair_t *pair = data;
+		gaps += abs(pair->position.rain - prev_pos - 1);
+		prev_pos = pair->position.rain;
 	}
+	g_ptr_array_foreach(ctx->chunks_data, _find_gaps, NULL);
+
+	if (gaps) {
+		// One or more chunks are missing in the beginning or middle of the
+		// metachunk, we must fix the metachunk size (which has been computed
+		// by adding data chunk sizes).
+		if (lend < ctx->k) {
+			struct bean_CHUNKS_s *ref_chunk = NULL;
+			// Parity chunks are never smaller than rain_encoding.block_size.
+			if (lenp > 0)
+				ref_chunk = ((chunk_pair_t*)ctx->chunks_parity->pdata[0])->chunk;
+			// Use the first data chunk as reference for block_size.
+			else
+				ref_chunk = ((chunk_pair_t*)ctx->chunks_data->pdata[0])->chunk;
+			ctx->size_metachunk += gaps * CHUNKS_get_size(ref_chunk);
+		}
+		// Positions are not consecutive but we have the correct number of
+		// chunks. Grow lend to make further tests fail.
+		else {
+			lend += gaps;
+		}
+	}
+
 	errno = 0; // rain_get_encoding() doesn't set errno in case of success
-	rain_get_encoding(&rain_encoding, metachunk_size, ctx->k, ctx->m, ctx->algo);
+	rain_get_encoding(&rain_encoding,
+			ctx->size_metachunk, ctx->k, ctx->m, ctx->algo);
 	if (errno != 0) {
 		flaw = m2v2_check_append_flaw(hc, M2CHK_CHUNK_RAIN_BAD_ALGO,
 				NEWERROR(0,
@@ -641,13 +665,24 @@ _alert_for_invalid_rain_stgpol(header_check_t *hc, struct ctx_rain_stgpol_s *ctx
 		return;
 	}
 
-	// For last position of the content, actual_k may be smaller than k,
-	// depending on the RAIN algorithm and the metachunk size
-	if (ctx->last->position.meta == (size_real / ns_chunk_size)) {
+	// Last metachunk can be smaller than namespace's chunk size without
+	// causing problems. But if one of the first metachunks is smaller,
+	// we are not able to detect missing data chunks at the end (because
+	// the actual value is k is determined by the original size of the
+	// metachunk, and we don't store this information).
+	if (ctx->size_metachunk != ns_chunk_size && actual_k > lend) {
+		// gaps -> will fail the next test, no gaps -> unsure
+		if (ctx->last->position.meta != hc->metachunk_count -1 && !gaps) {
+			GRID_WARN("Found a metachunk with %u data chunks (%u expected) "
+					"at an intermediate position (%d), cannot determine "
+					"if it's normal or if we miss a data chunk.",
+					lend, actual_k, ctx->last->position.meta);
+		}
 		gint64 rain_chunk_size = rain_encoding.block_size;
-		actual_k = 1 + ((metachunk_size - 1) / rain_chunk_size);
-		GRID_TRACE("metachunk size: %ld, rain chunk size: %ld, k: %u, actual_k: %u",
-				metachunk_size, rain_chunk_size, ctx->k, actual_k);
+		actual_k = 1 + ((ctx->size_metachunk - 1) / rain_chunk_size);
+		GRID_TRACE("metachunk size: %ld, rain chunk size: %ld, "
+				"k: %u, actual_k: %u",
+				ctx->size_metachunk, rain_chunk_size, ctx->k, actual_k);
 	}
 
 	if (lenp + lend > actual_k + ctx->m) {
@@ -718,12 +753,14 @@ hook_CHUNK_rain_stgpol(header_check_t *hc, chunk_pair_t *pair, void *u)
 		_alert_for_invalid_rain_stgpol(hc, ctx);
 		g_ptr_array_set_size(ctx->chunks_data, 0);
 		g_ptr_array_set_size(ctx->chunks_parity, 0);
+		ctx->size_metachunk = 0;
 	}
 
 	if (pair->position.parity)
 		g_ptr_array_add(ctx->chunks_parity, pair);
 	else {
 		ctx->size_total += CHUNKS_get_size(pair->chunk);
+		ctx->size_metachunk += CHUNKS_get_size(pair->chunk);
 		g_ptr_array_add(ctx->chunks_data, pair);
 	}
 	ctx->last = pair;
@@ -794,7 +831,7 @@ _check_rained_alias(header_check_t *hc, guint k, guint m, guint distance,
 	struct ctx_stgclass_s ctx_stgclass = { NULL, NULL };
 	struct ctx_rain_only_s ctx_rain_only = {
 		.k = k, .m = m };
-	struct ctx_rain_stgpol_s ctx_rain_stgpol = { 0, NULL, NULL,
+	struct ctx_rain_stgpol_s ctx_rain_stgpol = { 0, 0, NULL, NULL,
 		.k = k, .m = m, .distance = distance, .algo = algo };
 
 	GRID_TRACE2("%s(%p,%u,%u,%u)", __FUNCTION__, hc, k, m, distance);
@@ -875,6 +912,7 @@ _load_header_chunks(header_check_t *hc)
 {
 	struct bean_CONTENTS_s *c0;
 	chunk_pair_t pair;
+	gint max_pos = 0;
 	GByteArray *id0, *id1;
 
 	GRID_TRACE2("%s(%p)", __FUNCTION__, hc);
@@ -894,8 +932,11 @@ _load_header_chunks(header_check_t *hc)
 				if (pair.chunk != NULL)
 					g_array_append_vals(hc->unavail_chunks, &pair, 1);
 			}
+			if (pair.position.meta > max_pos)
+				max_pos = pair.position.meta;
 		}
 	}
+	hc->metachunk_count = max_pos + 1;
 	g_array_sort(hc->chunks, (GCompareFunc) compare_pairs_positions);
 	return NULL;
 }
