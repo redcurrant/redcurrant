@@ -532,8 +532,7 @@ GError* m2db_copy_alias(struct m2db_put_args_s *args, const char *source);
  * @param u0
  * @return
  */
-GError* m2db_append_to_alias(struct sqlx_sqlite3_s *sq3, namespace_info_t *ni,
-		gint64 max_versions, struct hc_url_s *url, GSList *beans,
+GError* m2db_append_to_alias(struct m2db_put_args_s *args, GSList *beans,
 		m2_onbean_cb cb, gpointer u0);
 
 /*!

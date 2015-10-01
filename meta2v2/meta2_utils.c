@@ -1845,18 +1845,18 @@ static void _delete_contents_by_id(struct sqlx_sqlite3_s *sq3, GByteArray *cid,
 }
 
 GError*
-m2db_append_to_alias(struct sqlx_sqlite3_s *sq3, namespace_info_t *ni,
-		gint64 max_versions, struct hc_url_s *url, GSList *beans,
+m2db_append_to_alias(struct m2db_put_args_s *args, GSList *beans,
 		m2_onbean_cb cb, gpointer u0)
 {
 	struct append_context_s ctx;
 	GError *err = NULL;
 
 	// Sanity checks
-	GRID_TRACE("M2 APPEND(%s)", hc_url_get(url, HCURL_WHOLE));
-	g_assert(sq3 != NULL);
-	g_assert(url != NULL);
-	if (!hc_url_has(url, HCURL_PATH))
+	GRID_TRACE("M2 APPEND(%s)", hc_url_get(args->url, HCURL_WHOLE));
+	EXTRA_ASSERT(args != NULL);
+	EXTRA_ASSERT(args->sq3 != NULL);
+	EXTRA_ASSERT(args->url != NULL);
+	if (!hc_url_has(args->url, HCURL_PATH))
 		return NEWERROR(400, "Missing path");
 
 	memset(&ctx, 0, sizeof(ctx));
@@ -1866,14 +1866,14 @@ m2db_append_to_alias(struct sqlx_sqlite3_s *sq3, namespace_info_t *ni,
 	ctx.old_count = G_MININT64;
 	ctx.old_version = G_MININT64;
 	ctx.old_size = G_MININT64;
-	ctx.versioning = VERSIONS_ENABLED(max_versions);
+	ctx.versioning = VERSIONS_ENABLED(args->max_versions);
 	SHA256_randomized_buffer(ctx.uid, sizeof(ctx.uid));
 
 	// Merge the previous versions of the beans with the new part
-	err = m2db_get_alias(sq3, url, M2V2_FLAG_NOPROPS, _keep_old_bean, &ctx);
+	err = m2db_get_alias(args->sq3, args->url, M2V2_FLAG_NOPROPS, _keep_old_bean, &ctx);
 	/* Content does not exist or is deleted */
 	if (err && err->code == CODE_CONTENT_NOTFOUND &&
-			!VERSIONS_DISABLED(max_versions)) {
+			!VERSIONS_DISABLED(args->max_versions)) {
 		ctx.fresh = TRUE; // Do a PUT instead of append
 		g_clear_error(&err);
 	}
@@ -1886,13 +1886,13 @@ m2db_append_to_alias(struct sqlx_sqlite3_s *sq3, namespace_info_t *ni,
 	/* Append the old beans that will be kept */
 	if (!err) {
 		if (ctx.fresh) {
-			struct m2db_put_args_s args;
-			memset(&args, 0, sizeof(args));
-			args.sq3 = sq3;
-			args.url = url;
-			args.max_versions = max_versions;
-			args.nsinfo = *ni;
-			err = m2db_put_alias(&args, beans, cb, u0);
+			struct m2db_put_args_s args2;
+			memset(&args2, 0, sizeof(args2));
+			args2.sq3 = args->sq3;
+			args2.url = args->url;
+			args2.max_versions = args->max_versions;
+			args2.nsinfo = args->nsinfo;
+			err = m2db_put_alias(&args2, beans, cb, u0);
 		}
 		else {
 			GRID_TRACE("M2 already %u beans, version=%"G_GINT64_FORMAT
@@ -1902,7 +1902,7 @@ m2db_append_to_alias(struct sqlx_sqlite3_s *sq3, namespace_info_t *ni,
 					ctx.old_size, ctx.md->str);
 			gint64 append_size = 0;
 
-			ctx.container_version = 1 + m2db_get_version(sq3);
+			ctx.container_version = 1 + m2db_get_version(args->sq3);
 			ctx.old_count = ctx.tmp->len ? ctx.old_count + 1 : 0;
 			if (ctx.old_version == G_MININT64) {
 				ctx.old_version = 0;
@@ -1910,31 +1910,47 @@ m2db_append_to_alias(struct sqlx_sqlite3_s *sq3, namespace_info_t *ni,
 
 			/* append and mangle the new beans */
 			GRID_TRACE("MANGLE NEW BEAN => v + 1");
-			for (; beans ;beans=beans->next) {
-				if( _mangle_new_bean(&ctx, beans->data)) {
+			for (; beans; beans=beans->next) {
+				if(_mangle_new_bean(&ctx, beans->data)) {
 					append_size = CONTENTS_HEADERS_get_size(beans->data);
 				}
 			}
 
+			/* Check that the merged list of beans is coherent */
+			struct check_args_s check_args;
+			memset(&check_args, 0, sizeof(check_args));
+			check_args.ns_info = &(args->nsinfo);
+			check_args.lbpool = args->lbpool;
+			check_args.mask_checks = m2db_get_mask_check_put(check_args.ns_info);
+
+			GSList *new_beans = metautils_gpa_to_list(ctx.tmp);
+			err = m2db_check_alias_beans_list(args->url, new_beans, &check_args);
+			g_slist_free(new_beans);
+			if (err) {
+				g_prefix_error(&err, "Invalid beans: ");
+				err->code = 400;
+				goto end;
+			}
+
 			/* Now save the whole */
-			if (!(err = _db_save_beans_array(sq3->db, ctx.tmp)) && cb) {
+			if (!(err = _db_save_beans_array(args->sq3->db, ctx.tmp)) && cb) {
 				guint i;
 				for (i=0; i<ctx.tmp->len; i++) {
 					cb(u0, _bean_dup(ctx.tmp->pdata[i]));
 				}
 			}
-			if (VERSIONS_ENABLED(max_versions)) {
+			if (VERSIONS_ENABLED(args->max_versions)) {
 				// Container size is cumulative. Even if some chunks are
 				// referenced by another alias version, we count them.
-				m2db_set_size(sq3,
-						m2db_get_size(sq3) + append_size + ctx.old_size);
+				m2db_set_size(args->sq3,
+						m2db_get_size(args->sq3) + append_size + ctx.old_size);
 			} else {
-				m2db_set_size(sq3, m2db_get_size(sq3) + append_size);
+				m2db_set_size(args->sq3, m2db_get_size(args->sq3) + append_size);
 			}
-			if (!err && VERSIONS_DISABLED(max_versions)) {
+			if (!err && VERSIONS_DISABLED(args->max_versions)) {
 				// We must not let old contents in the base or
 				// synchronous deletion won't delete all chunks.
-				_delete_contents_by_id(sq3, ctx.old_uid, &err);
+				_delete_contents_by_id(args->sq3, ctx.old_uid, &err);
 				if (err) {
 					GRID_DEBUG("%s", err->message);
 					GRID_WARN("Some chunks may be referenced twice, purge recommended");
@@ -1944,6 +1960,7 @@ m2db_append_to_alias(struct sqlx_sqlite3_s *sq3, namespace_info_t *ni,
 		}
 	}
 
+end:
 	g_string_free(ctx.md, TRUE);
 	g_string_free(ctx.policy, TRUE);
 	_bean_cleanv2(ctx.tmp);
