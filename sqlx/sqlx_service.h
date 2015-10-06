@@ -3,6 +3,10 @@
 
 #define PSRV(P) ((struct sqlx_service_s*)(P))
 
+#define SQLX_MAX_BASES_PERCENT(max)   (max * 30) / 100
+#define SQLX_MAX_PASSIVE_PERCENT(max) (max * 40) / 100
+#define SQLX_MAX_ACTIVE_PERCENT(max)  (max * 30) / 100
+
 struct sqlx_service_config_s;
 struct sqlx_service_s;
 

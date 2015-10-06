@@ -447,7 +447,7 @@ sqlx_cache_reset_bases(sqlx_cache_t *cache, guint max)
 	g_mutex_lock(cache->lock);
 
 	if (cache->used) {
-		GRID_WARN("SQLX base cahce cannot be reset: already in use");
+		GRID_WARN("SQLX base cache cannot be reset: already in use");
 	}
 	else {
 		BEACON_RESET(&(cache->beacon_free));
