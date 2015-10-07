@@ -226,7 +226,7 @@ _pool_unmonitor(struct gridd_client_pool_s *pool, int fd)
 static void
 _manage_timeouts(struct gridd_client_pool_s *pool)
 {
-	GTimeVal now;
+	GTimeVal now, end, diff;
 	struct event_client_s *ec;
 
 	if (pool->active_count <= 0)
@@ -236,7 +236,7 @@ _manage_timeouts(struct gridd_client_pool_s *pool)
 	if (pool->last_timeout_check == now.tv_sec)
 		return;
 
-	for (int i=0; i<pool->active_clients_size ;i++) {
+	for (int i=0; i<pool->active_clients_size; i++) {
 
 		if (!(ec = pool->active_clients[i]))
 			continue;
@@ -246,35 +246,48 @@ _manage_timeouts(struct gridd_client_pool_s *pool)
 
 		if (gridd_client_expired(ec->client, &now)) {
 			GRID_INFO("EXPIRED Client fd=%d [%s]", i, gridd_client_url(ec->client));
+			GError *err = NEWERROR(CODE_NETWORK_ERROR, "Timeout");
+			gridd_client_fail(ec->client, err);
+			g_clear_error(&err);
 			_pool_unmonitor(pool, i);
 			event_client_free(ec);
 		}
 	}
+
+	g_get_current_time(&end);
+	timersub(&end, &now, &diff);
+	if (diff.tv_sec > 5)
+		GRID_WARN("Client pool timeout check took %lds!", diff.tv_sec);
+	else if (GRID_DEBUG_ENABLED())
+		GRID_DEBUG("Client pool timeout check took %ld.%06lds",
+				diff.tv_sec, diff.tv_usec);
 }
 
 static void
 _manage_requests(struct gridd_client_pool_s *pool)
 {
+	GTimeVal start, end, diff;
 	struct event_client_s *ec;
 
 	EXTRA_ASSERT(pool != NULL);
 
+	g_get_current_time(&start);
 	while (pool->active_count < pool->active_max) {
 		ec = g_async_queue_try_pop(pool->pending_clients);
 		if (NULL == ec)
-			return;
+			break;
 		EXTRA_ASSERT(ec->client != NULL);
 
 		if (!gridd_client_start(ec->client)) {
 			GError *err = gridd_client_error(ec->client);
 			if (NULL != err) {
-				GRID_WARN("STARTUP Client fd=%d [%s] : (%d) %s",
+				GRID_WARN("STARTUP Client fd=%d [%s]: (%d) %s",
 						gridd_client_fd(ec->client), gridd_client_url(ec->client),
 						err->code, err->message);
 				g_clear_error(&err);
 			}
 			else {
-				GRID_WARN("STARTUP Client fd=%d [%s] : already started",
+				GRID_WARN("STARTUP Client fd=%d [%s]: already started",
 						gridd_client_fd(ec->client), gridd_client_url(ec->client));
 				g_assert(err != NULL);
 			}
@@ -282,6 +295,20 @@ _manage_requests(struct gridd_client_pool_s *pool)
 		}
 		else if (!event_client_monitor(pool, ec))
 			event_client_free(ec);
+	}
+
+	g_get_current_time(&end);
+	timersub(&end, &start, &diff);
+	gint qlen = g_async_queue_length(pool->pending_clients);
+	if (diff.tv_sec > 5) {
+		GRID_WARN("Client pool request management took %lds!",
+				diff.tv_sec);
+		if (qlen > 1000)
+			GRID_WARN("Client pool still has %d pending requests", qlen);
+	} else if (GRID_DEBUG_ENABLED()) {
+		GRID_DEBUG("Client pool request management took %ld.%06lds",
+				diff.tv_sec, diff.tv_usec);
+		GRID_DEBUG("Client pool has %d pending requests", qlen);
 	}
 }
 

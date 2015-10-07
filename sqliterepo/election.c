@@ -1053,16 +1053,11 @@ step_WatchMaster_change(zhandle_t *handle, int type, int state,
 
 	member = d;
 	if (member && MMANAGER(member) && MMANAGER(member)->exiting) {
-		GRID_INFO("ZK callback triggered during exit");
+		GRID_INFO("ZK 'master change' callback triggered during exit, ignored");
 		return;
 	}
 	member_trace(__FUNCTION__, "CHANGE", member);
 	MEMBER_CHECK(member);
-
-	/* Master may change because peers changed in meta1,
-	 * so we need to flush the cache to avoid starting
-	 * an election with wrong peers. */
-	member_decache_peers(member);
 
 	member_lock(member);
 	transition(member, EVT_MASTER_CHANGE, NULL);
@@ -1083,13 +1078,11 @@ step_WatchNode_change(zhandle_t *handle, int type, int state,
 
 	member = d;
 	if (member && MMANAGER(member) && MMANAGER(member)->exiting) {
-		GRID_INFO("ZK callback triggered during exit");
+		GRID_INFO("ZK 'node change' callback triggered during exit, ignored");
 		return;
 	}
 	MEMBER_CHECK(member);
 	member_trace(__FUNCTION__, "CHANGE", member);
-
-	member_decache_peers(member);
 
 	member_lock(member);
 	transition(member, EVT_NODE_LEFT, NULL);
@@ -1744,8 +1737,10 @@ on_end_GETVERS(struct event_client_s *mc)
 		transition(member, EVT_GETVERS_CONCURRENT, &(udata->reqid));
 	else {
 		GRID_DEBUG("GETVERS error: (%d) %s", err->code, err->message);
-		// We may have asked the wrong peer
-		member_decache_peers(member);
+		if (err->code == CODE_CONTAINER_NOTFOUND) {
+			// We may have asked the wrong peer
+			member_decache_peers(member);
+		}
 		transition(member, EVT_GETVERS_ERROR, &(udata->reqid));
 	}
 	member_unlock(member);
