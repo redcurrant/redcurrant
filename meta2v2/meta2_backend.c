@@ -24,6 +24,7 @@
 #include <meta2v2/meta2_backend_internals.h>
 
 #include <meta2/remote/meta2_remote.h>
+#include <sqliterepo/sqlx_remote_ex.h>
 
 #include <resolver/hc_resolver.h>
 
@@ -825,6 +826,7 @@ meta2_backend_create_container(struct meta2_backend_s *m2,
 		struct hc_url_s *url, struct m2v2_create_params_s *params)
 {
 	GError *err = NULL;
+	gchar maxvers_str[32];
 	enum m2v2_open_type_e open_mode = 0;
 	struct sqlx_sqlite3_s *sq3 = NULL;
 
@@ -838,6 +840,15 @@ meta2_backend_create_container(struct meta2_backend_s *m2,
 	if (params->storage_policy) {
 		if (NULL != (err = _check_policy(m2, params->storage_policy)))
 			return err;
+	}
+
+	/* An undefined number of versions is dangerous, we must fix it. */
+	if (!params->version_policy) {
+		gint64 maxvers = m2b_max_versions(m2, hc_url_get(url, HCURL_NS));
+		g_snprintf(maxvers_str, sizeof(maxvers_str), "%"G_GINT64_FORMAT, maxvers);
+		params->version_policy = maxvers_str;
+		GRID_DEBUG("Forcing number of versions for [%s] to %"G_GINT64_FORMAT,
+				hc_url_get(url, HCURL_WHOLE), maxvers);
 	}
 
 	if (params->local) // NOREFCHECK: do not call get_peers()
@@ -921,6 +932,30 @@ meta2_backend_destroy_container(struct meta2_backend_s *m2,
 			if (!err && peers != NULL && g_strv_length(peers) > 0) {
 				err = m2v2_remote_execute_DESTROY_many(
 						peers, NULL, url, flags);
+				if (err) {
+					// Destroy has failed on some peer, try a rollback
+					// on other peers by asking them to restore the base.
+					GError *local_err = NULL;
+					GByteArray *dump = NULL;
+					struct sqlx_name_s bname = {
+							"", sq3->logical_name, sq3->logical_type};
+					// The base is supposed to be empty when we destroy it,
+					// but the file may still be big as we never explicitly
+					// call VACUUM.
+					sqlx_exec(sq3->db, "VACUUM");
+					local_err = sqlx_repository_dump_base_gba(sq3, &dump);
+					if (!local_err) {
+						local_err = sqlx_remote_execute_RESTORE_many(peers,
+								NULL, &bname, dump);
+					}
+					if (local_err) {
+						g_prefix_error(&err, "Restoration failed (%s) "
+								"after partial destroy: ",
+								local_err->message);
+					}
+					metautils_gba_unref(dump);
+					g_clear_error(&local_err);
+				}
 				g_strfreev(peers);
 				peers = NULL;
 			}

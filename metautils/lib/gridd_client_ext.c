@@ -290,8 +290,9 @@ gridd_clients_step(struct client_s **clients)
 			gridd_client_fail(last, err);
 			g_clear_error(&err);
 		}
-		else
+		else if (pfd[i].revents & (POLLIN|POLLOUT)) {
 			gridd_client_react(last);
+		}
 	}
 
 	/* Now check for expired clients */

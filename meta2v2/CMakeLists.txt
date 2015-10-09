@@ -68,6 +68,7 @@ add_library(meta2v2remote SHARED
 
 target_link_libraries(meta2v2remote
 		meta2v2utils metacomm metautils
+		sqlitereporemote
 		${GLIB2_LIBRARIES} ${SQLITE3_LIBRARIES})
 
 add_library(meta2v2 SHARED

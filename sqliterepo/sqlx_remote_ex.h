@@ -18,13 +18,37 @@ GError* sqlx_remote_execute_DESTROY(const gchar *target, GByteArray *sid,
 /**
  * Locally destroy an SQLX database on several services.
  *
- * @param targets An array of services managing the database.
+ * @param targets An array of services managing the database. After the
+ *   operation, this array will contain the addresses of services that
+ *   have succeeded with the destruction.
  * @param sid Unused
  * @param name The name of the database
- * @param local
  */
 GError* sqlx_remote_execute_DESTROY_many(gchar **targets, GByteArray *sid,
 		struct sqlxsrv_name_s *name);
+
+/**
+ * Locally destroy an SQLX database on several services. After the
+ *   operation, this array will contain the addresses of services that
+ *   have succeeded with the destruction.
+ *
+ * @param targets An array of services managing the database.
+ * @param sid Unused
+ * @param req an already packed DESTROY request (will be freed)
+*/
+GError* sqlx_remote_execute_packed_DESTROY_many(gchar **targets,
+		GByteArray *sid, GByteArray *req);
+
+/**
+ * Restore a base on several services.
+ *
+ * @param targets An array of services managing the database
+ * @param sid Unused
+ * @param name The name of the base
+ * @param dump The content of the local database
+ */
+GError* sqlx_remote_execute_RESTORE_many(gchar **targets, GByteArray *sid,
+		struct sqlx_name_s *name, GByteArray *dump);
 
 /**
  * Get a value from 'admin' table.
