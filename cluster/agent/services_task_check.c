@@ -56,6 +56,32 @@ zero_service_stats(GPtrArray *pa)
 }
 
 /**
+ * @return TRUE if "agent_check" tag is missing or is true,
+ *   false otherwise
+ */
+static gboolean
+_agent_check_enabled(struct service_info_s *si)
+{
+	if (!si)
+		return FALSE;
+	gboolean srv_check_enabled = TRUE;
+	service_tag_t *tag = service_info_get_tag(si->tags,
+			NAME_TAGNAME_AGENT_CHECK);
+	if (tag) {
+		GError *err = NULL;
+		if (tag->type == STVT_BOOL) {
+			service_tag_get_value_boolean(tag, &srv_check_enabled, &err);
+		} else {
+			gchar buf[64] = {0};
+			service_tag_get_value_string(tag, buf, sizeof(buf), &err);
+			srv_check_enabled = metautils_cfg_get_bool(buf, TRUE);
+		}
+		g_clear_error(&err);
+	}
+	return srv_check_enabled;
+}
+
+/**
  * Find the service in the conscience and set its score to 0, and call
  * zero_service_stats() on the conscience service.
  */
@@ -161,7 +187,7 @@ _detect_obsolete_services(struct namespace_data_s *ns_data)
 	time_down = time_now - 5;
 	time_broken = time_now - 30;
 	counter = 0;
-	
+
 	if (!ns_data->configured) {
 		TRACE_POSITION();
 		return;
@@ -173,7 +199,7 @@ _detect_obsolete_services(struct namespace_data_s *ns_data)
 		str_key = s_k;
 		si = s_v;
 		si->score.value = -2;/*score not set*/
-		if (si->score.timestamp < time_down) {
+		if (si->score.timestamp < time_down && _agent_check_enabled(si)) {
 			gchar str_addr[STRLEN_ADDRINFO];
 
 			addr_info_to_string(&(si->addr),str_addr,sizeof(str_addr));
@@ -347,29 +373,13 @@ allservice_check_start_HT(struct namespace_data_s *ns_data, GHashTable *ht)
 	g_hash_table_iter_init(&iter_serv, ht);
 	while (g_hash_table_iter_next(&iter_serv, &k, &v)) {
 		struct service_info_s *si = v;
-		gboolean srv_check_enabled = TRUE;
-
-		/* Services can disable TCP checks (enabled by default) */
-		service_tag_t *tag = service_info_get_tag(si->tags,
-				NAME_TAGNAME_AGENT_CHECK);
-		if (tag) {
-			GError *err = NULL;
-			if (tag->type == STVT_BOOL) {
-				service_tag_get_value_boolean(tag, &srv_check_enabled, &err);
-			} else {
-				gchar buf[64] = {0};
-				service_tag_get_value_string(tag, buf, sizeof(buf), &err);
-				srv_check_enabled = metautils_cfg_get_bool(buf, TRUE);
-			}
-			g_clear_error(&err);
-		}
 
 		memset(&td_scheme, 0x00, sizeof(td_scheme));
 		offset = g_snprintf(td_scheme.task_name, sizeof(td_scheme.task_name), "%s.", TASK_ID);
 		addr_info_to_string(&(si->addr), td_scheme.task_name+offset, sizeof(td_scheme.task_name)-offset);
 		g_strlcpy(td_scheme.ns_name, ns_data->name, sizeof(td_scheme.ns_name)-1);
 
-		if (!srv_check_enabled) {
+		if (!_agent_check_enabled(si)) {
 			GRID_DEBUG("Task [%s] disabled by "
 					NAME_TAGNAME_AGENT_CHECK, td_scheme.task_name);
 		} else if (!is_task_scheduled(td_scheme.task_name)) {
@@ -396,7 +406,7 @@ allservice_check_start_HT(struct namespace_data_s *ns_data, GHashTable *ht)
 				ERROR("Memory allocation failure");
 				continue;
 			}
-			
+
 			/* now start the task! */
 			if (add_task_to_schedule(task, &error_local))
 				INFO("Task started: %s", td_scheme.task_name);
