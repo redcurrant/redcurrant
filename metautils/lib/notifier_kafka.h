@@ -14,7 +14,7 @@ struct kafka_handle_s;
  * Compatible with typedef notifier_configure. */
 GError *kafka_configure(const namespace_info_t *nsinfo,
 		struct grid_lbpool_s *lb_pool, GSList *topics,
-		struct kafka_handle_s **handle);
+		gint64 timeout, struct kafka_handle_s **handle);
 
 /** Sending function for Kafka notifier.
  * Compatible with typedef notifier_send. */

@@ -99,7 +99,8 @@ metautils_notif_pool_clear(metautils_notif_pool_t **pool)
 
 GError *
 metautils_notif_pool_configure_type(metautils_notif_pool_t *pool,
-		namespace_info_t *nsinfo, const gchar *type, GSList *topics)
+		namespace_info_t *nsinfo, const gchar *type, GSList *topics,
+		gint64 timeout)
 {
 	GError *err = NULL;
 	struct notifier_s *notifier = NULL;
@@ -119,7 +120,7 @@ metautils_notif_pool_configure_type(metautils_notif_pool_t *pool,
 	}
 
 	if (!err) {
-		err = notifier->configure(nsinfo, pool->lb_pool, topics,
+		err = notifier->configure(nsinfo, pool->lb_pool, topics, timeout,
 				&(notifier->handle));
 	}
 

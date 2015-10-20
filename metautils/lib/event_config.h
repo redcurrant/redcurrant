@@ -48,6 +48,12 @@ const gchar *event_get_notifier_topic_name(struct event_config_s *evt_config,
 		const gchar *default_topic);
 
 /**
+ * Get the message timeout defined in configuration, in milliseconds.
+ * Returns -1 by default.
+ */
+gint64 event_get_notifier_timeout(struct event_config_s *evt_config);
+
+/**
  * @param evt_config
  * @return
  */
