@@ -89,7 +89,7 @@ kafka_send(struct kafka_handle_s *handle, const gchar *topic_name,
 
 GError *
 _kafka_prepare_topic(struct kafka_handle_s *handle,
-		 const gchar *topic_name)
+		const gchar *topic_name, gint64 timeout)
 {
 	GError *err = NULL;
 	rd_kafka_topic_t *topic = NULL;
@@ -116,7 +116,7 @@ _kafka_prepare_topic(struct kafka_handle_s *handle,
 		// Zero partition? Write to partition 0
 		// and hope it will be automatically created.
 		if (partition_cnt == 0) {
-			GRID_DEBUG("No already created partition for topic [%s], "
+			GRID_NOTICE("No already created partition for topic [%s], "
 					"writing to [0]", rd_kafka_topic_name(rkt));
 			return 0;
 		}
@@ -160,6 +160,12 @@ _kafka_prepare_topic(struct kafka_handle_s *handle,
 	// created with this configuration, and next callers can pass NULL.
 	rd_kafka_topic_conf_t *topic_conf = rd_kafka_topic_conf_new();
 	rd_kafka_topic_conf_set_partitioner_cb(topic_conf, _partitioner);
+	if (timeout >= 0) { // The default for rdkafka is 300000
+		gchar to_str[32] = {0};
+		g_snprintf(to_str, sizeof(to_str), "%"G_GINT64_FORMAT, timeout);
+		rd_kafka_topic_conf_set(topic_conf, "message.timeout.ms", to_str,
+				NULL, 0);
+	}
 	err = _kafka_topic_ref(handle, topic_name, topic_conf, &topic);
 	if (!err) {
 		g_hash_table_insert(handle->kafka_topics, g_strdup(topic_name), topic);
@@ -175,6 +181,25 @@ _kafka_logger(const rd_kafka_t *rk, int level, const char *fac, const char *buf)
 	(void) fac;
 	int redc_level = 1 << MAX(0, level-3);
 	GRID_LOG(redc_level, "%s: %s", rk ? rd_kafka_name(rk) : "", buf);
+}
+
+static void
+_kafka_dr_cb(rd_kafka_t *rk, void *payload, size_t len,
+		rd_kafka_resp_err_t err, void *opaque, void *msg_opaque)
+{
+	(void) rk;
+	(void) opaque;
+	(void) msg_opaque;
+	if (err) {
+		if (((char*)payload)[0] == '{') {
+			// Message is JSON, we can print it
+			GRID_WARN("Message not delivered ((%d) %s): %.*s",
+					err, rd_kafka_err2str(err), (int)len, (char*) payload);
+		} else {
+			GRID_WARN("Message not delivered ((%d) %s): <%zd bytes>",
+					err, rd_kafka_err2str(err), len);
+		}
+	}
 }
 
 void
@@ -195,7 +220,7 @@ kafka_free(struct kafka_handle_s *handle)
 
 GError *
 kafka_configure(const namespace_info_t *nsinfo, struct grid_lbpool_s *lb_pool,
-		GSList *topics, struct kafka_handle_s **handle)
+		GSList *topics, gint64 timeout, struct kafka_handle_s **handle)
 {
 	(void) nsinfo;
 	GError *err = NULL;
@@ -219,13 +244,17 @@ kafka_configure(const namespace_info_t *nsinfo, struct grid_lbpool_s *lb_pool,
 		}
 		grid_addrinfo_to_string(&(svc->addr), broker, sizeof(broker));
 
-		// TODO: customize configuration
-		rd_kafka_t *k_handle = rd_kafka_new(RD_KAFKA_PRODUCER, NULL,
+		rd_kafka_conf_t *kconf = rd_kafka_conf_new();
+		rd_kafka_conf_set(kconf, "delivery.report.only.error", "true", NULL, 0);
+		rd_kafka_conf_set_dr_cb(kconf, _kafka_dr_cb);
+
+		rd_kafka_t *k_handle = rd_kafka_new(RD_KAFKA_PRODUCER, kconf,
 				errmsg, sizeof(errmsg));
 
 		if (!k_handle) {
 			err = NEWERROR(CODE_INTERNAL_ERROR,
 					"Failed to initialize Kafka: %s", errmsg);
+			// FIXME: maybe free kconf (documentation is unclear)
 			goto end;
 		}
 		rd_kafka_set_logger(k_handle, _kafka_logger);
@@ -239,10 +268,13 @@ kafka_configure(const namespace_info_t *nsinfo, struct grid_lbpool_s *lb_pool,
 		l_handle->kafka_topics = g_hash_table_new_full(g_str_hash, g_str_equal,
 				g_free, (GDestroyNotify)rd_kafka_topic_destroy);
 		l_handle->kafka = k_handle;
+	} else {
+		int nb_events = rd_kafka_poll(l_handle->kafka, 0);
+		GRID_DEBUG("Handled %d kafka events", nb_events);
 	}
 
 	for (GSList *cursor = topics; cursor != NULL; cursor = cursor->next) {
-		err = _kafka_prepare_topic(l_handle, cursor->data);
+		err = _kafka_prepare_topic(l_handle, cursor->data, timeout);
 		if (err) {
 			GRID_WARN("Failed to prepare topic %s: %s",
 					(gchar*)cursor->data, err->message);

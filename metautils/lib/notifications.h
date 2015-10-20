@@ -7,7 +7,8 @@
 /** Function type for notifier configuration or reconfiguration.
  * handle is an in/out parameter. It is opaque to the caller. */
 typedef GError *(*notifier_configure)(const namespace_info_t *nsinfo,
-		struct grid_lbpool_s *lbpool, GSList *topics, gpointer *handle);
+		struct grid_lbpool_s *lbpool, GSList *topics, gint64 timeout,
+		gpointer *handle);
 /** Function type for sending a notification. */
 typedef GError *(*notifier_send)(gpointer handle, const gchar *topic,
 		const guint32 *key, GByteArray *data);
@@ -56,9 +57,11 @@ void metautils_notif_pool_clear(metautils_notif_pool_t **notifier);
  * @param type the notifier type to configure (ex: "kafka")
  * @param topics a list of topics the notifier must be prepared
  *   to send notifications to
+ * @param timeout Message timeout in milliseconds (-1 for default)
  */
 GError *metautils_notif_pool_configure_type(metautils_notif_pool_t *pool,
-		namespace_info_t *nsinfo, const gchar *type, GSList *topics);
+		namespace_info_t *nsinfo, const gchar *type,
+		GSList *topics, gint64 timeout);
 
 /** Remove a notifier type from the notifier pool. */
 void metautils_notif_pool_clear_type(metautils_notif_pool_t *pool,

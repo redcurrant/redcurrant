@@ -13,9 +13,8 @@ struct event_config_s {
 	gint64 seq;
 	gchar *dir;
 	gboolean aggregate;
-	time_t last_error;
-	time_t delay_on_error;
 	gchar *kafka_topic;
+	gint64 kafka_timeout;
 };
 
 struct event_config_repo_s {
@@ -42,8 +41,9 @@ event_config_create(void)
 	result->seq = 0;
 	result->dir = g_strdup("/var/spool/redcurrant");
 	result->aggregate = FALSE;
-	result->last_error = 0;
-	result->delay_on_error = 0;
+	result->kafka_enabled = FALSE;
+	result->kafka_topic = NULL;
+	result->kafka_timeout = -1L;
 
 	return result;
 }
@@ -82,12 +82,15 @@ event_config_dump(struct event_config_s *evt_config)
 
 	g_mutex_lock(evt_config->lock);
 	g_string_append_printf(out,"enabled=%s; kafka_enabled=%s; dir=%s; aggr=%s,"
-			" seq=%"G_GINT64_FORMAT,
+			" seq=%"G_GINT64_FORMAT"; "
+			"kafka_topic=%s; kafka_timeout=%"G_GINT64_FORMAT,
 			evt_config->enabled ? "yes":"no",
 			evt_config->kafka_enabled ? "yes":"no",
 			evt_config->dir,
 			evt_config->aggregate ? "yes":"no",
-			evt_config->seq);
+			evt_config->seq,
+			evt_config->kafka_topic,
+			evt_config->kafka_timeout);
 	g_mutex_unlock(evt_config->lock);
 
 	out = g_string_append(out, "}");
@@ -123,11 +126,16 @@ event_config_reconfigure(struct event_config_s *evt_config,
 			if (evt_config->kafka_topic)
 				g_free(evt_config->kafka_topic);
 			evt_config->kafka_topic = g_strdup(val);
-		} else if(0 == g_ascii_strncasecmp(tok[i], "dir", 3)) {
+		} else if (0 == g_ascii_strncasecmp(tok[i], "kafka_timeout", 13)) {
+			gchar *endptr = NULL;
+			gint64 to = g_ascii_strtoll(val, &endptr, 10);
+			if (endptr != val)
+				evt_config->kafka_timeout = to;
+		} else if (0 == g_ascii_strncasecmp(tok[i], "dir", 3)) {
 			if (evt_config->dir)
 				g_free(evt_config->dir);
 			evt_config->dir = g_strdup(val);
-		} else if(0 == g_ascii_strncasecmp(tok[i], "aggregate", 9)) {
+		} else if (0 == g_ascii_strncasecmp(tok[i], "aggregate", 9)) {
 			evt_config->aggregate = metautils_cfg_get_bool(val, FALSE);
 		}
 	}
@@ -159,6 +167,15 @@ event_get_notifier_topic_name(struct event_config_s *evt_config, const gchar *de
 	} else {
 		return evt_config->kafka_topic;
 	}
+}
+
+gint64
+event_get_notifier_timeout(struct event_config_s *evt_config)
+{
+	if (!evt_config)
+		return -1;
+	else
+		return evt_config->kafka_timeout;
 }
 
 gboolean
