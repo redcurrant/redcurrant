@@ -66,6 +66,8 @@ event_config_destroy(struct event_config_s *evt_config)
 
 	if (evt_config->dir)
 		g_free(evt_config->dir);
+	if (evt_config->kafka_topic)
+		g_free(evt_config->kafka_topic);
 
 	if (lock) {
 		g_mutex_unlock(lock);
