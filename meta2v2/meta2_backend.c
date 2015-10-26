@@ -1386,7 +1386,8 @@ meta2_backend_substitute_chunks(struct meta2_backend_s *m2b,
 	g_assert(m2b != NULL);
 	g_assert(url != NULL);
 
-	// TODO: check that new_chunks->data is really a struct bean_CHUNKS_s *
+	if (DESCR(new_chunks->data) != &descr_struct_CHUNKS)
+		return NEWERROR(CODE_BAD_REQUEST, "The provided bean is not a chunk!");
 
 	err = m2b_open(m2b, url, M2V2_OPEN_MASTERONLY|M2V2_OPEN_ENABLED, &sq3);
 	if (!err) {

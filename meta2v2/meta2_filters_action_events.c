@@ -346,8 +346,10 @@ _notify_kafka(struct gridd_filter_ctx_s *ctx, struct gridd_reply_ctx_s *reply,
 			sublist = l->data;
 			struct bean_ALIASES_s *alias = _find_alias(sublist);
 			if (!alias) {
-				GRID_WARN("Cannot generate event: "
-						"no alias in the list of beans");
+				GString *first = _bean_debug(NULL, sublist->data);
+				GRID_WARN("Cannot generate event: no alias in the list of "
+						"beans. First bean is %s", first->str);
+				g_string_free(first, TRUE);
 				g_slist_free(sublist);
 				continue;
 			}

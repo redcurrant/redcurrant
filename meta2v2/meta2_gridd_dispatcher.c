@@ -235,7 +235,7 @@ static gridd_filter M2V2_DELETE_FILTERS[] =
 	meta2_filter_extract_header_flags32,
 	meta2_filter_action_has_container,
 	meta2_filter_action_delete_content,
-	//meta2_filter_action_notify_content_DELETE,
+	meta2_filter_action_notify_content_DELETE,
 	NULL
 };
 
