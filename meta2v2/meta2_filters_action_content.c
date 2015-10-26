@@ -81,6 +81,9 @@ _bean_list_prepend_cb(gpointer udata, gpointer bean)
 	ctx->l = g_slist_prepend(ctx->l, bean);
 }
 
+/**
+ * Answer beans to the client by batches of 32.
+ */
 static void
 _get_cb(gpointer udata, gpointer bean)
 {
@@ -366,7 +369,6 @@ meta2_filter_action_put_content(struct gridd_filter_ctx_s *ctx,
 {
 	TRACE_FILTER();
 	const char *copy_source = meta2_filter_ctx_get_param(ctx, M2_KEY_COPY_SOURCE);
-	struct hc_url_s *url = meta2_filter_ctx_get_url(ctx);
 
 	reply->did_write = TRUE;
 
@@ -1447,7 +1449,7 @@ _update_beans(struct gridd_filter_ctx_s *ctx, struct gridd_reply_ctx_s *reply,
 		struct on_bean_ctx_s *obc = _on_bean_ctx_init(ctx, reply);
 		err = meta2_backend_get_alias(m2b, url, M2V2_FLAG_NODELETED,
 				_bean_list_prepend_cb, obc);
-		_on_bean_ctx_append_udata_list(obc);
+		_on_bean_ctx_append_all(obc);
 		_on_bean_ctx_clean(obc);
 	}
 
