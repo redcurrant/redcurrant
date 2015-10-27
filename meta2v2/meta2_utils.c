@@ -1517,7 +1517,7 @@ m2db_force_alias(struct m2db_put_args_s *args, GSList *beans)
 			g_clear_error(&err);
 			SHA256_randomized_buffer(uid, sizeof(uid));
 			args2.uid = uid;
-			args2.uid_size = sizeof(uid);
+			args2.uid_size = sizeof(hash_sha256_t)/2;
 			err = m2db_real_put_alias(args->sq3, &args2);
 		}
 	}
@@ -1527,7 +1527,7 @@ m2db_force_alias(struct m2db_put_args_s *args, GSList *beans)
 		else {
 			SHA256_randomized_buffer(uid, sizeof(uid));
 			args2.uid = uid;
-			args2.uid_size = sizeof(uid);
+			args2.uid_size = sizeof(hash_sha256_t)/2;
 			err = m2db_real_put_alias(args->sq3, &args2);
 		}
 	}
@@ -1579,7 +1579,7 @@ m2db_put_alias(struct m2db_put_args_s *args, GSList *beans,
 	SHA256_randomized_buffer(uid, sizeof(uid));
 	args2.put_args = args;
 	args2.uid = uid;
-	args2.uid_size = sizeof(uid);
+	args2.uid_size = sizeof(hash_sha256_t)/2;
 	args2.cb = cb;
 	args2.cb_data = u0;
 	args2.beans = beans;
@@ -1718,6 +1718,7 @@ struct append_context_s
 {
 	GPtrArray *tmp;
 	guint8 uid[32];
+	gsize uid_size;
 	GByteArray *old_uid;
 	GString *md;
 	GString *policy;
@@ -1752,7 +1753,7 @@ _keep_old_bean(gpointer u, gpointer bean)
 	gint64 i64;
 
 	if (DESCR(bean) == &descr_struct_CONTENTS) {
-		CONTENTS_set2_content_id(bean, ctx->uid, sizeof(ctx->uid));
+		CONTENTS_set2_content_id(bean, ctx->uid, ctx->uid_size);
 		if (NULL != (gs = CONTENTS_get_position(bean))) {
 			i64 = g_ascii_strtoll(gs->str, NULL, 10);
 			if (ctx->old_count < i64)
@@ -1800,7 +1801,7 @@ _mangle_new_bean(struct append_context_s *ctx, gpointer bean)
 		bean = _bean_dup(bean);
 		ALIASES_set_container_version(bean, ctx->container_version);
 		ALIASES_set_version(bean, ((ctx->versioning) ? ctx->old_version + 1 : ctx->old_version));
-		ALIASES_set2_content_id(bean, ctx->uid, sizeof(ctx->uid));
+		ALIASES_set2_content_id(bean, ctx->uid, ctx->uid_size);
 		ALIASES_set_mdsys(bean, ctx->md);
 		g_ptr_array_add(ctx->tmp, bean);
 		return FALSE;
@@ -1809,7 +1810,7 @@ _mangle_new_bean(struct append_context_s *ctx, gpointer bean)
 	if (DESCR(bean) == &descr_struct_CONTENTS_HEADERS) {
 		bean = _bean_dup(bean);
 		CONTENTS_HEADERS_set_size(bean, CONTENTS_HEADERS_get_size(bean) + ctx->old_size);
-		CONTENTS_HEADERS_set2_id(bean, ctx->uid, sizeof(ctx->uid));
+		CONTENTS_HEADERS_set2_id(bean, ctx->uid, ctx->uid_size);
 		CONTENTS_HEADERS_set2_policy(bean, ctx->policy->str);
 		CONTENTS_HEADERS_nullify_hash(bean);
 		g_ptr_array_add(ctx->tmp, bean);
@@ -1819,7 +1820,7 @@ _mangle_new_bean(struct append_context_s *ctx, gpointer bean)
 	if (DESCR(bean) == &descr_struct_CONTENTS) {
 		bean = _bean_dup(bean);
 		_increment_position(CONTENTS_get_position(bean), ctx->old_count);
-		CONTENTS_set2_content_id(bean, ctx->uid, sizeof(ctx->uid));
+		CONTENTS_set2_content_id(bean, ctx->uid, ctx->uid_size);
 		g_ptr_array_add(ctx->tmp, bean);
 		return FALSE;
 	}
@@ -1868,6 +1869,7 @@ m2db_append_to_alias(struct m2db_put_args_s *args, GSList *beans,
 	ctx.old_size = G_MININT64;
 	ctx.versioning = VERSIONS_ENABLED(args->max_versions);
 	SHA256_randomized_buffer(ctx.uid, sizeof(ctx.uid));
+	ctx.uid_size = sizeof(hash_sha256_t)/2;
 
 	// Merge the previous versions of the beans with the new part
 	err = m2db_get_alias(args->sq3, args->url, M2V2_FLAG_NOPROPS, _keep_old_bean, &ctx);
@@ -1967,6 +1969,7 @@ end:
 struct update_alias_header_ctx_s {
 	GPtrArray *tmp;
 	guint8 uid[32];
+	gsize uid_size;
 	gint64 container_version;
 	gint64 old_version;
 	gboolean versioning;
@@ -1980,7 +1983,7 @@ _update_new_bean(struct update_alias_header_ctx_s *ctx, gpointer bean)
 		bean = _bean_dup(bean);
 		ALIASES_set_container_version(bean, ctx->container_version);
 		ALIASES_set_version(bean, ((ctx->versioning) ? ctx->old_version + 1 : ctx->old_version));
-		ALIASES_set2_content_id(bean, ctx->uid, sizeof(ctx->uid));
+		ALIASES_set2_content_id(bean, ctx->uid, ctx->uid_size);
 		g_ptr_array_add(ctx->tmp, bean);
 		return;
 	}
@@ -1988,7 +1991,7 @@ _update_new_bean(struct update_alias_header_ctx_s *ctx, gpointer bean)
 	if (DESCR(bean) == &descr_struct_CONTENTS_HEADERS) {
 		/* Update id */
 		bean = _bean_dup(bean);
-		CONTENTS_HEADERS_set2_id(bean, ctx->uid, sizeof(ctx->uid));
+		CONTENTS_HEADERS_set2_id(bean, ctx->uid, ctx->uid_size);
 		g_ptr_array_add(ctx->tmp, bean);
 		return;
 	}
@@ -1996,7 +1999,7 @@ _update_new_bean(struct update_alias_header_ctx_s *ctx, gpointer bean)
 	if (DESCR(bean) == &descr_struct_CONTENTS) {
 		bean = _bean_dup(bean);
 		/* Update id */
-		CONTENTS_set2_content_id(bean, ctx->uid, sizeof(ctx->uid));
+		CONTENTS_set2_content_id(bean, ctx->uid, ctx->uid_size);
 		g_ptr_array_add(ctx->tmp, bean);
 		return;
 	}
@@ -2042,6 +2045,7 @@ m2db_update_alias_header(struct sqlx_sqlite3_s *sq3, gint64 max_versions,
 	ctx.old_version = G_MININT64;
 	ctx.versioning = VERSIONS_ENABLED(max_versions);
 	SHA256_randomized_buffer(ctx.uid, sizeof(ctx.uid));
+	ctx.uid_size = sizeof(hash_sha256_t)/2;
 
 	// Merge the previous versions of the beans with the new part
 	if (NULL != (err = m2db_latest_alias(sq3, url, (gpointer*)(&latest)))) {
@@ -2073,6 +2077,7 @@ struct gen_ctx_s
 	struct storage_policy_s *pol;
 	struct grid_lb_iterator_s *iter;
 	guint8 uid[32];
+	gsize uid_size;
 	guint8 h[32];
 	gint64 size;
 	gint64 chunk_size;
@@ -2351,6 +2356,7 @@ m2_generate_beans_v1(struct hc_url_s *url, gint64 size, gint64 chunk_size,
 	memset(ctx.h, 0, sizeof(ctx.h));
 	memset(ctx.uid, 0, sizeof(ctx.uid));
 	SHA256_randomized_buffer(ctx.uid, sizeof(ctx.uid));
+	ctx.uid_size = sizeof(hash_sha256_t)/2;
 	ctx.iter = iter;
 	ctx.pol = pol;
 	ctx.url = url;
