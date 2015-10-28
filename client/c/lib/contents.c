@@ -1,3 +1,4 @@
+#include <glib.h>
 #include "./gs_internals.h"
 #include "hc.h"
 
@@ -1064,7 +1065,6 @@ hc_set_content_property(gs_content_t *content, char ** props, gs_error_t **e)
 	char target[64];
 	GSList *beans = NULL;
 	gs_status_t status = GS_OK;
-	guint i;
 
 	bzero(target, 64);
 	addr_info_to_string(&(C1_C0(content)->meta2_addr), target, 64);
@@ -1072,7 +1072,7 @@ hc_set_content_property(gs_content_t *content, char ** props, gs_error_t **e)
 	struct hc_url_s *url;
 	fill_hcurl_from_content(content, &url);
 
-	for ( i=0; i < g_strv_length(props); i++) {
+	for (guint i = 0, nb_props = g_strv_length(props); i < nb_props; i++) {
 		struct bean_PROPERTIES_s *bp;
 
 		bp = _bean_create(&descr_struct_PROPERTIES);
@@ -1170,7 +1170,6 @@ hc_delete_content_property(gs_content_t *content, char ** keys ,gs_error_t **e)
 	GError *ge = NULL;
 	char target[64];
 	gs_status_t status= GS_OK;
-	guint i;
 
 	bzero(target, 64);
 	addr_info_to_string(&(C1_C0(content)->meta2_addr), target, 64);
@@ -1191,7 +1190,7 @@ hc_delete_content_property(gs_content_t *content, char ** keys ,gs_error_t **e)
 	}
 
 
-	for ( i=0; i < g_strv_length(keys); i++) {
+	for (guint i = 0, nb_keys = g_strv_length(keys); i < nb_keys; i++) {
 		for ( l=out_beans ; l && l->data ; l=l->next) {
 			if(DESCR(l->data) == &descr_struct_PROPERTIES) {
 				if ( g_ascii_strcasecmp(PROPERTIES_get_key((struct bean_PROPERTIES_s *)l->data)->str,keys[i]) == 0 ) {

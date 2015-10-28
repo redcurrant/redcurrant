@@ -16,6 +16,8 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#include <glib.h>
+
 #include <neon/ne_basic.h>
 #include <neon/ne_request.h>
 #include <neon/ne_session.h>
@@ -141,7 +143,7 @@ _srvinfo_populate_with_rawx_stats(struct service_info_s *si)
 		(void)uData;
 		(void)bSize;
 		char **tok = g_strsplit(b, "\n", 0);
-		for (uint i = 0; i < g_strv_length(tok); i++) {
+		for (uint i = 0, len = g_strv_length(tok); i < len; i++) {
 			if(g_str_has_prefix(tok[i], "rawx.reqpersec")) {
 				char *p = strrchr(tok[i], ' ');
 				if(NULL != p)

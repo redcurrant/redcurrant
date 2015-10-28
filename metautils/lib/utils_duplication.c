@@ -36,18 +36,18 @@ storage_policy_from_metadata(GByteArray *sys_metadata, gchar **storage_policy)
 	gchar buf[sys_metadata->len +1];
 	gchar **metadata_tokens = NULL;
 	GError *result = NULL;
-	guint i = 0;
+	guint i = 0, len = 0;
 
 	bzero(buf, sizeof(buf));
 	memcpy(buf, sys_metadata->data, sys_metadata->len);
 
 	metadata_tokens = g_strsplit(buf, ";", 0);
 
-	for(i = 0; i < g_strv_length(metadata_tokens); i++) {
-		if(!g_str_has_prefix(metadata_tokens[i], "storage-policy"))
+	for (i = 0, len = g_strv_length(metadata_tokens); i < len; i++) {
+		if (!g_str_has_prefix(metadata_tokens[i], "storage-policy"))
 			continue;
 		gchar *p = strchr(metadata_tokens[i], '=');
-		if(p) {
+		if (p) {
 			*storage_policy = g_strdup(p + 1);
 		} else {
 			result = NEWERROR(500,

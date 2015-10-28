@@ -1969,7 +1969,8 @@ meta2_backend_get_conditionned_spare_chunks(struct meta2_backend_s *m2b,
 			return NULL;
 
 		char **urls = g_strsplit(str, "|", 0);
-		for (uint i = 0; i < g_strv_length(urls); i++) {
+		guint splits = g_strv_length(urls);
+		for (uint i = 0; i < splits; i++) {
 			if (strlen(urls[i]) <= 0)
 				continue;
 			struct service_info_s *si = NULL;

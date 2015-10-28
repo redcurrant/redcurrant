@@ -86,11 +86,12 @@ _fill_chunk_id(chunk_id_t *cid, gpointer chunk)
 	/* chunk v2 id => http://ip:port/vol/CID */
 	char *idv2 = CHUNKS_get_id(chunk)->str;
 	char **url_tok = g_strsplit(idv2, "/", 0);
+	guint splits = g_strv_length(url_tok);
 
-	if(g_strv_length(url_tok) >= 5) {
+	if (splits >= 5) {
 		char ** tok_addr = g_strsplit(url_tok[2], ":", 2);
 		GString *vol = g_string_new("");
-		for(guint i = 3; i < g_strv_length(url_tok) - 1; i++)
+		for (guint i = 3; i < splits - 1; i++)
 			g_string_append_printf(vol, "/%s", url_tok[i]);
 		memcpy(cid->vol, vol->str, MIN(strlen(vol->str), sizeof(cid->vol) - 1));
 		g_string_free(vol, TRUE);
@@ -98,7 +99,7 @@ _fill_chunk_id(chunk_id_t *cid, gpointer chunk)
 			addr_info_t *pa = build_addr_info(tok_addr[0], atoi(tok_addr[1]), &e);
 			if(NULL == e) {
 				memcpy(&(cid->addr), pa, sizeof(addr_info_t));
-				hex2bin(url_tok[g_strv_length(url_tok) - 1], cid->id, sizeof(cid->id), &e);
+				hex2bin(url_tok[splits - 1], cid->id, sizeof(cid->id), &e);
 			}
 			if(NULL != pa)
 				g_free(pa);
