@@ -300,6 +300,7 @@ _get_additional_pairs_DUPLI(struct policy_check_s *pc, m2v2_chunk_pair_t *src,
 {
 	struct service_info_s **array = NULL;
 	GSList * result = NULL;
+	guint array_len = 0;
 
 	struct lb_next_opt_ext_s opt;
 	memset(&opt, '\0', sizeof(opt));
@@ -315,7 +316,8 @@ _get_additional_pairs_DUPLI(struct policy_check_s *pc, m2v2_chunk_pair_t *src,
 		return NULL;
 	}
 
-	for (guint i = 0; i < g_strv_length((char **)array); i++)
+	array_len = g_strv_length((char **)array);
+	for (guint i = 0; i < array_len; i++)
 		result = g_slist_prepend(result, _forge_pair_copy_DUPLI(src, array[i]));
 
 	service_info_cleanv(array, FALSE);

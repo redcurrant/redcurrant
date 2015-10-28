@@ -110,9 +110,10 @@ event_config_reconfigure(struct event_config_s *evt_config,
 		gquark_log = g_quark_from_static_string(G_LOG_DOMAIN);
 
 	gchar **tok = g_strsplit(cfg, ";", 0);
+	guint len = g_strv_length(tok);
 	g_mutex_lock(evt_config->lock);
 
-	for(guint i = 0; i < g_strv_length(tok); i++) {
+	for (guint i = 0; i < len; i++) {
 		char *val = NULL;
 		if (!tok[i] || 0 == strlen(tok[i]) || !(val = strchr(tok[i],'='))) {
 			continue;

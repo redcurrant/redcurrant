@@ -2,6 +2,8 @@
 # define G_LOG_DOMAIN "grid.client.resolv.local"
 #endif
 
+#include <glib.h>
+
 #include "./gs_internals.h"
 
 static void
@@ -312,7 +314,7 @@ _service_array_to_slist(char **m2)
 {
 	GSList *result = NULL;
 	addr_info_t *a = NULL;
-	for (uint i = 0 ; i < g_strv_length(m2) ; i++) {
+	for (uint i = 0, len = g_strv_length(m2); i < len; i++) {
 		DEBUG("Got meta2=%s", m2[i]);
 		a = addr_info_from_service_str(m2[i]);
 		if (NULL != a) {

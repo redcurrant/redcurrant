@@ -868,7 +868,7 @@ static void
 __write_container_props_xml(gchar **props, GString **s)
 {
 	*s = g_string_append(*s, "  <properties>\n");
-	for (uint i = 0; i < g_strv_length(props); i++) {
+	for (uint i = 0, len = g_strv_length(props); i < len; i++) {
 		char *p = strchr(props[i], '=');
 		if(!p) {
 			/* cannot split into k v, don't take care */
@@ -988,10 +988,11 @@ _loc_context_to_text(const struct loc_context_s *lc)
 		g_hash_table_foreach(lc->admin_info, __write_admin_info, &s);
 	}
 	g_string_append_printf(s, "\n");
-
-	if(NULL != lc->container_props && g_strv_length(lc->container_props) > 0) {
+	guint nb_props = 0;
+	if (NULL != lc->container_props &&
+			(nb_props = g_strv_length(lc->container_props)) > 0) {
 		s = g_string_append(s, "\t\tProperties :\n");
-		for (uint i = 0; i < g_strv_length(lc->container_props); i++) {
+		for (uint i = 0; i < nb_props; i++) {
 				g_string_append_printf(s, "\t\t\t     %s\n", lc->container_props[i]);
 		}
 		g_string_append_printf(s, "\n");
