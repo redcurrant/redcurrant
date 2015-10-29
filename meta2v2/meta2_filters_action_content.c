@@ -497,7 +497,8 @@ meta2_filter_action_delete_content(struct gridd_filter_ctx_s *ctx,
 		flags = (guint32)atoi(fstr);
 	}
 	sync_del = BOOL(flags & M2V2_FLAG_SYNCDEL);
-
+	if (!sync_del)
+		reply->subject("async");
 	reply->did_write = TRUE;
 
 	TRACE_FILTER();
