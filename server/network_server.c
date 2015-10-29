@@ -64,6 +64,7 @@ struct network_server_s
 	struct grid_stats_holder_s *stats;
 
 	GMutex *lock_threads;
+	GSList *died_threads;
 
 	guint64 counter_created;
 	guint64 counter_destroyed;
@@ -147,9 +148,11 @@ static void _thread_start(struct network_server_s *srv);
 static void _thread_stop(struct network_server_s *srv);
 static void _thread_become_active(struct network_server_s *srv);
 static void _thread_become_inactive(struct network_server_s *srv);
+static void _thread_suicide(struct network_server_s *srv);
 static gboolean _thread_can_die(struct network_server_s *srv);
 
 static guint _start_necessary_threads(struct network_server_s *srv);
+static void _join_died_threads(struct network_server_s *srv);
 
 /* Returns the number of processors, at the runtime */
 static guint _server_count_procs(void);
@@ -635,7 +638,10 @@ network_server_run(struct network_server_s *srv)
 			_server_update_main_stats(srv);
 			last_update = now;
 		}
-		usleep(_start_necessary_threads(srv) ? 50000 : 500000);
+		guint started = _start_necessary_threads(srv);
+		if (!started)
+			_join_died_threads(srv);
+		usleep(started ? 50000 : 500000);
 		clock_gettime(CLOCK_MONOTONIC_COARSE, &srv->now);
 	}
 
@@ -655,6 +661,7 @@ network_server_run(struct network_server_s *srv)
 		srv->thread_events = NULL;
 	}
 
+	_join_died_threads(srv);
 	ARM_WAKER(srv, EPOLL_CTL_DEL);
 
 	GRID_DEBUG("Server %p exiting its main loop", srv);
@@ -1048,6 +1055,7 @@ label_exit:
 		grid_stats_holder_increment_merge(srv->stats, local_stats);
 		grid_stats_holder_clean(local_stats);
 	}
+	_thread_suicide(srv);
 	return td;
 }
 
@@ -1167,6 +1175,14 @@ _thread_become_inactive(struct network_server_s *srv)
 	g_mutex_unlock(srv->lock_threads);
 }
 
+static void
+_thread_suicide(struct network_server_s *srv)
+{
+	g_mutex_lock(srv->lock_threads);
+	srv->died_threads = g_slist_prepend(srv->died_threads, g_thread_self());
+	g_mutex_unlock(srv->lock_threads);
+}
+
 static gboolean
 _thread_can_die(struct network_server_s *srv)
 {
@@ -1250,6 +1266,15 @@ _start_necessary_threads(struct network_server_s *srv)
 	}
 
 	return count;
+}
+
+static void
+_join_died_threads(struct network_server_s *srv)
+{
+	g_mutex_lock(srv->lock_threads);
+	g_slist_free_full(srv->died_threads, (GDestroyNotify) g_thread_join);
+	srv->died_threads = NULL;
+	g_mutex_unlock(srv->lock_threads);
 }
 
 /* Client functions --------------------------------------------------------- */

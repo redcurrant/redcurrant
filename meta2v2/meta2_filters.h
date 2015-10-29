@@ -16,6 +16,7 @@ struct gridd_reply_ctx_s;
 
 struct on_bean_ctx_s {
 	GSList *l;
+	GSList *all;
 	gboolean first;
 	struct gridd_reply_ctx_s *reply;
 	struct gridd_filter_ctx_s *ctx;
@@ -28,10 +29,10 @@ struct on_bean_ctx_s *_on_bean_ctx_init(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply);
 
 /**
- * Concat obc->l and obc->ctx->input_udata into obc->ctx->input_udata
- * if notifications are enabled, else just clean obc->l.
+ * Concat obc->l and obc->all into obc->all if notifications are enabled,
+ * else just clean obc->l.
  */
-void _on_bean_ctx_append_udata_list(struct on_bean_ctx_s *obc);
+void _on_bean_ctx_append_all(struct on_bean_ctx_s *obc);
 
 /**
  *
@@ -39,7 +40,7 @@ void _on_bean_ctx_append_udata_list(struct on_bean_ctx_s *obc);
 void _on_bean_ctx_send_list(struct on_bean_ctx_s *obc, gboolean final);
 
 /**
- *
+ * Move obc->all into obc->ctx->input_udata and clean obc.
  */
 void _on_bean_ctx_clean(struct on_bean_ctx_s *obc);
 

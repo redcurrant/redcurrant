@@ -77,12 +77,15 @@ sqlx_task_reload_lb(struct sqlx_service_s *ss)
 
 static GError*
 _init_events(metautils_notif_pool_t *notifier, namespace_info_t *ns_info,
-		const gchar *topic)
+		struct event_config_s *conf)
 {
 	GError *err = NULL;
+	const gchar *topic = event_get_notifier_topic_name(conf, "redc");
+	gint64 timeout = event_get_notifier_timeout(conf);
 	GSList *topics = g_slist_prepend(NULL, (gpointer)topic);
 	// We only know about kafka
-	err = metautils_notif_pool_configure_type(notifier, ns_info, "kafka", topics);
+	err = metautils_notif_pool_configure_type(notifier, ns_info, "kafka",
+			topics, timeout);
 	g_slist_free(topics);
 	return err;
 }
@@ -108,8 +111,7 @@ sqlx_task_reload_event_config(struct sqlx_service_s *ss)
 			err = event_config_reconfigure(conf, (char *)v);
 			if (!err && event_is_notifier_enabled(conf)) {
 				must_clear_events = FALSE;
-				err = _init_events(notifier, &(ss->nsinfo),
-						event_get_notifier_topic_name(conf, "redc"));
+				err = _init_events(notifier, &(ss->nsinfo), conf);
 				if (err) {
 					GRID_WARN("Failed to initialize notifications (will retry soon): %s",
 							err->message);

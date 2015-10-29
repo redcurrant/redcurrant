@@ -2225,9 +2225,9 @@ module_reload_vns(struct conscience_s *cs, GError ** err)
 		GSList *new_vns_list = NULL;
 
 		/* get vns list we must serve */
-		for(guint i = 0; i < g_strv_length (buf); i++) {
+		for (guint i = 0, nb_vns = g_strv_length(buf); i < nb_vns; i++) {
 			tmp = g_strstrip(g_strdup(buf[i]));
-			INFO("Serving virtual namespace : [%s]", tmp);
+			INFO("Serving virtual namespace: [%s]", tmp);
 			new_vns_list = g_slist_prepend(new_vns_list, tmp);
 		}
 		g_strfreev(buf);
@@ -2311,9 +2311,9 @@ module_init_vns(struct conscience_s *cs, GError ** err)
 		gchar *tmp = NULL;
 
 		/* Place all served vns in the tree */
-		for(guint i = 0; i < g_strv_length (buf); i++) {
+		for (guint i = 0, nb_vns = g_strv_length(buf); i < nb_vns; i++) {
 			tmp = g_strstrip(g_strdup(buf[i]));
-			INFO("Serving virtual namespace : [%s]", tmp);
+			INFO("Serving virtual namespace: [%s]", tmp);
 			init_vns_in_tree(cs->virtual_namespace_tree, tmp);
 			gint64 vns_chunk_size = namespace_chunk_size(&cs->ns_info, tmp);
 			if (vns_chunk_size > cs->ns_info.chunk_size) {
@@ -2416,7 +2416,7 @@ fill_hashtable_with_group(GHashTable *ht, GKeyFile *conf_file, const gchar *grou
 
 	keys = g_key_file_get_keys (conf_file, group_name, &size, &e);
 	if ( NULL != keys) {
-		for (uint i = 0; i < g_strv_length(keys); i++) {
+		for (uint i = 0, nb_keys = g_strv_length(keys); i < nb_keys; i++) {
 			v = g_key_file_get_value (conf_file, group_name, keys[i], &e);
 			if (!v) {
 				GSETERROR (&e, "Cannot get the value");

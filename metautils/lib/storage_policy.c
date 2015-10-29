@@ -140,11 +140,10 @@ _dummy_stgpol(void)
 static void
 __fill_info(GHashTable *params, const char *info)
 {
-	gchar **tok = NULL;
-	tok = g_strsplit(info, "|", 0);
-	for (guint i = 0; i < g_strv_length(tok); i++) {
+	gchar **tok = g_strsplit(info, "|", 0);
+	for (guint i = 0, len = g_strv_length(tok); i < len; i++) {
 		gchar **kv = g_strsplit(tok[i], "=", 2);
-		if(g_strv_length(kv) == 2) {
+		if (g_strv_length(kv) == 2) {
 			g_hash_table_insert(params, g_strdup(kv[0]), g_strdup(kv[1]));
 		}
 		g_strfreev(kv);

@@ -621,18 +621,26 @@ sqlx_service_specific_fini(void)
 	}
 
 	// Cleanup
-	if (SRV.gtq_admin)
+	if (SRV.gtq_admin) {
 		grid_task_queue_destroy(SRV.gtq_admin);
-	if (SRV.gtq_reload)
+		SRV.gtq_admin = NULL;
+	}
+	if (SRV.gtq_reload) {
 		grid_task_queue_destroy(SRV.gtq_reload);
-	if (SRV.gtq_register)
+		SRV.gtq_reload = NULL;
+	}
+	if (SRV.gtq_register) {
 		grid_task_queue_destroy(SRV.gtq_register);
+		SRV.gtq_register = NULL;
+	}
 
 	if (SRV.extras)
 		sqlx_service_extras_clear(&SRV);
 
-	if (SRV.server)
+	if (SRV.server) {
 		network_server_clean(SRV.server);
+		SRV.server = NULL;
+	}
 	if (SRV.dispatcher)
 		gridd_request_dispatcher_clean(SRV.dispatcher);
 	if (SRV.repository)

@@ -153,17 +153,18 @@ __display_friendly_error(gs_error_t *error) {
 static void
 __dump_props(gchar **s)
 {
-	guint i;
+	guint i, nb_props;
 	if (!s)
 		return;
+	nb_props = g_strv_length(s);
 	if (!flag_xml) {
-		for (i = 0; i < g_strv_length(s); i++) {
+		for (i = 0; i < nb_props; i++) {
 			if (s[i])
 				g_print("   [%s]\n", s[i]);
 		}
 	} else {
 		g_print("XML output not yet implemented for properties\n");
-		for (i = 0; i < g_strv_length(s); i++) {
+		for (i = 0; i < nb_props; i++) {
 			if (s[i])
 				g_print("   [%s]\n", s[i]);
 		}
@@ -173,18 +174,19 @@ __dump_props(gchar **s)
 static void
 __dump_services(gchar **s)
 {
-	guint i;
+	guint i, nb_svc;
 	if (!s)
 		return;
+	nb_svc = g_strv_length(s);
 	if (!flag_xml) {
-		for (i = 0; i < g_strv_length(s); i++) {
+		for (i = 0; i < nb_svc; i++) {
 			if (s[i])
 				g_print("   [%s]\n", s[i]);
 		}
 	}
 	else {
 		g_print("<services>\n");
-		for (i = 0; i < g_strv_length(s); i++) {
+		for (i = 0; i < nb_svc; i++) {
 			if (NULL == s[i])
 				continue;
 			struct meta1_service_url_s *m1url;
