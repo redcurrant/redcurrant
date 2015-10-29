@@ -406,6 +406,9 @@ _set_max(struct gridd_client_pool_s *pool, guint max)
 	EXTRA_ASSERT(pool != NULL);
 	EXTRA_ASSERT(pool->vtable == &VTABLE);
 	g_assert(max > 3);
+	gboolean changed = _get_max(pool) != max;
 	pool->active_max = max - 3;
+	if (changed)
+		GRID_INFO("Max active connections set to %u", max);
 }
 

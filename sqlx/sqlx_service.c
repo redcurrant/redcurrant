@@ -148,19 +148,21 @@ static gboolean
 _configure_limits(struct sqlx_service_s *ss, guint max_passive,
 		guint max_active, guint max_bases)
 {
-	guint newval = 0, max = 0;
+	guint newval = 0, max = 0, total = 0, available = 0, min = 0;
 	gboolean changed = FALSE;
 	struct rlimit limit = {0,0};
 
 #define CONFIGURE_LIMIT(cfg,real) do { \
-	max = (limit.rlim_cur - 20) / 3;\
+	max = MIN(max, available); \
 	newval = (cfg > 0 && cfg < max) ? cfg : max; \
-	changed |= newval != real;\
-	real = newval;\
+	newval = newval > min? newval : min; \
+	changed |= newval != real; \
+	real = newval; \
+	available -= real; \
 } while (0)
 
 	if (0 != getrlimit(RLIMIT_NOFILE, &limit)) {
-		GRID_ERROR("Max file descriptor unknown : getrlimit error "
+		GRID_ERROR("Max file descriptor unknown: getrlimit error "
 				"(errno=%d) %s", errno, strerror(errno));
 		return FALSE;
 	}
@@ -170,13 +172,36 @@ _configure_limits(struct sqlx_service_s *ss, guint max_passive,
 		return FALSE;
 	}
 
-	CONFIGURE_LIMIT(max_passive, ss->max_passive);
-	CONFIGURE_LIMIT(max_active, ss->max_active);
-	CONFIGURE_LIMIT(max_bases, ss->max_bases);
+	// We keep 20 FDs for unexpected cases (sqlite sometimes uses
+	// temporary files, event when we ask for memory journals).
+	total = (limit.rlim_cur - 20);
+	// If user sets outstanding values for the first 2 parameters,
+	// there is still 2% available for the 3rd.
+	max = total * 49 / 100;
+	// This is totally arbitrary.
+	min = total / 100;
+
+	available = total;
+	// max_bases cannot be changed at runtime, so we set it first and
+	// clamp the other limits accordingly.
+	CONFIGURE_LIMIT(
+			(max_bases > 0? max_bases : SQLX_MAX_BASES_PERCENT(total)),
+			ss->max_bases);
+	// max_passive > max_active permits answering to clients while
+	// managing internal procedures (elections, replications...).
+	CONFIGURE_LIMIT(
+			(max_passive > 0? max_passive : SQLX_MAX_PASSIVE_PERCENT(total)),
+			ss->max_passive);
+	CONFIGURE_LIMIT(
+			(max_active > 0? max_active : SQLX_MAX_ACTIVE_PERCENT(total)),
+			ss->max_active);
 
 	if (changed)
-		GRID_INFO("Limits set to ACTIVES[%u] PASSIVES[%u] BASES[%u]",
-				ss->max_active, ss->max_passive, ss->max_bases);
+		GRID_INFO("Limits set to ACTIVES[%u] PASSIVES[%u] BASES[%u] "
+				"(%u/%u available file descriptors)",
+				ss->max_active, ss->max_passive, ss->max_bases,
+				ss->max_active + ss->max_passive + ss->max_bases,
+				(guint)limit.rlim_cur);
 
 	return TRUE;
 #undef CONFIGURE_LIMIT
@@ -454,6 +479,9 @@ sqlx_service_action(void)
 {
 	GError *err = NULL;
 
+	// We need to get some values from namespace info
+	grid_task_queue_fire(SRV.gtq_reload);
+
 	gridd_client_pool_set_max(SRV.clients_pool, SRV.max_active);
 	network_server_set_maxcnx(SRV.server, SRV.max_passive);
 	network_server_set_cnx_backlog(SRV.server, SRV.cnx_backlog);
@@ -464,7 +492,6 @@ sqlx_service_action(void)
 		election_manager_set_sync(SRV.election_manager, SRV.sync);
 	sqlx_repository_set_elections(SRV.repository, SRV.election_manager);
 
-	grid_task_queue_fire(SRV.gtq_reload);
 	grid_task_queue_fire(SRV.gtq_admin);
 	grid_task_queue_fire(SRV.gtq_register);
 	GRID_DEBUG("All tasks now fired once");
@@ -540,7 +567,7 @@ sqlx_service_configure_overrides(GHashTable *overrides)
 static void
 sqlx_service_set_defaults(void)
 {
-	SRV.cnx_backlog = 50;
+	SRV.cnx_backlog = 0;
 
 	SRV.cfg_max_bases = 0;
 	SRV.max_passive = 0;
@@ -886,9 +913,10 @@ _task_reload_config(gpointer p)
 
 	network_server_set_max_workers(PSRV(p)->server, (guint) max_workers);
 	network_server_set_maxcnx(PSRV(p)->server, PSRV(p)->max_passive);
-	gridd_client_pool_set_max(PSRV(p)->clients_pool, PSRV(p)->max_active);
 	network_server_set_cnx_backlog(PSRV(p)->server, max_cnx_backlog);
+	gridd_client_pool_set_max(PSRV(p)->clients_pool, PSRV(p)->max_active);
 	sqlx_repository_configure_open_timeout(PSRV(p)->repository, timeout_open);
 	sqlx_repository_configure_max_waiting(PSRV(p)->repository, max_waiting);
-}
+
+	}
 

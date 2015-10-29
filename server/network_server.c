@@ -187,7 +187,8 @@ _cnx_notify_accept(struct network_server_s *srv)
 	g_mutex_lock(srv->lock_threads);
 	++ srv->cnx_accept;
 	++ srv->cnx_clients;
-	inxs = 1 + srv->workers_active > srv->workers_maximum + srv->cnx_backlog ;
+	inxs = 1 + srv->cnx_clients > srv->workers_maximum + srv->cnx_backlog ;
+	inxs |= srv->cnx_clients > srv->cnx_max;
 	g_mutex_unlock(srv->lock_threads);
 	return inxs;
 }
@@ -804,8 +805,14 @@ retry:
 		return NULL;
 	}
 
-	if (_cnx_notify_accept(srv))
-		clt->current_error = NEWERROR(CODE_UNAVAILABLE, "Server overloaded.");
+	if (_cnx_notify_accept(srv)) {
+		clt->current_error = NEWERROR(CODE_UNAVAILABLE, "Server overloaded");
+		GRID_DEBUG(
+				"Server overloaded, workers_active: %u/%u, cnx_clients: %u/%u/%u",
+				srv->workers_active, srv->workers_maximum,
+				srv->cnx_clients, srv->cnx_backlog + srv->workers_maximum,
+				srv->cnx_max);
+	}
 
 	clt->main_stats = srv->stats;
 	clt->server = srv;
@@ -922,7 +929,16 @@ network_server_set_cnx_backlog(struct network_server_s *srv, guint cnx_bl)
 	guint max_bl = MAX(srv->cnx_max - srv->workers_maximum, 0);
 	guint bl = MIN(cnx_bl, max_bl);
 
-	if (bl != cnx_bl)
+	// Each worker will consume one passive connection. `backlog` is the length
+	// of the queue of accepted but not already managed connections. Each new
+	// connection after the queue length reaches `backlog` will be accepted
+	// and immediately answered with the message "Server overloaded". A high
+	// value for `backlog` may result in client timeouts when the server is
+	// under high pressure, but is safer than a low value that would trigger
+	// many "Server overloaded" errors when we replay many elections.
+	bl = cnx_bl > 0? cnx_bl : max_bl * 99 / 100;
+
+	if (bl != cnx_bl && bl != srv->cnx_backlog)
 		GRID_WARN("CNX BACKLOG clamped to [%u]", bl);
 
 	if (bl != srv->cnx_backlog) {
