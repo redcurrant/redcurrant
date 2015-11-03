@@ -159,7 +159,8 @@ __close_base(struct sqlx_sqlite3_s *sq3)
 					sq3->logical_name,
 					sq3->logical_type);
 			if (err) {
-				GRID_WARN("Failed to exit election [%s]", err->message);
+				if (err->code != CODE_CONTAINER_NOTFOUND)
+					GRID_WARN("Failed to exit election [%s]", err->message);
 				g_clear_error(&err);
 			} else {
 				GRID_TRACE("exit election succeeded [%s][%s]",

@@ -1,3 +1,4 @@
+#include <glib.h>
 #include "./gs_internals.h"
 #include <meta2/remote/meta2_services_remote.h>
 
@@ -547,43 +548,42 @@ gs_get_all_services_used( gs_container_t *container, const gchar *srvtype, gs_er
 	gs_service_t **result;
 	GError *gerr = NULL;
 	GSList *list_addr = NULL;
-	
+
 	if (!container) {
 		GSERR_EINVAL(err);
 		return NULL;
 	}
 
-        addr_info_t *meta1_addr = NULL;
+	addr_info_t *meta1_addr = NULL;
 	gchar **tmp = NULL;
 
-        meta1_addr = gs_resolve_meta1 (container->info.gs, C0_ID(container), &gerr);
+	meta1_addr = gs_resolve_meta1 (container->info.gs, C0_ID(container), &gerr);
 	tmp = meta1v2_remote_list_reference_services(meta1_addr, &gerr,
 			gs_get_full_vns(container->info.gs), C0_ID(container), srvtype,
 			C0_M1CNX(container)/1000, C0_M1TO(container)/1000);
 	/* TODO: make a list of addr_info from a list of string services */
-	guint i = 0;
-	for( i= 0 ; i < g_strv_length(tmp); i++) {
-		if(!tmp[i] && strlen(tmp[i]) <= 0)
+	for (guint i = 0, len = g_strv_length(tmp); i < len; i++) {
+		if (!tmp[i] && strlen(tmp[i]) <= 0)
 			continue;
 		gchar **t = NULL;
 		gchar **addr_tok = NULL;
 		addr_info_t* addr = NULL;
 		t = g_strsplit(tmp[i], "|", 3);
-		if(g_strv_length(t) != 3)
+		if (g_strv_length(t) != 3)
 			continue;
 		addr_tok = g_strsplit(t[2], ":", 2);
-		if(g_strv_length(addr_tok) != 2)
+		if (g_strv_length(addr_tok) != 2)
 			continue;
-		if((addr = build_addr_info(addr_tok[0], atoi(addr_tok[1]), &gerr)) != NULL)
+		if ((addr = build_addr_info(addr_tok[0], atoi(addr_tok[1]), &gerr)))
 			list_addr = g_slist_prepend(list_addr, addr);
-		if(addr_tok)
+		if (addr_tok)
 			g_strfreev(addr_tok);
-		if(t)
+		if (t)
 			g_strfreev(t);
 	}
 
 	result = _make_service_array_from_addresses(container, srvtype, list_addr);
-	
+
 	if (list_addr) {
 		g_slist_foreach(list_addr, g_free1, NULL);
 		g_slist_free(list_addr);
@@ -688,9 +688,8 @@ gs_container_service_get_all(gs_container_t *container, const char *srvtype, gs_
 			break;
 		} else {
 			service_info_t *srv = NULL;
-			guint i = 0;
-			for(i = 0; i < g_strv_length(srv_str_list); i++) {
-				if(!srv_str_list[i] || strlen(srv_str_list[i]) <= 0)
+			for (guint i = 0, len = g_strv_length(srv_str_list); i < len; i++) {
+				if (!srv_str_list[i] || strlen(srv_str_list[i]) <= 0)
 					continue;
 				srv = g_malloc0(sizeof(service_info_t));
 				g_snprintf(srv->ns_name, sizeof(srv->ns_name), "%s",
@@ -699,7 +698,7 @@ gs_container_service_get_all(gs_container_t *container, const char *srvtype, gs_
 				addr_info_t* tmp = NULL;
 				tmp = _unpack_service(srv_str_list[i]);
 				memcpy(&(srv->addr), tmp, sizeof(addr_info_t));
-				if(tmp)
+				if (tmp)
 					g_free(tmp);
 				list_of_srvinfo = g_slist_prepend(list_of_srvinfo, srv);
 			}
@@ -777,9 +776,8 @@ gs_container_service_get_available(gs_container_t *container, const char *srvtyp
 			break;
 		} else {
 			/* TODO: service_info from str */
-			guint i = 0;
-			for(i = 0; i < g_strv_length(str_srv); i++) {
-				if(!str_srv[i] || strlen(str_srv[i]) <=0)
+			for (guint i = 0, len = g_strv_length(str_srv); i < len; i++) {
+				if (!str_srv[i] || strlen(str_srv[i]) <=0)
 					continue;
 				service_info_t *srv = NULL;
 				srv = g_malloc0(sizeof(service_info_t));

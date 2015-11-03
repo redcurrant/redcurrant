@@ -705,9 +705,10 @@ _adjust_chunk_copies(struct meta2_ctx_s *ctx, GSList *rawx,
 	GSList *tmp = NULL;
 	const char *str = data_security_get_param(storage_policy_get_data_security(ctx->sp), DS_KEY_COPY_COUNT);
 	guint32 nb_copy = (NULL != str) ? atoi(str) : 1;
-	GRID_DEBUG("adjust chunk copies, we have %d positions to scan", g_strv_length((gchar**)chunks));
+	guint nb_chunks = g_strv_length((gchar**)chunks);
+	GRID_DEBUG("adjust chunk copies, we have %d positions to scan", nb_chunks);
 
-	for (i = 0; i < g_strv_length((gchar**)chunks); i++) {
+	for (i = 0; i < nb_chunks; i++) {
 		GRID_DEBUG("Scanning chunks at position %d", i);
 		size = dup_chunk_info_get_copy_count(chunks[i]);
 		size2 = g_slist_length(almost_good[i]);

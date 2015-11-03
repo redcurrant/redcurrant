@@ -81,6 +81,9 @@ _bean_list_prepend_cb(gpointer udata, gpointer bean)
 	ctx->l = g_slist_prepend(ctx->l, bean);
 }
 
+/**
+ * Answer beans to the client by batches of 32.
+ */
 static void
 _get_cb(gpointer udata, gpointer bean)
 {
@@ -366,7 +369,6 @@ meta2_filter_action_put_content(struct gridd_filter_ctx_s *ctx,
 {
 	TRACE_FILTER();
 	const char *copy_source = meta2_filter_ctx_get_param(ctx, M2_KEY_COPY_SOURCE);
-	struct hc_url_s *url = meta2_filter_ctx_get_url(ctx);
 
 	reply->did_write = TRUE;
 
@@ -495,26 +497,19 @@ meta2_filter_action_delete_content(struct gridd_filter_ctx_s *ctx,
 		flags = (guint32)atoi(fstr);
 	}
 	sync_del = BOOL(flags & M2V2_FLAG_SYNCDEL);
-
+	if (!sync_del)
+		reply->subject("async");
 	reply->did_write = TRUE;
 
 	TRACE_FILTER();
 	e = meta2_backend_delete_alias(m2b, url, sync_del, _get_cb, obc);
 	if(NULL != e) {
-		GRID_DEBUG("Fail to delete alias for url: %s", hc_url_get(url, HCURL_WHOLE));
+		GRID_DEBUG("Fail to delete alias for url: %s",
+				hc_url_get(url, HCURL_WHOLE));
 		meta2_filter_ctx_set_error(ctx, e);
 		_on_bean_ctx_clean(obc);
 		return FILTER_KO;
 	}
-
-	// This is required for Kafka notifications to work
-	_on_bean_ctx_send_list(obc, FALSE);
-
-	//generate notification before send reply, 
-	//besause a destroy container should executes 
-	//   before realy generated events was created on disk
-	//   and no chunk on it ! no purge by polix!
-	meta2_filter_action_notify_content_DELETE_v2(ctx, reply, obc);
 
 	_on_bean_ctx_send_list(obc, TRUE);
 	_on_bean_ctx_clean(obc);
@@ -1447,7 +1442,7 @@ _update_beans(struct gridd_filter_ctx_s *ctx, struct gridd_reply_ctx_s *reply,
 		struct on_bean_ctx_s *obc = _on_bean_ctx_init(ctx, reply);
 		err = meta2_backend_get_alias(m2b, url, M2V2_FLAG_NODELETED,
 				_bean_list_prepend_cb, obc);
-		_on_bean_ctx_append_udata_list(obc);
+		_on_bean_ctx_append_all(obc);
 		_on_bean_ctx_clean(obc);
 	}
 

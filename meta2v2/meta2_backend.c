@@ -1389,7 +1389,8 @@ meta2_backend_substitute_chunks(struct meta2_backend_s *m2b,
 	g_assert(m2b != NULL);
 	g_assert(url != NULL);
 
-	// TODO: check that new_chunks->data is really a struct bean_CHUNKS_s *
+	if (DESCR(new_chunks->data) != &descr_struct_CHUNKS)
+		return NEWERROR(CODE_BAD_REQUEST, "The provided bean is not a chunk!");
 
 	err = m2b_open(m2b, url, M2V2_OPEN_MASTERONLY|M2V2_OPEN_ENABLED, &sq3);
 	if (!err) {
@@ -1975,7 +1976,8 @@ meta2_backend_get_conditionned_spare_chunks(struct meta2_backend_s *m2b,
 			return NULL;
 
 		char **urls = g_strsplit(str, "|", 0);
-		for (uint i = 0; i < g_strv_length(urls); i++) {
+		guint splits = g_strv_length(urls);
+		for (uint i = 0; i < splits; i++) {
 			if (strlen(urls[i]) <= 0)
 				continue;
 			struct service_info_s *si = NULL;

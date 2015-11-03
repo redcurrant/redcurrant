@@ -63,6 +63,7 @@ GError *
 _notifier_load(metautils_notif_pool_t *pool, const gchar *type,
 		struct notifier_s **out)
 {
+	(void) pool;
 	GError *err = NULL;
 
 #ifdef RD_KAFKA_ENABLED
@@ -90,16 +91,15 @@ metautils_notif_pool_clear(metautils_notif_pool_t **pool)
 		return;
 	metautils_notif_pool_t *pool2 = *pool;
 	*pool = NULL;
-	for (GSList *cur = pool2->notifiers; cur; cur = cur->next) {
-		_notifier_clear(cur->data);
-	}
+	g_slist_free_full(pool2->notifiers, (GDestroyNotify)_notifier_clear);
 	g_free((gpointer)pool2->ns);
 	g_free(pool2);
 }
 
 GError *
 metautils_notif_pool_configure_type(metautils_notif_pool_t *pool,
-		namespace_info_t *nsinfo, const gchar *type, GSList *topics)
+		namespace_info_t *nsinfo, const gchar *type, GSList *topics,
+		gint64 timeout)
 {
 	GError *err = NULL;
 	struct notifier_s *notifier = NULL;
@@ -119,7 +119,7 @@ metautils_notif_pool_configure_type(metautils_notif_pool_t *pool,
 	}
 
 	if (!err) {
-		err = notifier->configure(nsinfo, pool->lb_pool, topics,
+		err = notifier->configure(nsinfo, pool->lb_pool, topics, timeout,
 				&(notifier->handle));
 	}
 

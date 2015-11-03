@@ -45,10 +45,9 @@ _display_err(gchar *msg, gs_error_t *err)
 	static void
 _dump_arrays(gchar **arrays)
 {
-	guint i;
 	if (!arrays)
 		return;
-	for (i = 0; i < g_strv_length(arrays); i++) {
+	for (guint i = 0, len = g_strv_length(arrays); i < len; i++) {
 		g_print("   [%s]\n", arrays[i]);
 	}
 }
