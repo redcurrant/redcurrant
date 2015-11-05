@@ -1024,7 +1024,7 @@ static gs_status_t _gs_upload(gs_container_t *container,
 	long timeout_cnx, timeout_op;
 	gchar *actual_stgpol = stgpol ? g_strdup(stgpol) : NULL;
 
-	gboolean is_rainx, tmp_is_rainx;
+	gboolean is_rainx;
 	content_version_t content_version;
 
 	/*sanity checks*/
@@ -1145,9 +1145,7 @@ static gs_status_t _gs_upload(gs_container_t *container,
 		goto error_label;
 	}
 
-	// Don't do RAIN with empty contents
-	tmp_is_rainx = stg_pol_is_rainx(&(container->info.gs->ni), actual_stgpol);
-	is_rainx = (content_size > 0 && tmp_is_rainx);
+	is_rainx = stg_pol_is_rainx(&(container->info.gs->ni), actual_stgpol);
 	if (is_rainx) {
 		GRID_DEBUG("'%s' of size %"G_GINT64_FORMAT" split into %u chunks (every chunk has %u sub-chunks, there are %u unique presets and %u spares)",
 				content_name, content_size,
@@ -1183,7 +1181,7 @@ static gs_status_t _gs_upload(gs_container_t *container,
 				feeder, user_data, container->str_cID,
 				content_name, content_size,
 				system_metadata_str_esc, actual_stgpol,
-				reqid, timeout_cnx, timeout_op, tmp_is_rainx);
+				reqid, timeout_cnx, timeout_op, FALSE);
 	}
 
 	if (local_error != NULL) {
