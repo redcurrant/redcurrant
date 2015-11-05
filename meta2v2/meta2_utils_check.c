@@ -606,15 +606,10 @@ _alert_for_invalid_rain_stgpol(header_check_t *hc, struct ctx_rain_stgpol_s *ctx
 
 	GRID_TRACE2("%s(%p,%u,%u)", __FUNCTION__, hc, lend, lenp);
 
-	if (size_real == 0) {
-		GRID_DEBUG("Content is empty, skipping RAIN tests");
-		return;
-	}
-
 	// Check the count is respected
 	if (lenp + lend == 0 || ctx->last == NULL) {
-		flaw = m2v2_check_append_flaw(hc, M2CHK_CHUNK_RAIN_LOST, NEWERROR(0,
-					"No chunks at all!"));
+		flaw = m2v2_check_append_flaw(hc, M2CHK_CHUNK_RAIN_LOST,
+				NEWERROR(0, "No chunks at all!"));
 		// Create empty arrays
 		flaw->param.rain_lost.pairs_data = _pairs_copy(ctx->chunks_data);
 		flaw->param.rain_lost.pairs_parity = _pairs_copy(ctx->chunks_parity);

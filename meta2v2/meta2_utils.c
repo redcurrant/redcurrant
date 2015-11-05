@@ -2214,7 +2214,7 @@ _m2_generate_RAIN(struct gen_ctx_s *ctx)
 		struct lb_next_opt_s opt;
 		memset(&opt, 0, sizeof(opt));
 		opt.req.duplicates = (distance <= 0);
-		opt.req.max = ((ctx->size>0)?(k + m):1);
+		opt.req.max = k + m;
 		opt.req.distance = distance;
 		opt.req.stgclass = stgclass;
 		opt.req.strict_stgclass = FALSE; // Accept ersatzes
