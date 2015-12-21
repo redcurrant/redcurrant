@@ -484,6 +484,7 @@ install(FILES
 			metautils-doc.h
 			metautils_errors.h
 			metautils_fd.h
+			metautils_fs.h
 			metautils_gba.h
 			metautils.h
 			metautils_hashstr.h
