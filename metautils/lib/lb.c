@@ -49,6 +49,8 @@ struct grid_lb_s
 	GHashTable *id_by_addr;
 
 	GArray *sorted_by_score;
+	GArray *current_selectable;
+	GHashTable *selectable_by_filter;
 	guint32 sum_scored;
 	guint32 size_max;
 };
@@ -60,10 +62,19 @@ struct score_slot_s
 	guint32 sum;
 };
 
+struct pre_filter_s
+{
+	service_filter filter;
+	gpointer filter_data;
+	filter_id_cb get_fid;
+	gpointer fid_data;
+};
+
 struct grid_lb_iterator_s
 {
 	struct grid_lb_s *lb;
 	guint64 version;
+	struct pre_filter_s pre_filter;
 	enum glbi_type_e {
 		LBIT_SINGLE=1,
 		LBIT_SHARED,
@@ -126,13 +137,27 @@ _get_raw(struct grid_lb_s *lb, guint idx)
 }
 
 static inline struct service_info_s*
+_get_raw_ref(struct grid_lb_s *lb, guint idx)
+{
+	register guint len;
+	return !(len = lb->gpa->len) ? NULL : lb->gpa->pdata[idx % len];
+}
+
+static inline GArray *
+_get_services(struct grid_lb_s *lb)
+{
+	return (lb->current_selectable) ? lb->current_selectable
+			: lb->sorted_by_score;
+}
+
+static inline struct service_info_s*
 _get_by_score(struct grid_lb_s *lb, guint idx)
 {
 	if (!lb->size_max)
 		return NULL;
 
 	register struct score_slot_s *slot;
-	slot = &g_array_index(lb->sorted_by_score, struct score_slot_s,
+	slot = &g_array_index(_get_services(lb), struct score_slot_s,
 			idx % lb->size_max);
 	return _get_raw(lb, slot->index);
 }
@@ -144,7 +169,7 @@ _get_by_score_no_shorten(struct grid_lb_s *lb, guint idx)
 		return NULL;
 
 	register struct score_slot_s *slot;
-	slot = &g_array_index(lb->sorted_by_score, struct score_slot_s,
+	slot = &g_array_index(_get_services(lb), struct score_slot_s,
 			idx % lb->gpa->len);
 	return _get_raw(lb, slot->index);
 }
@@ -207,6 +232,13 @@ grid_lb_set_shorten_ratio(struct grid_lb_s *lb, gdouble ratio)
 		lb->shorten_ratio = CLAMP(ratio, 0.001, 1.001);
 }
 
+static void
+_free_array_cb(gpointer _selectable)
+{
+	GArray *selectable = _selectable;
+	g_array_free(selectable, TRUE);
+}
+
 struct grid_lb_s*
 grid_lb_init(const gchar *ns, const gchar *srvtype)
 {
@@ -230,6 +262,11 @@ grid_lb_init(const gchar *ns, const gchar *srvtype)
 
 	lb->sorted_by_score = g_array_new(TRUE, TRUE,
 			sizeof(struct score_slot_s));
+
+	lb->selectable_by_filter = g_hash_table_new_full(
+			g_str_hash, g_str_equal, g_free, _free_array_cb);
+	lb->current_selectable = NULL;
+
 	return lb;
 }
 
@@ -245,6 +282,9 @@ _lb_flush(struct grid_lb_s *lb)
 	/* Flush the 'links' to the services */
 	g_hash_table_steal_all(lb->id_by_addr);
 	g_array_set_size(lb->sorted_by_score, 0);
+
+	lb->current_selectable = NULL;
+	g_hash_table_remove_all(lb->selectable_by_filter);
 
 	/* Now flush the services themselves */
 	gpa = lb->gpa;
@@ -276,6 +316,9 @@ grid_lb_clean(struct grid_lb_s *lb)
 
 	if (lb->sorted_by_score)
 		g_array_free(lb->sorted_by_score, TRUE);
+
+	if (lb->selectable_by_filter)
+		g_hash_table_destroy(lb->selectable_by_filter);
 
 	g_static_rec_mutex_free(&(lb->lock));
 
@@ -652,6 +695,18 @@ grid_lb_iterator_clean(struct grid_lb_iterator_s *iter)
 	g_free(iter);
 }
 
+void
+grid_lb_iterator_set_pre_filter(struct grid_lb_iterator_s *iter,
+		service_filter f, gpointer fdata, filter_id_cb id_cb, gpointer fid_data)
+{
+	if (f != NULL)
+		g_assert(id_cb != NULL);
+	iter->pre_filter.filter = f;
+	iter->pre_filter.filter_data = fdata;
+	iter->pre_filter.get_fid = id_cb;
+	iter->pre_filter.fid_data = fid_data;
+}
+
 gboolean
 grid_lb_iterator_is_srv_available(struct grid_lb_iterator_s *iter,
 		const struct service_info_s *si)
@@ -876,10 +931,10 @@ __next_SRR(struct grid_lb_s *lb, struct grid_lb_iterator_s *iter,
 		if (iter->internals.srr.current == 0 ||
 				(lb->reset_delay > 0 && expiration < time(NULL)))
 			reset();
-		else if (iter->internals.srr.next_idx >= lb->sorted_by_score->len)
+		else if (iter->internals.srr.next_idx >= _get_services(lb)->len)
 			decrement();
 		else {
-			slot = &g_array_index(lb->sorted_by_score, struct score_slot_s,
+			slot = &g_array_index(_get_services(lb), struct score_slot_s,
 					iter->internals.srr.next_idx);
 			if (iter->internals.srr.current > slot->score)
 				decrement();
@@ -938,7 +993,7 @@ __next_SRAND(struct grid_lb_s *lb, struct service_info_s **si)
 	if (lb->gpa->len > 0) {
 		if (lb->sum_scored) {
 			needle = needle % lb->sum_scored;
-			ga = lb->sorted_by_score;
+			ga = _get_services(lb);
 			result = _get_by_score(lb, dichotomic_search(0, ga->len));
 		}
 	}
@@ -1126,6 +1181,75 @@ cmp_ptr(gconstpointer a, gconstpointer b, gpointer user_data)
 	return CMP(a,b);
 }
 
+
+static GArray *
+_create_selectable(struct grid_lb_iterator_s *it)
+{
+	GArray *selectable = g_array_new(TRUE, TRUE, sizeof(struct score_slot_s));
+
+	for (guint32 i = 0; i < it->lb->sorted_by_score->len; i++) {
+		struct score_slot_s *s = &g_array_index(it->lb->sorted_by_score,
+				struct score_slot_s, i);
+		if (it->pre_filter.filter(_get_raw_ref(it->lb, s->index),
+				it->pre_filter.filter_data))
+			g_array_append_vals(selectable, s, 1);
+	}
+
+	return selectable;
+}
+
+static void
+_set_size_max(struct grid_lb_s *lb)
+{
+	if (lb->current_selectable) {
+		// size_max may be shortened, keep the lowest value
+		if (lb->current_selectable->len < lb->size_max)
+			lb->size_max = lb->current_selectable->len;
+	} else {
+		lb->size_max = _compute_shortened_size(lb);
+	}
+}
+
+static void
+_fill_selectable(struct grid_lb_iterator_s *it, gchar *fid)
+{
+	GArray *selectable = _create_selectable(it);
+
+	it->lb->current_selectable = selectable;
+	_set_size_max(it->lb);
+
+	g_hash_table_insert(it->lb->selectable_by_filter, fid, selectable);
+}
+
+static inline gboolean
+_no_service_selectable(struct grid_lb_iterator_s *it)
+{
+	return it->lb->current_selectable->len == 0U;
+}
+
+static inline void
+_empty_selectable(struct grid_lb_iterator_s *it)
+{
+	if (it->lb->current_selectable) {
+		it->lb->current_selectable = NULL;
+		_set_size_max(it->lb);
+	}
+}
+
+static inline void
+_set_current_selectable(struct grid_lb_iterator_s *it, gchar *fid)
+{
+	it->lb->current_selectable = g_hash_table_lookup(
+			it->lb->selectable_by_filter, fid);
+	_set_size_max(it->lb);
+}
+
+static inline gboolean
+_current_selectable_defined(struct grid_lb_iterator_s *it)
+{
+	return it->lb->current_selectable != NULL;
+}
+
 /* First search for servers matching the exact criterions.
  * If not enough services are found, bypass the shorten ratio
  * If still not enough servers are collected, retry with each fallback
@@ -1134,6 +1258,25 @@ static void
 _next_set(struct grid_lb_iterator_s *it, struct lb_next_opt_s *opt,
 		const gchar *stgclass, GTree *polled, GSList *fallbacks)
 {
+	if (it->pre_filter.filter) {
+		gchar *fid = it->pre_filter.get_fid(it->pre_filter.fid_data);
+		_set_current_selectable(it, fid);
+		if (!_current_selectable_defined(it)) {
+			GRID_DEBUG("Filling selectable array for filter %s", fid);
+			_fill_selectable(it, fid);
+		} else {
+			GRID_DEBUG("Reusing previous selectable array for filter %s", fid);
+			g_free(fid);
+		}
+		if (_no_service_selectable(it)) {
+			GRID_DEBUG("No service passed pre-filter");
+			return;
+		}
+	} else {
+		GRID_TRACE("No pre filter defined");
+		_empty_selectable(it);
+	}
+
 	_search_servers(it, opt, stgclass, polled, TRUE);
 
 	// TODO: possible optimization: in case of failure, reset next_idx
