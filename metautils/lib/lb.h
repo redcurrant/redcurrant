@@ -155,6 +155,10 @@ gboolean grid_lb_iterator_is_url_available(struct grid_lb_iterator_s *iter,
 
 typedef gboolean (*service_filter) (struct service_info_s *si, gpointer hook_data);
 
+/*! Set a filter applied before load balancing. */
+void grid_lb_iterator_set_pre_filter(struct grid_lb_iterator_s *iter,
+		service_filter f, gpointer fdata);
+
 /*! Get the next service from the iterator.
  * @see service_info_clean()
  * @param iter
