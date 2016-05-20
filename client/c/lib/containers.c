@@ -813,6 +813,7 @@ gs_container_load (gs_container_t *container, GError **err)
 		WARN("cannot connect to META2=%s for %s/%s (%s)",
 				str_addr, C0_NAME(container), C0_IDSTR(container),
 				err ? g_error_get_message(*err) : "error not set");
+		g_clear_error(err);
 	}
 
 	/* After all, if no connection can be opened, it is a strong error */
