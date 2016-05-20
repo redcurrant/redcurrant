@@ -223,6 +223,7 @@ gcluster_update_conf(addr_info_t * addr, long timeout, const gchar *srv_type,
 			timeout, &data);
 
 	message_destroy(req, NULL);
+	g_string_free(body, TRUE);
 }
 
 gint
