@@ -211,10 +211,10 @@ gcluster_update_conf(addr_info_t * addr, long timeout, const gchar *srv_type,
 	}
 	req = build_request(NAME_MSGNAME_OCTO_CONF_UPDATE, body->str, body->len,
 			error);
-	if (!req) {
-		g_string_free(body, TRUE);
+	g_string_free(body, TRUE);
+	
+	if (!req)
 		return;
-	}
 
 	if (no_overwrite)
 		message_add_fields_str(req, NAME_HEADER_NO_OVERWRITE, "True", NULL);
