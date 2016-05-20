@@ -807,6 +807,7 @@ gs_container_load (gs_container_t *container, GError **err)
 		g_memmove(&(container->meta2_addr), m2addr, sizeof(addr_info_t));
 
 		/*contact the META2*/
+		g_clear_error(err);
 		if (gs_container_reconnect_and_refresh(container,err,FALSE))
 			break;
 
