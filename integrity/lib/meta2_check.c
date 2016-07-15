@@ -23,7 +23,7 @@ meta2_sqlite_maintenance(const gchar* meta2_db_path, GError **error)
 	char* sqlite_error = NULL;
 
 	CHECK_ARG_POINTER(meta2_db_path, error);
-	CHECK_ARG_VALID_DIR(meta2_db_path, error);
+	CHECK_ARG_VALID_FILE(meta2_db_path, error);
 
         rc = sqlite3_open(meta2_db_path, &db);
 	if (rc) {
