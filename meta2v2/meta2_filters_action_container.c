@@ -360,8 +360,8 @@ _list_S3(struct gridd_filter_ctx_s *ctx, struct gridd_reply_ctx_s *reply,
 	send_result();
 
 	g_free(next_marker);
-
 	g_slist_free(common_prefixes);
+	_on_bean_ctx_clean(obc);
 
 	return FILTER_OK;
 }

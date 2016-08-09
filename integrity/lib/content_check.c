@@ -539,6 +539,14 @@ _count_active_connections(struct chunk_transfer_s *ct)
         return count;
 }
 
+#define _LOGMSG(FMT,...) \
+	GRID_INFO(FMT, ##__VA_ARGS__); \
+	check_result_append_msg(cres, FMT, ##__VA_ARGS__);
+
+#define _LOGERROR(FMT,...) \
+	GRID_ERROR(FMT, ##__VA_ARGS__); \
+	check_result_append_msg(cres, FMT, ##__VA_ARGS__);
+
 static GError*
 _copy_chunk_data(meta2_raw_content_t *content, meta2_raw_chunk_t *src_chunk, GSList *dest)
 {
@@ -602,7 +610,7 @@ _copy_chunk_data(meta2_raw_content_t *content, meta2_raw_chunk_t *src_chunk, GSL
 }
 
 static GError*
-_upload_new_copy(struct meta2_ctx_s *ctx, GSList *rawx,
+_upload_new_copy(struct meta2_ctx_s *ctx, check_result_t *cres, GSList *rawx,
 		GSList **rawx_garbage, struct dup_chunk_info_s *dci, guint nb_dup,
 		meta2_raw_chunk_t* src_chunk)
 {
@@ -657,11 +665,11 @@ _upload_new_copy(struct meta2_ctx_s *ctx, GSList *rawx,
 	}
 
 	if (g_slist_length(dest) == nb_dup) {
-		GRID_DEBUG("Missing chunks correctly created and filled.");
+		_LOGMSG("Missing chunks correctly created and filled.");
 	} else {
 		g_set_error(&result, gquark_log, CODE_POLICY_NOT_SATISFIABLE,
 				"Some copies are still missing (not enough matching rawx available)");
-		GRID_DEBUG("No all missing copies have been created (%d/%d)",
+		_LOGMSG("No all missing copies have been created (%d/%d)",
 				g_slist_length(dest), nb_dup);
 	}
 
@@ -695,7 +703,7 @@ _restore_chunk_by_pos(guint pos, GSList **garbage)
  * for each position. Also tries to relocate chunks with wrong storage class.
  */
 static void
-_adjust_chunk_copies(struct meta2_ctx_s *ctx, GSList *rawx,
+_adjust_chunk_copies(struct meta2_ctx_s *ctx, check_result_t *cres, GSList *rawx,
 		struct dup_chunk_info_s **chunks, GSList **garbage, GSList **rawx_garbage,
 		GSList **almost_good)
 {
@@ -717,7 +725,7 @@ _adjust_chunk_copies(struct meta2_ctx_s *ctx, GSList *rawx,
 				" (incorrect distance or storage class)", size2);
 		if (size == 0 && size2 == 0) {
 			/* No valid chunk found at this position, remove all from garbage and log fatal error */
-			GRID_ERROR("No valid chunk found at position %d, cannot repair anything", i);
+			_LOGERROR("No valid chunk found at position %d, cannot repair anything", i);
 			if (!ctx->check_only) {
 				_restore_chunk_by_pos(i, garbage);
 				ctx->fail = TRUE;
@@ -725,7 +733,7 @@ _adjust_chunk_copies(struct meta2_ctx_s *ctx, GSList *rawx,
 			/* TODO: flag content to corrupted */
 		} else {
 			if (size > nb_copy) {
-				GRID_DEBUG("Too many copies of chunk at position %"G_GUINT32_FORMAT" (%"G_GUINT32_FORMAT
+				_LOGMSG("Too many copies of chunk at position %"G_GUINT32_FORMAT" (%"G_GUINT32_FORMAT
 						" copies, %"G_GUINT32_FORMAT" expected)" , i, size, nb_copy);
 				if (!ctx->check_only) {
 					/* add chunks to the unwanted list */
@@ -734,7 +742,7 @@ _adjust_chunk_copies(struct meta2_ctx_s *ctx, GSList *rawx,
 					for (j = 0; j < size - nb_copy; j++) {
 						if (tmp && tmp->data) {
 							gchar *chunk_str = meta2_raw_chunk_to_string((meta2_raw_chunk_t*)tmp->data);
-							GRID_INFO("%s marked for delete, too many copies.", chunk_str);
+							_LOGMSG("%s marked for delete, too many copies.", chunk_str);
 							*garbage = g_slist_prepend(*garbage, tmp->data);
 							if (chunk_str)
 								g_free(chunk_str);
@@ -745,16 +753,16 @@ _adjust_chunk_copies(struct meta2_ctx_s *ctx, GSList *rawx,
 					}
 				}
 			} else if (size < nb_copy) {
-				GRID_INFO("Not enough copies of chunk at position %"G_GUINT32_FORMAT" (%"G_GUINT32_FORMAT
+				_LOGMSG("Not enough copies of chunk at position %"G_GUINT32_FORMAT" (%"G_GUINT32_FORMAT
 						" copies, %"G_GUINT32_FORMAT" expected)" , i, size, nb_copy);
 				/* we want new chunks at this pos */
 				GError *local_error = NULL;
 				if (!ctx->check_only) {
 					/* If there is no valid chunk, take the data from an 'almost valid' one */
 					meta2_raw_chunk_t* src_chunk = (size > 0) ? NULL : almost_good[i]->data;
-					local_error = _upload_new_copy(ctx, rawx, rawx_garbage, chunks[i], nb_copy - size, src_chunk);
+					local_error = _upload_new_copy(ctx, cres, rawx, rawx_garbage, chunks[i], nb_copy - size, src_chunk);
 					if (local_error) {
-						GRID_ERROR("Error while creating new chunk copy: %s", local_error->message);
+						_LOGERROR("Error while creating new chunk copy: %s", local_error->message);
 						/* don't touch to chunk at this position, we cannot create the other */
 						_restore_chunk_by_pos(i, garbage);
 						ctx->fail = TRUE;
@@ -773,17 +781,17 @@ _adjust_chunk_copies(struct meta2_ctx_s *ctx, GSList *rawx,
 static void
 _delete_chunk(gpointer data, gpointer udata)
 {
-	(void) udata;
+	check_result_t *cres = udata;
 	GError *local_error = NULL;
 	local_error = delete_chunk((meta2_raw_chunk_t*) data);
 	if(local_error) {
-		GRID_INFO("Failed to delete chunk from disk : %s", local_error->message);
+		_LOGMSG("Failed to delete chunk from disk : %s", local_error->message);
 		g_clear_error(&local_error);
 	}
 }
 
 static gboolean
-_check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
+_check_duplicated_content_is_valid(struct meta2_ctx_s *ctx, check_result_t *cres)
 {
 	GRID_DEBUG("Checking duplicated content");
 
@@ -813,9 +821,9 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
 	rawx = list_namespace_services(ctx->ns, "rawx", &local_error);
 	if(!rawx) {
 		if(local_error) {
-			GRID_ERROR("Cannot get rawx list from namespace : %s", local_error->message);
+			_LOGERROR("Cannot get rawx list from namespace : %s", local_error->message);
 		} else {
-			GRID_ERROR("Cannot work, namespace return an empty rawx list");
+			_LOGERROR("Cannot work, namespace return an empty rawx list");
 		}
 		goto clean_up;
 	}
@@ -835,7 +843,7 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
 
 		if(!(si = get_rawx_from_raw_chunk(c, rawx))) {
 			/* inconsistent chunk */
-			GRID_INFO(MSG_INCONSISTENT_CHUNK, chunk_str);
+			_LOGMSG(MSG_INCONSISTENT_CHUNK, chunk_str);
 			if(!ctx->check_only)
 				garbage = g_slist_prepend(garbage, c);
 			g_free(chunk_str);
@@ -847,7 +855,7 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
 		local_error = download_and_check_chunk(c, ctx->sp);
 		if(local_error) {
 			/* invalid chunk (corrupted, missing, rawx connection failed */
-			GRID_INFO("Chunk %s marked for suppression: %s", chunk_str, local_error->message);
+			_LOGMSG("Chunk %s marked for suppression: %s", chunk_str, local_error->message);
 			/* if rawx unreachable, add it to garbage */
 			if(local_error->code == 10060 || local_error->code == 10061)
 				rawx_garbage = g_slist_prepend(rawx_garbage, si);
@@ -861,7 +869,7 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
 		GRID_DEBUG("Chunk available and not corrupted");
 
 		if(!(loc = get_rawx_location(si))) {
-			GRID_INFO("Cannot get location of rawx matching %s", chunk_str);
+			_LOGMSG("Cannot get location of rawx matching %s", chunk_str);
 			/* inconsistant chunk */
 			if(!ctx->check_only)
 				garbage = g_slist_prepend(garbage, c);
@@ -871,7 +879,7 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
 
 		/* check chunk storage class */
 		if (!service_info_check_storage_class(si, storage_class_get_name(stg_class))) {
-			GRID_INFO("Wrong storage class for %s: expected '%s'",
+			_LOGMSG("Wrong storage class for %s: expected '%s'",
 					chunk_str, storage_class_get_name(stg_class));
 			/* Add the chunk to the "almost good" list. These
 			 * are not corrupted, but should be replaced if possible. */
@@ -891,7 +899,7 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
 			dup_chunk_info_add_chunk(chunks[c->position], c, loc);
 		} else {
 			/* unwanted chunk */
-			GRID_INFO("Chunk %s not compatible with configured duplication, and will be deleted", chunk_str);
+			_LOGMSG("Chunk %s not compatible with configured duplication, and will be deleted", chunk_str);
 			almost_good[c->position] = g_slist_prepend(almost_good[c->position], c);
 			if(!ctx->check_only) {
 				garbage = g_slist_prepend(garbage, c);
@@ -900,7 +908,7 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
 		g_free(chunk_str);
 	}
 
-	_adjust_chunk_copies(ctx, rawx, chunks, &garbage, &rawx_garbage, almost_good);
+	_adjust_chunk_copies(ctx, cres, rawx, chunks, &garbage, &rawx_garbage, almost_good);
 
 	if(ctx->modified) {
 		GRID_DEBUG("Chunks modified, we need to update the content");
@@ -912,7 +920,7 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
 			ctx->fail = TRUE;
 			goto clean_up;
 		}
-		GRID_DEBUG("Content modification correctly send to meta2");
+		_LOGMSG("Content modification correctly sent to meta2");
 	} else {
 		GRID_DEBUG("No modification registered");
 	}
@@ -927,12 +935,12 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx)
 			ctx->fail = TRUE;
 			goto clean_up;
 		}
-		GRID_DEBUG("Chunk deletion correctly sent to meta2");
+		_LOGMSG("Chunk deletion correctly sent to meta2");
 		ctx->content->raw_chunks = tmp;
 	}
 
 	/* delete unwanted chunks from rawx */
-	g_slist_foreach(garbage, _delete_chunk, NULL);
+	g_slist_foreach(garbage, _delete_chunk, cres);
 
 	GRID_DEBUG("Duplicated content checked!");
 
@@ -966,18 +974,19 @@ clean_up:
 }
 
 static gboolean
-_check_rained_content_is_valid(struct meta2_ctx_s *ctx)
+_check_rained_content_is_valid(struct meta2_ctx_s *ctx, check_result_t *cres)
 {
 	(void) ctx;
-			
+	(void) cres;
 			
 	return TRUE;
 }
 
 gboolean
-check_content_storage_policy(const gchar *namespace, const gchar *container_id, const gchar *content_name,
-			gboolean check_only, GError **error)
+check_content_storage_policy_full(const gchar *namespace, const gchar *container_id, const gchar *content_name,
+			gboolean check_only, check_result_t *cres, GError **error)
 {
+	gboolean ret = TRUE;
 	struct meta2_ctx_s *ctx = get_meta2_ctx(
 			namespace, container_id, content_name, check_only, error);
 
@@ -987,21 +996,21 @@ check_content_storage_policy(const gchar *namespace, const gchar *container_id, 
 	/* Check data_security is respected */
 	switch(data_security_get_type(storage_policy_get_data_security(ctx->sp))) {
 	case DUPLI:
-		if(!_check_duplicated_content_is_valid(ctx)) {
-			GSETERROR(error, "Duplicated content check return in error, content not completly valid");
+		if(!_check_duplicated_content_is_valid(ctx, cres)) {
+			GSETERROR(error, "Duplicated content check return in error, content not completely valid");
 			goto clean_up;
 		}
 		break;
 	case RAIN:
-		if(!_check_rained_content_is_valid(ctx)) {
-			GSETERROR(error, "Duplicated content check return in error, content not completly valid");
+		if(!_check_rained_content_is_valid(ctx, cres)) {
+			GSETERROR(error, "Duplicated content check return in error, content not completely valid");
 			goto clean_up;
 		}
 		break;
 	default:
 		/* No duplication = duplication with 1 copy and distance of 1 */
-		if(!_check_duplicated_content_is_valid(ctx)) {
-			GSETERROR(error, "Duplicated content check return in error, content not completly valid");
+		if(!_check_duplicated_content_is_valid(ctx, cres)) {
+			GSETERROR(error, "Duplicated content check return in error, content not completely valid");
 			goto clean_up;
 		}
 		break;
@@ -1011,8 +1020,20 @@ clean_up:
 
 	if(ctx)
 		content_check_ctx_clear(ctx);
+	if (error)
+		ret = (*error == NULL);
+	if (cres)
+		cres->check_ok = ret;
 
-	return error == NULL;
+	return ret;
+}
+
+gboolean
+check_content_storage_policy(const gchar *namespace, const gchar *container_id, const gchar *content_name,
+			gboolean check_only, GError **error)
+{
+	return check_content_storage_policy_full(namespace, container_id,
+			content_name, check_only, NULL, error);
 }
 
 gboolean

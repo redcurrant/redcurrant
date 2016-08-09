@@ -1104,6 +1104,7 @@ meta2_filter_action_generate_beans(struct gridd_filter_ctx_s *ctx,
 			e = NEWERROR(CODE_BAD_REQUEST, "Unknown type of spare request: %s", spare_type);
 		}
 		if (e != NULL) {
+			_on_bean_ctx_clean(obc);
 			meta2_filter_ctx_set_error(ctx, e);
 			return FILTER_KO;
 		}

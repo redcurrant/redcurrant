@@ -138,9 +138,9 @@ expand_urlv(struct meta1_service_url_s **uv)
 }
 
 static struct service_info_s**
-convert_url_to_serviceinfo(struct meta1_service_url_s *u, const gchar *excludeurl)
+_convert_url_to_serviceinfo(struct grid_lbpool_s *glp,
+		struct meta1_service_url_s *u, const gchar *excludeurl)
 {
-	GError *err = NULL;
 	struct meta1_service_url_s **lst, **extracted=NULL;
 
 	if (!u)
@@ -154,20 +154,23 @@ convert_url_to_serviceinfo(struct meta1_service_url_s *u, const gchar *excludeur
 		if ( g_strcmp0(excludeurl, (*lst)->host) == 0 ) {
 			continue;
 		}
-		struct service_info_s *srv;
-		srv = g_malloc0(sizeof(struct service_info_s));
-		if ( !l4_address_init_with_url(&(srv->addr), (*lst)->host, &err)) {
-			GRID_DEBUG("failed to build addr with url [%s], %s",(*lst)->host,err->message);
-			g_clear_error(&err);
-			continue;
+		struct service_info_s *srv = NULL;
+		// Try to get service_info from cs to get full tag infos
+		srv = grid_lbpool_get_service_from_url(glp, (*lst)->srvtype,
+				(*lst)->host);
+		// Fallback to create a new service_info if not found in cs
+		if (srv == NULL) {
+			srv = g_malloc0(sizeof(struct service_info_s));
+			l4_address_init_with_url(&(srv->addr), (*lst)->host, NULL);
+			g_strlcpy(srv->type, (*lst)->srvtype, sizeof(srv->type));
 		}
-		g_strlcpy(srv->type,(*lst)->srvtype,sizeof(srv->type));
 		g_ptr_array_add(tmp, srv);
 	}
 
 	g_ptr_array_add(tmp, NULL);
 	if ( extracted )
 		free_urlv(extracted);
+
 	return (struct service_info_s**)g_ptr_array_free(tmp, FALSE);
 }
 
@@ -1422,9 +1425,10 @@ __poll_services_with_contraints(struct meta1_backend_s *m1, guint replicas,
 static GError*
 _update_m1_policy(struct meta1_backend_s *m1,
 		struct meta1_full_service_url_s *m1_srv_urls,
-		struct compound_type_s *ct, guint replica, guint reqdist, gchar *tag_name,
-		const gchar *excludesrv, addr_info_t *excludeaddr,
-		GHashTable *hash_srv, struct meta1_full_service_url_s **update_m1_srv_urls)
+		struct compound_type_s *ct, guint replica, guint reqdist,
+		gchar *tag_name, const gchar *excludesrv, addr_info_t *excludeaddr,
+		GHashTable *hash_srv,
+		struct meta1_full_service_url_s **update_m1_srv_urls)
 {
 	GError *err = NULL;
 	struct service_info_s **requestedsrv = NULL;
@@ -1479,8 +1483,10 @@ _update_m1_policy(struct meta1_backend_s *m1,
 	if (url_count == replica && !excludesrvfound)
 		goto failedend;
 
+	requestedsrv = _convert_url_to_serviceinfo(m1->backend.lb,
+			m1_srv_urls->urls, excludesrv);
+
 	struct meta1_service_url_s *url = NULL;
-	requestedsrv = convert_url_to_serviceinfo(m1_srv_urls->urls, excludesrv);
 	if ((url = __poll_services_with_contraints(m1, replica, reqdist, ct,
 				m1_srv_urls->urls->seq, excludeaddr, requestedsrv, args,
 				&err))) {

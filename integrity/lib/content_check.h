@@ -57,6 +57,9 @@ struct dup_chunk_info_s {
 	GSList *used_loc;
 };
 
+gboolean check_content_storage_policy_full(const gchar *namespace, const gchar *container_id, const gchar *content_name,
+		gboolean check_only, check_result_t *cres, GError **error);
+
 gboolean check_content_storage_policy(const gchar *namespace, const gchar *container_id, const gchar *content_name,
 		gboolean check_only, GError **error);
 
