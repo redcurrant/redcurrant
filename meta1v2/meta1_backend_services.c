@@ -154,9 +154,16 @@ _convert_url_to_serviceinfo(struct grid_lbpool_s *glp,
 		if ( g_strcmp0(excludeurl, (*lst)->host) == 0 ) {
 			continue;
 		}
-		struct service_info_s *srv;
+		struct service_info_s *srv = NULL;
+		// Try to get service_info from cs to get full tag infos
 		srv = grid_lbpool_get_service_from_url(glp, (*lst)->srvtype,
 				(*lst)->host);
+		// Fallback to create a new service_info if not found in cs
+		if (srv == NULL) {
+			srv = g_malloc0(sizeof(struct service_info_s));
+			l4_address_init_with_url(&(srv->addr), (*lst)->host, NULL);
+			g_strlcpy(srv->type, (*lst)->srvtype, sizeof(srv->type));
+		}
 		g_ptr_array_add(tmp, srv);
 	}
 
