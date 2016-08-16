@@ -125,7 +125,9 @@ distance_between_location(const gchar *loc1, const gchar *loc2)
 	/* If the token distance is 1 and the last tokens are equal (ie both locations are equal) -> return 0. */
 	/* If the token distance is 1 and the last tokens are different -> return 1. */
 	/* If the token distance is > 1, then return 2^(token_dist). */
-	return token_dist > 1U ? 1U << (token_dist - 1U) : (found_diff ? 1U : 0U);
+	guint d = token_dist > 1U ? 1U << (token_dist - 1U) : (found_diff ? 1U : 0U);
+	GRID_TRACE("Calculated distance between [%s] and [%s] is : %u", loc1, loc2, d);
+	return d;
 }
 
 guint
