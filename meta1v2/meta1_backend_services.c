@@ -167,6 +167,7 @@ _convert_url_to_serviceinfo(struct grid_lbpool_s *glp,
 			g_strlcpy(srv->type, ct.type, sizeof(srv->type));
 		}
 		g_ptr_array_add(tmp, srv);
+		compound_type_clean(&ct);
 	}
 
 	g_ptr_array_add(tmp, NULL);
