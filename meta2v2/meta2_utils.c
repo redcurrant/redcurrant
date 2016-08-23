@@ -1349,11 +1349,12 @@ _patch_alias_metadata(struct bean_ALIASES_s *alias)
 static GError*
 m2db_real_put_alias(struct sqlx_sqlite3_s *sq3, struct put_args_s *args)
 {
-	gint64 container_version;
+	gint64 container_version, alias_version;
 	GError *err = NULL;
 	GSList *l;
 
 	container_version = 1 + m2db_get_version(sq3);
+	alias_version = 1 + args->version;
 
 	for (l=args->beans; !err && l ;l=l->next) {
 		gpointer bean = l->data;
@@ -1365,7 +1366,7 @@ m2db_real_put_alias(struct sqlx_sqlite3_s *sq3, struct put_args_s *args)
 			if (args->merge_only)
 				continue;
 			/* reset the alias version and remap the header'is */
-			ALIASES_set_version(bean, args->version+1);
+			ALIASES_set_version(bean, alias_version);
 			ALIASES_set2_content_id(bean, args->uid, args->uid_size);
 			ALIASES_set_container_version(bean, container_version);
 			ALIASES_set_deleted(bean, FALSE);
@@ -1381,6 +1382,9 @@ m2db_real_put_alias(struct sqlx_sqlite3_s *sq3, struct put_args_s *args)
 		else if (DESCR(bean) == &descr_struct_CONTENTS) {
 			/* remap the contant_header id to a unique value */
 			CONTENTS_set2_content_id(bean, args->uid, args->uid_size);
+		}
+		else if (DESCR(bean) == &descr_struct_PROPERTIES) {
+			PROPERTIES_set_alias_version(bean, alias_version);
 		}
 
 		err = _db_save_bean(sq3->db, bean);
