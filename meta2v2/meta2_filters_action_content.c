@@ -946,16 +946,12 @@ meta2_filter_action_modify_mdsys_v1(struct gridd_filter_ctx_s *ctx,
 		const gchar *old_sp = CONTENTS_HEADERS_get_policy(header)->str;
 		e = storage_policy_check_compat_by_name(&(m2b->backend.ns_info),
 				old_sp, sp);
-		if (e == NULL)
-			CONTENTS_HEADERS_set2_policy(header, sp);
-		g_free(sp);
 	}
 
 	beans = g_slist_prepend(g_slist_prepend(beans, header), alias);
-	if (e == NULL) {
-		// skip checks only when changing stgpol
-		e = meta2_backend_update_alias_header(m2b, url, beans, (sp != NULL));
-	}
+	if (e == NULL)
+		e = meta2_backend_update_alias_header(m2b, url, beans, sp);
+	g_free(sp);
 	_bean_cleanl2(beans);
 
 	if (NULL != e) {
