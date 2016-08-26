@@ -1960,46 +1960,72 @@ struct update_alias_header_ctx_s {
 	gint64 container_version;
 	gint64 old_version;
 	gboolean versioning;
+	gchar *stgpol;
 };
 
 static void
 _update_new_bean(struct update_alias_header_ctx_s *ctx, gpointer bean)
 {
+	bean = _bean_dup(bean);
+	g_ptr_array_add(ctx->tmp, bean);
+
+	/* always update container version */
 	if (DESCR(bean) == &descr_struct_ALIASES) {
-		/* Update id, version, container_version */
-		bean = _bean_dup(bean);
 		ALIASES_set_container_version(bean, ctx->container_version);
-		ALIASES_set_version(bean, ((ctx->versioning) ? ctx->old_version + 1 : ctx->old_version));
+		/* update mdsys if policy changed */
+		if (ctx->stgpol) {
+			GError *e = NULL;
+			GHashTable *unpacked = metadata_unpack_string(ALIASES_get_mdsys(bean)->str, &e);
+			if (e != NULL) {
+				GRID_ERROR("Error unpacking mdsys: %s", (*e).message ? (*e).message : "<no details>");
+				return;
+			}
+			metadata_add_printf(unpacked, "storage-policy", ctx->stgpol);
+			GByteArray *pack = metadata_pack(unpacked, NULL);
+			g_hash_table_destroy(unpacked);
+			g_byte_array_append(pack, (const guint8*)"\0", 1);
+			char *mdsys = (char *)g_byte_array_free(pack, FALSE);
+			ALIASES_set2_mdsys(bean, mdsys);
+			g_free(mdsys);
+		}
+	}
+
+	/* update policy if it changed */
+	if (ctx->stgpol) {
+		if (DESCR(bean) == &descr_struct_CONTENTS_HEADERS)
+			CONTENTS_HEADERS_set2_policy(bean, ctx->stgpol);
+	}
+
+	/* if no versioning: existing data will be replaced, no need to update
+	 * content id */
+	if (!ctx->versioning)
+		return;
+
+	if (DESCR(bean) == &descr_struct_ALIASES) {
+		/* Update id, version */
+		ALIASES_set_version(bean, ctx->old_version + 1);
 		ALIASES_set2_content_id(bean, ctx->uid, sizeof(ctx->uid));
-		g_ptr_array_add(ctx->tmp, bean);
-		return;
-	}
-
-	if (DESCR(bean) == &descr_struct_CONTENTS_HEADERS) {
+	} else if (DESCR(bean) == &descr_struct_CONTENTS_HEADERS) {
 		/* Update id */
-		bean = _bean_dup(bean);
 		CONTENTS_HEADERS_set2_id(bean, ctx->uid, sizeof(ctx->uid));
-		g_ptr_array_add(ctx->tmp, bean);
-		return;
-	}
-
-	if (DESCR(bean) == &descr_struct_CONTENTS) {
-		bean = _bean_dup(bean);
+	} else if (DESCR(bean) == &descr_struct_CONTENTS) {
 		/* Update id */
 		CONTENTS_set2_content_id(bean, ctx->uid, sizeof(ctx->uid));
-		g_ptr_array_add(ctx->tmp, bean);
-		return;
+	} else {
+		/* other bean types are ignored and discarded */
+		if (GRID_TRACE2_ENABLED()) {
+			GString *s = _bean_debug(NULL, bean);
+			GRID_TRACE("Alias update: no need to update bean %s", s->str);
+			g_string_free(s, TRUE);
+		}
 	}
-
-	/* other bean types are ignored and discarded */
-
-	g_ptr_array_add(ctx->tmp, _bean_dup(bean));
 }
 
 
 GError*
 m2db_update_alias_header(struct sqlx_sqlite3_s *sq3, gint64 max_versions,
-		struct hc_url_s *url, GSList *beans, gboolean skip_checks)
+		const gchar *stgpol, struct hc_url_s *url, GSList *beans,
+		gboolean skip_checks)
 {
 	struct update_alias_header_ctx_s ctx;
 	struct bean_ALIASES_s *latest = NULL;
@@ -2040,17 +2066,27 @@ m2db_update_alias_header(struct sqlx_sqlite3_s *sq3, gint64 max_versions,
 	}
 	ctx.old_version = ALIASES_get_version(latest);
 	ctx.container_version = 1 + m2db_get_version(sq3);
+	ctx.stgpol = g_strdup(stgpol);
 
 	/* append and mangle the new beans */
 	GRID_TRACE("UDPATE NEW BEAN => v + 1");
 	for (; beans ;beans=beans->next) {
+		/* remove existing content header if versioning is off */
+		if (!ctx.versioning && DESCR(beans->data) == &descr_struct_CONTENTS_HEADERS) {
+			if (NULL != (err = _db_delete_bean(sq3->db, beans->data)))
+				goto exit;
+		}
 		_update_new_bean(&ctx, beans->data);
 	}
 
 	/* Now save the whole */
 	err = _db_save_beans_array(sq3->db, ctx.tmp);
 
+exit:
+	g_free(ctx.stgpol);
 	_bean_cleanv2(ctx.tmp);
+	if (latest)
+		_bean_clean(latest);
 	return err;
 }
 

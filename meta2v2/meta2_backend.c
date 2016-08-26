@@ -1842,7 +1842,7 @@ meta2_backend_get_all_properties(struct meta2_backend_s *m2b,
 
 GError*
 meta2_backend_update_alias_header(struct meta2_backend_s *m2b, struct hc_url_s *url,
-		GSList *beans, gboolean skip_checks)
+		GSList *beans, gboolean skip_checks, const gchar *stgpol)
 {
 	GError *err = NULL;
 	struct sqlx_sqlite3_s *sq3 = NULL;
@@ -1856,7 +1856,8 @@ meta2_backend_update_alias_header(struct meta2_backend_s *m2b, struct hc_url_s *
 	if (!err) {
 		max_versions = _maxvers(sq3, m2b);
 		if (!(err = _transaction_begin(sq3, url, &repctx))) {
-			err = m2db_update_alias_header(sq3, max_versions, url, beans, skip_checks);
+			err = m2db_update_alias_header(sq3, max_versions, stgpol, url,
+					beans, skip_checks);
 			err = sqlx_transaction_end(repctx, err);
 		}
 		m2b_close(sq3);
