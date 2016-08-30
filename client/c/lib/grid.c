@@ -621,6 +621,7 @@ _gs_locate_container_by_cid(gs_grid_storage_t *gs, container_id_t cid, char** ou
 		if (gerror_local)
 			g_clear_error(&gerror_local);
 		success = TRUE;
+		break;
 	}
 
 	if (m1_addr)
