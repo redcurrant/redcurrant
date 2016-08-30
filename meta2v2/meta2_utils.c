@@ -1487,7 +1487,7 @@ GError*
 //m2db_force_alias(struct sqlx_sqlite3_s *sq3, struct hc_url_s *url, GSList *beans)
 m2db_force_alias(struct m2db_put_args_s *args, GSList *beans)
 {
-	guint8 uid[33];
+	hash_sha256_t uid;
 	struct put_args_s args2;
 	struct bean_ALIASES_s *latest = NULL;
 	GError *err = NULL;
@@ -1509,7 +1509,13 @@ m2db_force_alias(struct m2db_put_args_s *args, GSList *beans)
 		err = m2db_get_versioned_alias(args->sq3, args->url, (gpointer*)&latest);
 	} else {
 		err = m2db_latest_alias(args->sq3, args->url, (gpointer*)&latest);
+		if (latest)
+			args2.version = ALIASES_get_version(latest);
 	}
+
+	/* m2db_real_put_alias always increments version. */
+	/* In order to force args2.version, decrement it first. */
+	args2.version--;
 
 	if (NULL != err) {
 		if (err->code != CODE_CONTENT_NOTFOUND)

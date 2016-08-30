@@ -15,18 +15,6 @@
 
 
 /* ------------------------ INTERNALS -----------------------*/
-
-static GByteArray *
-_hex_string_to_byte_array(const gchar *src)
-{
-	GByteArray *gba = g_byte_array_new();
-	size_t bufsize = strlen(src) / 2;
-	guint8 buf[bufsize];
-	hex2bin(src, buf, bufsize, NULL);
-	g_byte_array_append(gba, buf, bufsize);
-	return gba;
-}
-
 static gpointer
 _generate_property_from_mdusr(const char *alias, GByteArray *mdusr)
 {
@@ -455,7 +443,7 @@ m2v2_beans_from_raw_content_custom(const char *id, meta2_raw_content_t *rc,
 	}
 
 	if (id && strlen(id))
-		id_gba = _hex_string_to_byte_array(id);
+		id_gba = metautils_gba_from_hexstring(id);
 
 	/* headers */
 	beans = g_slist_prepend(beans,
@@ -535,7 +523,7 @@ m2v2_beans_from_raw_content_v2(const char *id, meta2_raw_content_v2_t *rc)
 		return NULL;
 	}
 	if (id != NULL && strlen(id) > 0) {
-		id_gba = _hex_string_to_byte_array(id);
+		id_gba = metautils_gba_from_hexstring(id);
 	}
 
 	/* headers */
