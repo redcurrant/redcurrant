@@ -950,7 +950,7 @@ _check_alias(struct m2v2_check_s *check, struct bean_ALIASES_s *alias)
 		e = _load_header_chunks(&hc);
 
 	// Even if empty, an alias must have a chunk's footprint
-	if (!hc.chunks->len)
+	if (!e && !hc.chunks->len)
 		return NEWERROR(400, "No chunk/content");
 
 	if (!e)
