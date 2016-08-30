@@ -1446,7 +1446,7 @@ meta2_filter_action_add_raw_v1(struct gridd_filter_ctx_s *ctx,
 {
 	TRACE_FILTER();
 	const char *position_prefix = meta2_filter_ctx_get_param(ctx, "POSITION_PREFIX");
-	gchar content_id[64];
+	gchar content_id[65];
 	memset(content_id, 0, sizeof(content_id));
 	SHA256_randomized_string(content_id, sizeof(content_id));
 
