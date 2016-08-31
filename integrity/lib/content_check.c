@@ -260,9 +260,9 @@ __dst_cb_in(struct bufferevent *bev, void *ctx)
 				}
 				else {
 					GRID_DEBUG("Output header line [%s]", header_line);
-					free(header_line);
 					bufferevent_enable(bev, EV_READ);
 				}
+				free(header_line);
 			}
 		}
 		if (ct->reply_parsing == PARSE_BODY) {
@@ -421,8 +421,9 @@ __out_start(struct chunk_transfer_s *ct)
 	for (lb = ct->dst_bevents; lb && lb->data ; lb = lb->next) {
 		bufferevent_enable(lb->data, EV_WRITE);
 	}
-        GRID_DEBUG("Output started! (%"G_GINT64_FORMAT" bytes expected, already"
-                        " %"G_GINT64_FORMAT" bytes of headers)", ct->dst_size, header_size);
+	GRID_DEBUG("Output started! (%"G_GINT64_FORMAT" bytes expected, already"
+			" %"G_GINT64_FORMAT" bytes of headers)", ct->dst_size, header_size);
+	g_slist_free(dsts_out);
 }
 
 static void
@@ -588,10 +589,10 @@ _copy_chunk_data(meta2_raw_content_t *content, meta2_raw_chunk_t *src_chunk, GSL
 
 	while (_count_active_connections(ct) > 0) {
 		int rc;
-                rc = event_base_loop(ct->evt_base, EVLOOP_ONCE);
-                if (rc == 1)
-                        break;
-        }
+		rc = event_base_loop(ct->evt_base, EVLOOP_ONCE);
+		if (rc == 1)
+			break;
+	}
 
 	GRID_DEBUG("Ok, no more connection opened, continue");
 
@@ -622,7 +623,17 @@ _upload_new_copy(struct meta2_ctx_s *ctx, check_result_t *cres, GSList *rawx,
 	gint64 distance = (NULL != tmp) ? g_ascii_strtoll(tmp, NULL, 10) : 1;
 	const gchar *stgclass = storage_class_get_name(storage_policy_get_storage_class(ctx->sp));
 	GSList *dest = NULL;
-	GSList *used_loc = dup_chunk_info_get_used_locations(dci);
+	GSList *used_loc = NULL;
+
+	/* fill used_loc with copies of known used locations
+	 * so we can free the whole list at exit */
+	void _fill_used_loc(gpointer _loc, gpointer _unused)
+	{
+		(void) _unused;
+		gchar *loc = _loc;
+		used_loc = g_slist_prepend(used_loc, g_strdup(loc));
+	}
+	g_slist_foreach(dup_chunk_info_get_used_locations(dci), _fill_used_loc, NULL);
 
 	/* search for new available location */
 	// FIXME: this looks like grid_lb_iterator_next_set() from metautils/lib/lb.c
@@ -674,7 +685,8 @@ _upload_new_copy(struct meta2_ctx_s *ctx, check_result_t *cres, GSList *rawx,
 	}
 
 clean_up:
-
+	g_slist_free(dest);
+	g_slist_free_full(used_loc, g_free);
 	return result;
 }
 
@@ -896,7 +908,7 @@ _check_duplicated_content_is_valid(struct meta2_ctx_s *ctx, check_result_t *cres
 		/* Add only if distance is respected with already added chunks */
 		if(__test_location(loc, dup_chunk_info_get_used_locations(chunks[c->position]), req_dst)) {
 			GRID_DEBUG("Chunk copy is ok and could be added to the valid chunk list.");
-			dup_chunk_info_add_chunk(chunks[c->position], c, loc);
+			dup_chunk_info_add_chunk(chunks[c->position], meta2_raw_chunk_dup(c), loc);
 		} else {
 			/* unwanted chunk */
 			_LOGMSG("Chunk %s not compatible with configured duplication, and will be deleted", chunk_str);
