@@ -61,14 +61,18 @@ dup_chunk_info_new(void)
 }
 
 void
+_destroy_chunk(gpointer _chunk)
+{
+	meta2_maintenance_destroy_chunk(_chunk);
+}
+
+void
 dup_chunk_info_clear(struct dup_chunk_info_s *dup_chunk)
 {
 	if(!dup_chunk)
 		return;
-	if(dup_chunk->used_loc) {
-		g_slist_foreach(dup_chunk->used_loc, g_free1, NULL);
-		g_slist_free(dup_chunk->used_loc);
-	}
+	g_slist_free_full(dup_chunk->used_loc, g_free);
+	g_slist_free_full(dup_chunk->chunks, _destroy_chunk);
 	g_free(dup_chunk);
 }
 
@@ -359,34 +363,40 @@ static void chunk_attrinfo_clean(chunk_attrinfo_t *attrs)
 	g_free(attrs);
 }
 
+static void
+_bevent_free(gpointer _bevent)
+{
+	struct bufferevent *bevent = _bevent;
+	if (!bevent)
+		return;
+	evutil_socket_t event_fd = bufferevent_getfd(bevent);
+	if (event_fd != -1) {
+		errno = 0;
+		if (0 != close(event_fd))
+			GRID_WARN("Error closing socket: %s", strerror(errno));
+	}
+	bufferevent_free(bevent);
+}
+
 void chunk_transfer_clear(struct chunk_transfer_s *ct)
 {
 	/* dst rawx will be cleared by the caller */
 	if(!ct)
 		return;
-	if(ct->source_path)
-		g_free(ct->source_path);
-	if(ct->dst_chunks) {
-		g_slist_foreach(ct->dst_chunks, g_free1, NULL);
-		g_slist_free(ct->dst_chunks);
-	}
-	if(ct->attrs)
-		chunk_attrinfo_clean(ct->attrs);
-	if(ct->source_chunk)
-		meta2_raw_chunk_clean(ct->source_chunk);
-        if (ct->src_status == CNX_NONE)
-                evhttp_request_free(ct->src_req);
-
+	g_free(ct->source_path);
+	g_slist_free_full(ct->dst_chunks, g_free);
+	chunk_attrinfo_clean(ct->attrs);
+	meta2_raw_chunk_clean(ct->source_chunk);
+	if (ct->src_status == CNX_NONE)
+		evhttp_request_free(ct->src_req);
 	if(ct->src_cnx)
 		evhttp_connection_free(ct->src_cnx);
 	if(ct->evt_dns)
 		evdns_base_free(ct->evt_dns, 1);
+	g_slist_free_full(ct->dst_bevents, _bevent_free);
 	if(ct->evt_base)
 		event_base_free(ct->evt_base);
-	if(ct->dst_bevents)
-		g_slist_free(ct->dst_bevents);
 	g_free(ct);
-	
 }
 
 /*************************************************/

@@ -297,13 +297,18 @@ void check_result_append_msg(check_result_t *res, const gchar *format, ...)
 	}
 }
 
+void check_result_clean(check_result_t *res, void (*free_udata(gpointer)))
+{
+	if (res->msg)
+		g_string_free(res->msg, TRUE);
+	if (res->udata && free_udata)
+		free_udata(res->udata);
+}
+
 void check_result_clear(check_result_t **p_res, void (*free_udata(gpointer)))
 {
 	if (p_res && *p_res) {
-		if ((*p_res)->msg)
-			g_string_free((*p_res)->msg, TRUE);
-		if ((*p_res)->udata && free_udata)
-			free_udata((*p_res)->udata);
+		check_result_clean(*p_res, free_udata);
 		g_free(*p_res);
 		*p_res = NULL;
 	}
@@ -538,6 +543,12 @@ check_option_destroy(GHashTable *options)
 {
 	if (options)
 		g_hash_table_destroy(options);
+}
+
+void
+check_option_clean(GHashTable *options)
+{
+	g_hash_table_remove_all(options);
 }
 
 static gpointer
