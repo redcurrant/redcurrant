@@ -355,8 +355,16 @@ map_raw_content_from_beans(struct meta2_raw_content_s *raw_content, GSList *bean
 			struct bean_CONTENTS_s *bc = (struct bean_CONTENTS_s *) l->data;
 			struct bean_CHUNKS_s *ck = get_chunk_matching_content(beans, bc);
 			struct meta2_raw_chunk_s *ci = g_malloc0(sizeof(struct meta2_raw_chunk_s));
-			_fill_cid_from_bean(ci, ck);
-			ci->size = CHUNKS_get_size(ck);
+			if (ck == NULL) {
+				GRID_INFO("No chunk bean found matching content bean [chunk_id=%s]",
+						CONTENTS_get_chunk_id(bc)->str);
+				_fill_cid_from_bean(ci, bc);
+			} else {
+				_fill_cid_from_bean(ci, ck);
+				ci->size = CHUNKS_get_size(ck);
+				guint8 *hash = CHUNKS_get_hash(ck)->data;
+				memcpy(ci->hash, hash, sizeof(ci->hash));
+			}
 			if (rain_style_pos && !force_keep_position) {
 				ci->position = pos++;
 			} else {
@@ -364,8 +372,6 @@ map_raw_content_from_beans(struct meta2_raw_content_s *raw_content, GSList *bean
 				guint32 pos32 = pos64;
 				ci->position = pos32;
 			}
-			guint8 *hash = CHUNKS_get_hash(ck)->data;
-			memcpy(ci->hash, hash, sizeof(ci->hash));
 			raw_content->raw_chunks = g_slist_prepend(raw_content->raw_chunks, ci);
 			if ( pos > maxpos )
 				maxpos = pos;
