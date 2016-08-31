@@ -134,6 +134,13 @@ GError* generate_raw_chunk(check_info_t *info,
 check_result_t *check_result_new();
 
 /**
+ * Destroys all memory used by res but doest no free res.
+ * @param res check result to be destroyed
+ * @param free_udata callback aiming to free res->udata
+ */
+void check_result_clean(check_result_t *res, void (*free_udata(gpointer)));
+
+/**
  * Clears all memory allocated for res.
  * @param res check result to be freed
  * @param free_udata callback aiming to free res->udata
@@ -162,6 +169,12 @@ GHashTable *check_option_new();
  * @param options table to be destroyed
  */
 void check_option_destroy(GHashTable *options);
+
+/**
+ * Cleans all options but does not free the hashtable.
+ * @param options table to be cleaned
+ */
+void check_option_clean(GHashTable *options);
 
 /**
  * Return the integer value of an option, or G_MAXINT if no such option can be
