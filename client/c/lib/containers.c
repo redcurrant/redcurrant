@@ -991,6 +991,22 @@ _destroy_everywhere(gs_container_t *container, GSList **exclude, guint32 flags)
 				gs_get_full_vns(container->info.gs),
 				C0_ID(container), "meta2", 10000, 30000, NULL))
 			g_prefix_error(&err, "META0/1 unlink error: ");
+		else {
+			meta1v2_remote_delete_reference(m1, &err,
+					container->info.gs->ni.name, C0_ID(container),
+					10000, 30000, NULL); // FIXME: hardcoded timeout?
+			if (err) {
+				if (err->code == CODE_CONTAINER_INUSE) {
+					INFO("Container still linked to other services, "
+						   "not destroying it");
+					g_clear_error(&err);
+				} else {
+					WARN("Could not completely destroy [%s]: (%d) %s",
+							C0_NAME(container), err->code, err->message);
+					g_prefix_error(&err, "META1 destroy error: ");
+				}
+			}
+		}
 		g_free(m1);
 	}
 	return err;
