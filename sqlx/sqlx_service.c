@@ -415,6 +415,12 @@ _configure_registration(struct sqlx_service_s *ss)
 			service_info_ensure_tag(si->tags, "stat.space"),
 			"space", ss->volume);
 	service_tag_set_value_macro(
+			service_info_ensure_tag(si->tags, "stat.bytestotal"),
+			"fstat", ss->volume);
+	service_tag_set_value_macro(
+			service_info_ensure_tag(si->tags, "stat.bytesavail"),
+			"fstat", ss->volume);
+	service_tag_set_value_macro(
 			service_info_ensure_tag(si->tags, "stat.io"),
 			"io", ss->volume);
 	return TRUE;

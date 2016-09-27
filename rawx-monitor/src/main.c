@@ -865,6 +865,10 @@ main_prepare_srvinfo(void)
 		service_tag_set_value_macro(
 				service_info_ensure_tag(si->tags, NAME_MACRO_SPACE_NAME),
 				NAME_MACRO_SPACE_TYPE, fs_info.docroot);
+		service_tag_set_value_macro(service_info_ensure_tag(si->tags,NAME_MACRO_FSTAT_TOTAL),
+				NAME_MACRO_FSTAT_TYPE, fs_info.docroot);
+		service_tag_set_value_macro(service_info_ensure_tag(si->tags,NAME_MACRO_FSTAT_AVAIL),
+				NAME_MACRO_FSTAT_TYPE, fs_info.docroot);
 		service_tag_set_value_string(
 				service_info_ensure_tag(si->tags, NAME_TAGNAME_RAWX_VOL),
 				fs_info.docroot);

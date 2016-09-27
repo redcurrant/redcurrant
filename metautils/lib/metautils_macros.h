@@ -34,6 +34,10 @@
 # define NAME_MACRO_SPACE_NAME "stat.space"
 # define NAME_MACRO_SPACE_TYPE "space"
 
+# define NAME_MACRO_FSTAT_TOTAL "stat.bytestotal"
+# define NAME_MACRO_FSTAT_AVAIL "stat.bytesavail"
+# define NAME_MACRO_FSTAT_TYPE "fstat"
+
 # define NAME_MACRO_CPU_NAME "stat.cpu"
 # define NAME_MACRO_CPU_TYPE "cpu"
 
