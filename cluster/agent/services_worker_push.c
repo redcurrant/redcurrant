@@ -36,16 +36,53 @@ agent_get_service_key(struct service_info_s *si, gchar * dst, gsize dst_size)
 }
 
 static gboolean
+_set_statfs_tag(struct service_tag_s *tag, struct statfs *sfs)
+{
+	gint64 val;
+
+	if (!g_ascii_strcasecmp(tag->name, NAME_MACRO_FSTAT_TOTAL)) {
+		val = sfs->f_blocks * sfs->f_bsize;
+	} else if (!g_ascii_strcasecmp(tag->name, NAME_MACRO_FSTAT_AVAIL)) {
+		val = sfs->f_bavail * sfs->f_bsize;
+	} else {
+		return FALSE;
+	}
+
+	service_tag_set_value_i64(tag, val);
+	return TRUE;
+}
+
+static gboolean
 expand_service_tags(struct namespace_data_s *ns_data, struct service_info_s *si, GError ** error)
 {
 	int i, max;
 	struct service_tag_s *tag;
 	gchar str_addr[STRLEN_ADDRINFO], str_tag[1024];
+	// keep statfs result for a given docroot
+	GHashTable *docroot_statfs = NULL;
+	gboolean ret = FALSE;
 
 	if (!si->tags)
 		return TRUE;
 
+	struct statfs *_get_sfs(gchar *docroot)
+	{
+		struct statfs *sfs = g_hash_table_lookup(docroot_statfs, docroot);
+		if (!sfs) {
+			DEBUG("Exeuting statfs syscall for %s", docroot);
+			struct statfs newsfs;
+			if (get_statfs(docroot, &newsfs)) {
+				sfs = g_memdup(&newsfs, sizeof(newsfs));
+				g_hash_table_insert(docroot_statfs, g_strdup(docroot), sfs);
+			}
+		} else {
+			DEBUG("Reusing statfs result for %s", docroot);
+		}
+		return sfs;
+	}
+
 	addr_info_to_string(&(si->addr), str_addr, sizeof(str_addr));
+	docroot_statfs = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
 	for (i = 0, max = si->tags->len; i < max; i++) {
 
 		tag = g_ptr_array_index(si->tags, i);
@@ -56,7 +93,7 @@ expand_service_tags(struct namespace_data_s *ns_data, struct service_info_s *si,
 
 			if (!tag->value.macro.type) {
 				GSETERROR(error, "Invalid MACRO type for service_tag");
-				return FALSE;
+				goto error;
 			}
 
 			if (!g_ascii_strcasecmp(tag->value.macro.type, NAME_MACRO_IOIDLE_TYPE)) {
@@ -66,14 +103,14 @@ expand_service_tags(struct namespace_data_s *ns_data, struct service_info_s *si,
 					service_tag_to_string(tag, str_tag, sizeof(str_tag));
 					if (gridagent_blank_undefined_srvtags) {
 						DEBUG("Service [NS=%s][SRVTYPE=%s][@=%s] : %s nulled",
-							si->ns_name, si->type, str_addr, tag->name);
+								si->ns_name, si->type, str_addr, tag->name);
 						service_tag_set_value_i64(tag, 0);
 					}
 					else {
 						GSETERROR(error, "Service [NS=%s][SRVTYPE=%s][@=%s] : "
 								"macro expansion failure name=[%s] value=[%s]",
 								si->ns_name, si->type, str_addr, tag->name, str_tag);
-						return FALSE;
+						goto error;
 					}
 				}
 			}
@@ -91,24 +128,33 @@ expand_service_tags(struct namespace_data_s *ns_data, struct service_info_s *si,
 						GSETERROR(error, "Service [NS=%s][SRVTYPE=%s][@=%s] : "
 								"macro expansion failure name=[%s] value=[%s]",
 								si->ns_name, si->type, str_addr, tag->name, str_tag);
-						return FALSE;
+						goto error;
 					}
 				}
 			}
 			else if (!g_ascii_strcasecmp(tag->value.macro.type, NAME_MACRO_SPACE_TYPE)) {
 				long free_space;
 				gint64 free_space_i64;
-				free_space = get_free_space(tag->value.macro.param,ns_data->ns_info.chunk_size);
+				free_space = get_free_space(tag->value.macro.param, ns_data->ns_info.chunk_size,
+						_get_sfs(tag->value.macro.param));
 				free_space_i64 = free_space;
 				service_tag_set_value_i64(tag,free_space_i64);
+			} else if (!g_ascii_strcasecmp(tag->value.macro.type, NAME_MACRO_FSTAT_TYPE)) {
+				if (!_set_statfs_tag(tag, _get_sfs(tag->value.macro.param)))
+					WARN("Service [NS=%s][SRVTYPE=%s][@=%s]: unknown "NAME_MACRO_FSTAT_TYPE" tag [%s]",
+							si->ns_name, si->type, str_addr, tag->name);
 			}
 			else {
 				WARN("Service [NS=%s][SRVTYPE=%s][@=%s] : macro type not managed name=[%s] type=[%s]",
-					si->ns_name, si->type, str_addr, tag->name, tag->value.macro.type);
+						si->ns_name, si->type, str_addr, tag->name, tag->value.macro.type);
 			}
 		}
 	}
-	return TRUE;
+	ret = TRUE;
+
+error:
+	g_hash_table_destroy(docroot_statfs);
+	return ret;
 }
 
 static gboolean

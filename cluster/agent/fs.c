@@ -15,19 +15,35 @@
 
 #include "./fs.h"
 
+gboolean
+get_statfs(const char *path, struct statfs *p_sfs)
+{
+	g_assert(NULL != p_sfs);
+
+	if (statfs(path, p_sfs) < 0) {
+		ERROR("Failed to stat [%s]: %s", path, strerror(errno));
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 long
-get_free_space(const char *path, long chunk_size)
+get_free_space(const char *path, long chunk_size, const struct statfs *stat_fs)
 {
 	struct statfs sfs;
 	long result;
 	gdouble free_inodes_d, free_chunks_d, total_chunks_d, chunk_size_d;
 	gdouble blocks_max_d, block_size_d, blocks_avail_d;
 
-	if (statfs(path, &sfs) < 0) {
-		ERROR("Failed to get fs info on path %s : %s", path, strerror(errno));
-		return (-1);
+	if (stat_fs) {
+		memcpy(&sfs, stat_fs, sizeof(sfs));
+	} else {
+		if (!get_statfs(path, &sfs)) {
+			ERROR("Failed to get fs info on path %s: %s", path, strerror(errno));
+			return (-1);
+		}
 	}
-
 	chunk_size_d = chunk_size;	/*type conversion */
 	free_inodes_d = sfs.f_ffree;	/*type conversion */
 	blocks_max_d = sfs.f_blocks;	/*type conversion */
