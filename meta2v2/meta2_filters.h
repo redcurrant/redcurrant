@@ -637,6 +637,15 @@ int meta2_filter_fail_reply(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply);
 
 /*!
+ * Returns the flags set in context.
+ *
+ * @param ctx the context used by all meta2_filters
+ * @return the flags, 0 if no flag
+ */
+guint32
+meta2_filter_get_flags(const struct gridd_filter_ctx_s *ctx);
+
+/*!
  * Send a fail reply with all informations available in filter context to the client
  *
  * @param ctx the context used by all meta2_filters

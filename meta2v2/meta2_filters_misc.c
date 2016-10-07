@@ -171,6 +171,15 @@ meta2_filter_pack_url(struct gridd_filter_ctx_s *ctx,
 	return FILTER_OK;
 }
 
+inline guint32
+meta2_filter_get_flags(const struct gridd_filter_ctx_s *ctx)
+{
+	const char *fstr = meta2_filter_ctx_get_param(ctx, M2_KEY_GET_FLAGS);
+	if (NULL != fstr)
+		return (guint32) g_ascii_strtoull(fstr, NULL, 10);
+	return 0;
+}
+
 int
 meta2_filter_fail_reply(struct gridd_filter_ctx_s *ctx,
 		struct gridd_reply_ctx_s *reply)

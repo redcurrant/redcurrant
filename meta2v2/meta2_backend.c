@@ -163,10 +163,17 @@ transient_get(GTree *tree, const gchar *key)
 void
 transient_del(GTree *tree, const gchar *key)
 {
+	struct transient_element_s *elt;
+
 	g_assert(tree != NULL);
 	g_assert(key != NULL);
 
-	g_tree_remove(tree, key);
+	elt = g_tree_lookup(tree, key);
+	if (elt) {
+		if (elt->cleanup)
+			elt->cleanup(elt->what);
+		g_tree_remove(tree, key);
+	}
 }
 
 void
@@ -176,6 +183,7 @@ transient_cleanup(struct transient_s *transient)
 
 	g_mutex_free(transient->lock);
 	transient_tree_cleanup(transient->tree);
+	g_tree_unref(transient->tree);
 	g_free(transient);
 }
 
@@ -190,8 +198,11 @@ transient_tree_cleanup(GTree *tree)
 	gboolean cb(gpointer k, gpointer v, gpointer u) {
 		struct arg_s *parg = u;
 		struct transient_element_s *elt = v;
-		if (elt->expiration < parg->expiration)
+		if (elt->expiration < parg->expiration) {
 			parg->to_delete = g_slist_prepend(parg->to_delete, k);
+			if (elt->cleanup)
+				elt->cleanup(elt->what);
+		}
 		return FALSE;
 	}
 
@@ -234,7 +245,7 @@ m2b_transient_put(struct meta2_backend_s *m2b, const gchar *key, const gchar * h
 		if (trans == NULL) {
 			trans = g_new0(struct transient_s, 1);
 			trans->lock = g_mutex_new();
-			trans->tree = g_tree_new_full(metautils_strcmp3, NULL, g_free, NULL);
+			trans->tree = g_tree_new_full(metautils_strcmp3, NULL, g_free, g_free);
 			g_hash_table_insert(m2b->transient, g_strdup(hexID), trans);
 		}
 		g_mutex_unlock(m2b->lock_transient);
@@ -1587,7 +1598,7 @@ meta2_backend_flush_property(struct meta2_backend_s *m2b,
 
 GError*
 meta2_backend_set_properties(struct meta2_backend_s *m2b,
-		struct hc_url_s *url, GSList *beans,
+		struct hc_url_s *url, GSList *beans, guint32 flags,
 		m2_onbean_cb cb, gpointer u0)
 {
 	GError *err = NULL;
@@ -1604,7 +1615,8 @@ meta2_backend_set_properties(struct meta2_backend_s *m2b,
 	if (!err) {
 		max_versions = _maxvers(sq3, m2b);
 		if (!(err = _transaction_begin(sq3, url, &repctx))) {
-			if (!(err = m2db_set_properties(sq3, max_versions, url, beans, cb, u0)))
+			if (!(err = m2db_set_properties(sq3, max_versions, url, beans,
+					flags, cb, u0)))
 				m2db_increment_version(sq3);
 			err = sqlx_transaction_end(repctx, err);
 		}

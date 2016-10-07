@@ -10,6 +10,7 @@
 #define M2V2_FLAG_ALLPROPS         0x00000010
 #define M2V2_FLAG_HEADERS          0x00000020
 #define M2V2_FLAG_SYNCDEL          0x00000040
+#define M2V2_FLAG_IGNORENOTFOUND   0x00000080
 
 #define M2V2_DESTROY_PURGE 0x01
 /* Flush the container before deleting it
