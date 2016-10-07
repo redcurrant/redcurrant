@@ -84,10 +84,27 @@ m2v2_flags(guint32 flags, gchar *d, gsize ds)
 		g_strlcat(d, "|ALLVER", ds);
 	if (flags & M2V2_FLAG_NOPROPS)
 		g_strlcat(d, "|NOPROP", ds);
+	if (flags & M2V2_FLAG_NOFORMATCHECK)
+		g_strlcat(d, "|NOFORM", ds);
+	if (flags & M2V2_FLAG_ALLPROPS)
+		g_strlcat(d, "|ALLPROP", ds);
 	if (flags & M2V2_FLAG_HEADERS)
 		g_strlcat(d, "|HEADERS", ds);
+	if (flags & M2V2_FLAG_SYNCDEL)
+		g_strlcat(d, "|SYNCDEL", ds);
+	if (flags & M2V2_FLAG_IGNORENOTFOUND)
+		g_strlcat(d, "|IGNNOTFND", ds);
 
 	return d;
+}
+
+static inline void
+m2v2_trace_flags(const gchar *title, guint32 extracted, guint32 allowed)
+{
+	gchar d0[128], d1[128];
+	GRID_TRACE("(%s) Flags got[%s], allowed[%s]", title,
+			m2v2_flags(extracted, d0, sizeof(d0)),
+			m2v2_flags(allowed, d1, sizeof(d1)));
 }
 
 /**
@@ -438,8 +455,6 @@ m2db_get_alias(struct sqlx_sqlite3_s *sq3, struct hc_url_s *u,
 {
 	static guint32 allowed_mask = M2V2_FLAG_NOPROPS|M2V2_FLAG_NODELETED
 			|M2V2_FLAG_ALLVERSION;
-	gchar d0[64], d1[64];
-	(void) d0, (void) d1, (void) allowed_mask;
 	GError *err = NULL;
 	gchar *sql = NULL;
 	GVariant *params[3] = {NULL, NULL, NULL};
@@ -449,9 +464,8 @@ m2db_get_alias(struct sqlx_sqlite3_s *sq3, struct hc_url_s *u,
 	if (!hc_url_has(u, HCURL_PATH))
 		return NEWERROR(400, "Missing path");
 
-	GRID_TRACE("GET(%s) Flags got[%s], allowed[%s]", hc_url_get(u, HCURL_WHOLE),
-			m2v2_flags(flags, d0, sizeof(d0)),
-			m2v2_flags(allowed_mask, d1, sizeof(d1)));
+	if (GRID_TRACE_ENABLED())
+		m2v2_trace_flags("GET", flags, allowed_mask);
 
 	/* now manage the aliases and recurse on the other types */
 	params[0] = g_variant_new_string(hc_url_get(u, HCURL_PATH));
@@ -514,17 +528,14 @@ m2db_list_aliases(struct sqlx_sqlite3_s *sq3, struct list_params_s *lp,
 {
 	static guint32 allowed_mask = M2V2_FLAG_NODELETED
 		|M2V2_FLAG_ALLVERSION|M2V2_FLAG_HEADERS;
-	gchar d0[64], d1[64];
-	(void) d0, (void) d1, (void) allowed_mask;
 	GVariant *params[] = {NULL, NULL};
 	GError *err = NULL;
 	m2_onbean_cb local_cb = cb;
 
 	g_assert(sq3 != NULL);
 
-	GRID_TRACE("LIST Flags got[%s], allowed[%s]",
-			m2v2_flags(lp->flags, d0, sizeof(d0)),
-			m2v2_flags(allowed_mask, d1, sizeof(d1)));
+	if (GRID_TRACE_ENABLED())
+		m2v2_trace_flags("LIST", lp->flags, allowed_mask);
 
 	void _load_header_cb(gpointer udata, gpointer bean) {
 		GError *err_local = NULL;
@@ -867,10 +878,16 @@ GError*
 m2db_get_property(struct sqlx_sqlite3_s *sq3, struct hc_url_s *url,
 		const gchar *prop_name, guint32 flags, m2_onbean_cb cb, gpointer u0)
 {
+	static guint32 allowed_mask = M2V2_FLAG_IGNORENOTFOUND|M2V2_FLAG_ALLVERSION
+			|M2V2_FLAG_NODELETED;
 	gint64 version = -1;
 	GError *err = NULL;
 
-	do { // Ensure the ALIAS exists
+	if (GRID_TRACE_ENABLED())
+		m2v2_trace_flags("GET_PROP", flags, allowed_mask);
+
+	 // Ensure the ALIAS exists unless IGNORENOTFOUND flag set
+	if (!(flags & M2V2_FLAG_IGNORENOTFOUND)) {
 		struct bean_ALIASES_s *latest = NULL;
 		if (NULL != (err = m2db_latest_alias(sq3, url, (gpointer*)&latest)))
 			return err;
@@ -881,7 +898,7 @@ m2db_get_property(struct sqlx_sqlite3_s *sq3, struct hc_url_s *url,
 			return NULL;
 		}
 		_bean_clean(latest);
-	} while (0);
+	}
 
 	if (hc_url_has(url, HCURL_VERSION)) {
 		version = g_ascii_strtoll(hc_url_get(url, HCURL_VERSION), NULL, 10);
@@ -897,7 +914,7 @@ m2db_get_property(struct sqlx_sqlite3_s *sq3, struct hc_url_s *url,
 
 	params[param_count++] = g_variant_new_string(hc_url_get(url, HCURL_PATH));
 
-	if (version > 0) {
+	if (version >= 0) {
 		cl_version = " AND alias_version <= ?";
 		params[param_count++] = g_variant_new_int64(version);
 	}
@@ -945,26 +962,40 @@ m2db_get_properties(struct sqlx_sqlite3_s *sq3, struct hc_url_s *url, guint32 fl
 
 GError*
 m2db_set_properties(struct sqlx_sqlite3_s *sq3, gint64 max_versions,
-		struct hc_url_s *url, GSList *beans,
+		struct hc_url_s *url, GSList *beans, guint32 flags,
 		m2_onbean_cb cb, gpointer u0)
 {
+	static guint32 allowed_mask = M2V2_FLAG_IGNORENOTFOUND|M2V2_FLAG_NODELETED;
 	GError *err;
 	struct bean_ALIASES_s *latest = NULL;
+	gint64 version = 0;
+
+	if (GRID_TRACE_ENABLED())
+		m2v2_trace_flags("SET_PROP", flags, allowed_mask);
 
 	if (!beans)
 		return NEWERROR(400, "No properties");
 	if (NULL != (err = m2db_latest_alias(sq3, url, (gpointer*)(&latest))))
 		return err;
-	if (!latest)
-		return NEWERROR(CODE_CONTENT_NOTFOUND, "Alias not found");
+	if (!latest) {
+		if (!(flags & M2V2_FLAG_IGNORENOTFOUND))
+			return NEWERROR(CODE_CONTENT_NOTFOUND, "Alias not found");
+		GRID_DEBUG("SET_PROP: ignoring alias not found: %s",
+				hc_url_get(url, HCURL_PATH));
+	}
+	if (hc_url_has(url, HCURL_VERSION)) {
+		version = g_ascii_strtoll(hc_url_get(url, HCURL_VERSION), NULL, 10);
+		GRID_DEBUG("Got version of property to delete: %"G_GINT64_FORMAT
+				" for %s", version,	hc_url_get(url, HCURL_PATH));
+	}
 
-	if (ALIASES_get_deleted(latest))
+	if ((flags & M2V2_FLAG_NODELETED) && ALIASES_get_deleted(latest))
 		err = NEWERROR(CODE_CONTENT_NOTFOUND, "Alias deleted");
 
 	if (!err) {
-		gint64 base_version = m2db_get_version(sq3);
-		gint64 version = ALIASES_get_version(latest);
-		if (VERSIONS_ENABLED(max_versions)) {
+		if (latest && VERSIONS_ENABLED(max_versions)) {
+			gint64 base_version = m2db_get_version(sq3);
+			version = ALIASES_get_version(latest);
 			/* Make a new alias revision */
 			base_version++;
 			version++;
@@ -998,11 +1029,14 @@ m2db_set_properties(struct sqlx_sqlite3_s *sq3, gint64 max_versions,
 						PROPERTIES_get_key(prop)->str,
 						PROPERTIES_get_alias_version(prop),
 						hc_url_get(url, HCURL_PATH));
-				GVariant *params[3] = {NULL, NULL, NULL};
+				GVariant *params[4] = {NULL, NULL, NULL, NULL};
 				params[0] = g_variant_new_string(PROPERTIES_get_alias(prop)->str);
 				params[1] = g_variant_new_string(PROPERTIES_get_key(prop)->str);
-				err = PROPERTIES_delete(sq3->db, "alias = ? AND key = ?", params);
+				params[2] = g_variant_new_int64(version);
+				err = PROPERTIES_delete(sq3->db, "alias = ? AND key = ?"
+						" AND alias_version = ?", params);
 				_bean_clean(prop);
+				g_variant_unref(params[2]);
 				g_variant_unref(params[1]);
 				g_variant_unref(params[0]);
 			} else {

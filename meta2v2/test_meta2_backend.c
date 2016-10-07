@@ -422,7 +422,7 @@ test_content_put_prop_get(void)
 
 		/* set some properties */
 		beans = _props_generate(u, 1, 10);
-		err = meta2_backend_set_properties(m2, u, beans, NULL, NULL);
+		err = meta2_backend_set_properties(m2, u, beans, 0, NULL, NULL);
 		g_assert_no_error(err);
 		_bean_cleanl2(beans);
 
@@ -689,7 +689,7 @@ test_props_gotchas()
 		GError *err;
 		GSList *beans;
 
-		err = meta2_backend_set_properties(m2, u, NULL, NULL, NULL);
+		err = meta2_backend_set_properties(m2, u, NULL, 0, NULL, NULL);
 		g_assert_error(err, GQ(), 400);
 		g_clear_error(&err);
 
@@ -698,7 +698,7 @@ test_props_gotchas()
 		g_clear_error(&err);
 
 		beans = _props_generate(u, 1, 10);
-		err = meta2_backend_set_properties(m2, u, beans, NULL, NULL);
+		err = meta2_backend_set_properties(m2, u, beans, 0, NULL, NULL);
 		g_assert_error(err, GQ(), CODE_CONTENT_NOTFOUND);
 		g_clear_error(&err);
 		_bean_cleanl2(beans);
@@ -723,7 +723,7 @@ test_props_set_simple()
 
 		/* set it properties */
 		beans = _props_generate(u, 1, 10);
-		err = meta2_backend_set_properties(m2, u, beans, NULL, NULL);
+		err = meta2_backend_set_properties(m2, u, beans, 0, NULL, NULL);
 		g_assert_no_error(err);
 		_bean_cleanl2(beans);
 
@@ -755,7 +755,7 @@ test_props_set_deleted()
 
 		/* set it properties */
 		beans = _props_generate(u, 1, 10);
-		err = meta2_backend_set_properties(m2, u, beans, NULL, NULL);
+		err = meta2_backend_set_properties(m2, u, beans, 0, NULL, NULL);
 		g_assert_error(err, GQ(), CODE_CONTENT_NOTFOUND);
 		g_clear_error(&err);
 		_bean_cleanl2(beans);
@@ -765,7 +765,7 @@ test_props_set_deleted()
 		// XXX: why do we check a second time?
 		/* set it properties */
 		beans = _props_generate(u, 1, 10);
-		err = meta2_backend_set_properties(m2, u, beans, NULL, NULL);
+		err = meta2_backend_set_properties(m2, u, beans, 0, NULL, NULL);
 		g_assert_error(err, GQ(), CODE_CONTENT_NOTFOUND);
 		g_clear_error(&err);
 		_bean_cleanl2(beans);

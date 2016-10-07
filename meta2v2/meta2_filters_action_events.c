@@ -632,15 +632,12 @@ meta2_filter_action_touch_container_v1(struct gridd_filter_ctx_s *ctx,
 	GError *err = NULL;
 	struct meta2_backend_s *m2b;
 	struct hc_url_s *url;
-	guint32  flags_csize = 0;
+	guint32  flags_csize = meta2_filter_get_flags(ctx);
 
 	TRACE_FILTER();
 	(void) reply;
 	m2b = meta2_filter_ctx_get_backend(ctx);
 	url = meta2_filter_ctx_get_url(ctx);
-	const char *fstr = meta2_filter_ctx_get_param(ctx, M2_KEY_GET_FLAGS);
-	if (NULL != fstr)
-		flags_csize = (guint32) g_ascii_strtoull(fstr, NULL, 10);
 
 	GPtrArray *aliases = g_ptr_array_new();
 	struct list_params_s lp;
