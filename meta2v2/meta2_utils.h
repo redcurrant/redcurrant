@@ -627,7 +627,7 @@ GError* m2db_set_container_status(struct sqlx_sqlite3_s *sq3, guint32 r);
  * @return
  */
 GError* m2db_update_alias_header(struct sqlx_sqlite3_s *sq3, gint64 max_versions,
-		struct hc_url_s *url, GSList *beans, gboolean skip_checks);
+		const gchar *stgpol, struct hc_url_s *url, GSList *beans);
 
 /*!
  * @param db

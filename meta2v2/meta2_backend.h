@@ -515,8 +515,8 @@ GError* meta2_backend_set_container_status(struct meta2_backend_s *m2b,
  * @param beans
  * @return
  */
-GError* meta2_backend_update_alias_header(struct meta2_backend_s *m2b, struct hc_url_s *url,
-		GSList *beans, gboolean skip_checks);
+GError* meta2_backend_update_alias_header(struct meta2_backend_s *m2b,
+		struct hc_url_s *url, GSList *beans, const gchar *stgpol);
 
 /**
  * Generate spare chunk (in form of a chunk_info list). This function takes care
