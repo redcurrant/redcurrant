@@ -440,12 +440,13 @@ GError* meta2_backend_flush_property(struct meta2_backend_s *m2b,
  * @param m2b
  * @param url
  * @param beans
+ * @param flags
  * @param cb
  * @param u0
  * @return
  */
 GError* meta2_backend_set_properties(struct meta2_backend_s *m2b,
-		struct hc_url_s *url, GSList *beans,
+		struct hc_url_s *url, GSList *beans, guint32 flags,
 		m2_onbean_cb cb, gpointer u0);
 
 /* TESTING ------------------------------------------------------------------ */

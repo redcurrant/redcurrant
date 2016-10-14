@@ -138,11 +138,8 @@ meta2_filter_action_purge_container(struct gridd_filter_ctx_s *ctx,
 	reply->did_write = TRUE;
 
 	// M2V2_MODE_DRYRUN, ...
-    guint32 flags = 0;
+    guint32 flags = meta2_filter_get_flags(ctx);
 	struct on_bean_ctx_s *obc = _on_bean_ctx_init(ctx, reply);
-    const char *fstr = meta2_filter_ctx_get_param(ctx, M2_KEY_GET_FLAGS);
-    if (NULL != fstr)
-        flags = (guint32) g_ascii_strtoull(fstr, NULL, 10);
 
 	GError *err = meta2_backend_purge_container(
 			meta2_filter_ctx_get_backend(ctx),
@@ -166,10 +163,7 @@ meta2_filter_action_deduplicate_container(struct gridd_filter_ctx_s *ctx,
 	GString *status_message = NULL;
 
 	// M2V2_MODE_DRYRUN, ...
-	guint32 flags = 0;
-	const char *fstr = meta2_filter_ctx_get_param(ctx, M2_KEY_GET_FLAGS);
-	if (NULL != fstr)
-		flags = (guint32) g_ascii_strtoull(fstr, NULL, 10);
+	guint32 flags = meta2_filter_get_flags(ctx);
 	
 	GError *err = meta2_backend_deduplicate_contents(
 			meta2_filter_ctx_get_backend(ctx),
@@ -372,16 +366,13 @@ meta2_filter_action_list_contents(struct gridd_filter_ctx_s *ctx,
 {
 	TRACE_FILTER();
 
-	const char *fstr = meta2_filter_ctx_get_param(ctx, M2_KEY_GET_FLAGS);
 	const char *type = meta2_filter_ctx_get_param(ctx, M2_KEY_LISTING_TYPE);
 	struct list_params_s lp;
 
 	memset(&lp, '\0', sizeof(struct list_params_s));
 	lp.type = DEFAULT;
+	lp.flags = meta2_filter_get_flags(ctx);
 
-	if (NULL != fstr) {
-		lp.flags = atoi(fstr);
-	}
 	if(type && !g_ascii_strcasecmp(type, S3_LISTING_TYPE)) {
 		return _list_S3(ctx, reply, &lp);
 	} else if (type && !g_ascii_strcasecmp(type, REDC_LISTING_TYPE)) {

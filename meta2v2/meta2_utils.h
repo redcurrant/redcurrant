@@ -293,7 +293,8 @@ GError* m2db_flush_property(struct sqlx_sqlite3_s *sq3, const gchar *k);
  * @return
  */
 GError* m2db_set_properties(struct sqlx_sqlite3_s *sq3, gint64 max_versions,
-		struct hc_url_s *url, GSList *beans, m2_onbean_cb cb, gpointer u0);
+		struct hc_url_s *url, GSList *beans, guint32 flags, m2_onbean_cb cb,
+		gpointer u0);
 
 /*! Get an alias only
  *
