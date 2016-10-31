@@ -110,8 +110,8 @@ struct cache_counts_s
 };
 
 /** Returns several statistics about the current cache. Returns zeroed
- * stats is 'cache' is NULL. */
-struct cache_counts_s sqlx_cache_count(sqlx_cache_t *cache);
+ * stats if 'cache' is NULL. */
+void sqlx_cache_count(sqlx_cache_t *cache, struct cache_counts_s * count);
 
 /** @} */
 

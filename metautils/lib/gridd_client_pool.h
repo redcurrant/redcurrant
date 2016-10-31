@@ -38,6 +38,9 @@ struct gridd_client_pool_vtable_s
 	/** Destined to be called continuously, it shouldn't block more than 'sec'
 	 * seconds between each run of the polling loop. */
 	GError* (*round) (struct gridd_client_pool_s *p, time_t sec);
+
+	/** Get pool statistics for reporting purpose */
+	GHashTable* (*get_stats) (struct gridd_client_pool_s *pool);
 };
 
 struct abstract_client_pool_s
@@ -59,6 +62,9 @@ struct abstract_client_pool_s
 
 #define gridd_client_pool_set_max(p,max) \
 	((struct abstract_client_pool_s*)p)->vtable->set_max(p,max)
+
+#define gridd_client_pool_get_stats(p) \
+	((struct abstract_client_pool_s*)p)->vtable->get_stats(p)
 
 /* Public API -------------------------------------------------------------- */
 

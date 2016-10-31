@@ -2035,8 +2035,8 @@ _info_repository(struct sqlx_repository_s *r, GString *gstr)
 static void
 _info_elections(struct sqlx_repository_s *repo, GString *gstr)
 {
-	struct election_counts_s count = election_manager_count(
-			sqlx_repository_get_elections_manager(repo));
+	struct election_counts_s count;
+	election_manager_count(sqlx_repository_get_elections_manager(repo), &count);
 	g_string_append(gstr, "Elections count:\n");
 	g_string_append_printf(gstr, "\ttotal: %u\n", count.total);
 	g_string_append_printf(gstr, "\tnone: %u\n", count.none);
@@ -2085,8 +2085,8 @@ _info_replication(struct sqlx_repository_s *repo, GString *gstr)
 static void
 _info_cache(struct sqlx_repository_s *repo, GString *gstr)
 {
-	struct cache_counts_s count = sqlx_cache_count(
-			sqlx_repository_get_cache(repo));
+	struct cache_counts_s count;
+	sqlx_cache_count(sqlx_repository_get_cache(repo), &count);
 	g_string_append(gstr, "Cache count:\n");
 	g_string_append_printf(gstr, "\tmax: %u\n", count.max);
 	g_string_append_printf(gstr, "\thot: %u\n", count.hot);

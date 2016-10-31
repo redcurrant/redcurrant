@@ -48,6 +48,7 @@ static void _task_expire_resolver(gpointer p);
 static void _task_retry_elections(gpointer p);
 static void _task_reload_nsinfo(gpointer p);
 static void _task_reload_workers(gpointer p);
+static void _task_local_stats(gpointer p);
 static gpointer _worker_clients(gpointer p);
 
 // Static variables
@@ -356,14 +357,14 @@ static gboolean
 _configure_tasks(struct sqlx_service_s *ss)
 {
 	grid_task_queue_register(ss->gtq_register, 1, _task_register, NULL, ss);
-
 	grid_task_queue_register(ss->gtq_reload, 5, _task_reload_nsinfo, NULL, ss);
 	grid_task_queue_register(ss->gtq_reload, 5, _task_reload_workers, NULL, ss);
-
 	grid_task_queue_register(ss->gtq_admin, 30, _task_garbage_collect, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_bases, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_resolver, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_retry_elections, NULL, ss);
+	grid_task_queue_register(ss->gtq_reload, 60, _task_local_stats, NULL, ss);
+
 	return TRUE;
 }
 
@@ -740,6 +741,58 @@ _worker_clients(gpointer p)
 }
 
 static void
+_task_local_stats(gpointer p)
+{
+	struct grid_stats_holder_s *server_stats = NULL;
+	GHashTable *pool_stats = NULL;
+
+	void _traverser(gpointer key, gpointer value, gpointer data)
+	{
+		struct grid_stats_holder_s *stats = data;
+		if (NULL == stats)
+			return;
+		gchar *stat_name = g_strdup_printf("sqliterepo.clientpool.%s",
+				(gchar*)key);
+		guint64 stat_val = *((guint64*)value);
+		grid_stats_holder_set(stats, stat_name, stat_val, NULL);
+		g_free(stat_name);
+
+	}
+
+	server_stats = network_server_get_stats(PSRV(p)->server);
+	/* Add client pool stats */
+	pool_stats = gridd_client_pool_get_stats(PSRV(p)->clients_pool);
+	g_hash_table_foreach(pool_stats, _traverser, server_stats);
+	g_hash_table_destroy(pool_stats);
+	/* Add db cache stats */
+	struct cache_counts_s cache_count;
+	sqlx_cache_count(sqlx_repository_get_cache(PSRV(p)->repository),
+			&cache_count);
+	grid_stats_holder_set(server_stats,
+			"sqliterepo.dbcache.max", (guint64)cache_count.max,
+			"sqliterepo.dbcache.cold", (guint64)cache_count.cold,
+			"sqliterepo.dbcache.hot", (guint64)cache_count.hot,
+			"sqliterepo.dbcache.used", (guint64)cache_count.used,
+			NULL);
+	/* Add election stats */
+	struct election_counts_s el_count;
+	memset(&el_count, 0, sizeof(struct election_counts_s));
+	if (sqlx_repository_replication_configured(PSRV(p)->repository)) {
+		election_manager_count(
+				sqlx_repository_get_elections_manager(PSRV(p)->repository),
+				&el_count);
+	}
+	grid_stats_holder_set(server_stats,
+		"sqliterepo.elections.total", (guint64)el_count.total,
+		"sqliterepo.elections.none", (guint64)el_count.none,
+		"sqliterepo.elections.pending", (guint64)el_count.pending,
+		"sqliterepo.elections.failed", (guint64)el_count.failed,
+		"sqliterepo.elections.master", (guint64)el_count.master,
+		"sqliterepo.elections.slave", (guint64)el_count.slave,
+		NULL);
+}
+
+static void
 _task_register(gpointer p)
 {
 	if (PSRV(p)->flag_noregister)
@@ -754,7 +807,7 @@ _task_register(gpointer p)
 			INNER_STAT_NAME_READ_COUNTER, PSRV(p)->gsr_readreqcounter,
 			INNER_STAT_NAME_READ_TIME, PSRV(p)->gsr_readreqtime,
 			INNER_STAT_NAME_WRITE_COUNTER, PSRV(p)->gsr_writereqcounter,
-			INNER_STAT_NAME_WRITE_TIME, PSRV(p)->gsr_reqtime,
+			INNER_STAT_NAME_WRITE_TIME, PSRV(p)->gsr_writereqtime,
 			NULL);
 
 	guint64 avg_counter = grid_single_rrd_get_delta(PSRV(p)->gsr_reqcounter,
