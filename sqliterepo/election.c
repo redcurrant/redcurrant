@@ -189,7 +189,8 @@ static void _election_whatabout(struct election_manager_s *m,
 		const gchar *name, const gchar *type, gchar *d, gsize ds);
 static enum election_status_e _election_get_status(struct election_manager_s *m,
 		const gchar *name, const gchar *type, gchar **master_url);
-static struct election_counts_s _manager_count(struct election_manager_s *manager);
+static void _manager_count(struct election_manager_s *manager,
+		struct election_counts_s *count);
 
 static struct election_manager_vtable_s VTABLE =
 {
@@ -2426,19 +2427,17 @@ _count_runner(hashstr_t *k, struct election_member_s *v,
 	}
 }
 
-static struct election_counts_s
-_manager_count(struct election_manager_s *manager)
+static void
+_manager_count(struct election_manager_s *manager,
+		struct election_counts_s *count)
 {
-	struct election_counts_s count;
-
-	memset(&count, 0, sizeof(count));
+	memset(count, 0, sizeof(struct election_counts_s));
 	if (manager != NULL) {
 		g_mutex_lock(manager->lock);
 		lru_tree_foreach_DEQ(manager->lrutree_members,
-				(GTraverseFunc) _count_runner, &count);
+				(GTraverseFunc) _count_runner, count);
 		g_mutex_unlock(manager->lock);
 	}
-	return count;
 }
 
 const gchar *

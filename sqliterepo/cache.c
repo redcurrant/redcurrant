@@ -873,19 +873,15 @@ _count_beacon(sqlx_cache_t *cache, struct beacon_s *beacon)
 	return count;
 }
 
-struct cache_counts_s
-sqlx_cache_count(sqlx_cache_t *cache)
+void
+sqlx_cache_count(sqlx_cache_t *cache, struct cache_counts_s *count)
 {
-	struct cache_counts_s count;
-
-	memset(&count, 0, sizeof(count));
+	memset(count, 0, sizeof(struct cache_counts_s));
 	if (cache) {
-		count.max = cache->bases_count;
-		count.cold = _count_beacon(cache, &cache->beacon_idle);
-		count.hot = _count_beacon(cache, &cache->beacon_idle_hot);
-		count.used = _count_beacon(cache, &cache->beacon_used);
+		count->max = cache->bases_count;
+		count->cold = _count_beacon(cache, &cache->beacon_idle);
+		count->hot = _count_beacon(cache, &cache->beacon_idle_hot);
+		count->used = _count_beacon(cache, &cache->beacon_used);
 	}
-
-	return count;
 }
 

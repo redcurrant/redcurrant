@@ -49,13 +49,16 @@ static void _defer (struct gridd_client_pool_s *p, struct event_client_s *ev);
 
 static GError* _round (struct gridd_client_pool_s *p, time_t sec);
 
+static GHashTable* _get_stats (struct gridd_client_pool_s *p);
+
 static struct gridd_client_pool_vtable_s VTABLE =
 {
 	_destroy,
 	_get_max,
 	_set_max,
 	_defer,
-	_round
+	_round,
+	_get_stats
 };
 
 struct gridd_client_pool_s *
@@ -412,3 +415,19 @@ _set_max(struct gridd_client_pool_s *pool, guint max)
 		GRID_INFO("Max active connections set to %u", max);
 }
 
+static GHashTable*
+_get_stats(struct gridd_client_pool_s *pool)
+{
+	GHashTable* hash = NULL;
+
+	EXTRA_ASSERT(pool != NULL);
+	EXTRA_ASSERT(pool->vtable == &VTABLE);
+
+	hash = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+	gint qlen = g_async_queue_length(pool->pending_clients);
+	guint64 v = qlen < 0 ? 0 : (guint64)qlen;
+	g_hash_table_insert(hash, g_strdup("queuesize"),
+			g_memdup(&v, sizeof(v)));
+
+	return hash;
+}
