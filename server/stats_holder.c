@@ -124,10 +124,12 @@ grid_stats_holder_increment(struct grid_stats_holder_s *gsh, ...)
 		return;
 
 	va_start(va, gsh);
+	g_mutex_lock(gsh->lock);
 	while ((n = va_arg(va, gchar*)) != NULL) {
 		v = va_arg(va, guint64);
 		_real_increment(gsh->hashset, n, v);
 	}
+	g_mutex_unlock(gsh->lock);
 	va_end(va);
 }
 
