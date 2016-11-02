@@ -1062,7 +1062,6 @@ step_WatchMaster_change(zhandle_t *handle, int type, int state,
 
 	member_lock(member);
 	transition(member, EVT_MASTER_CHANGE, NULL);
-	member_unref(member);
 	member_unlock(member);
 }
 
@@ -1087,7 +1086,6 @@ step_WatchNode_change(zhandle_t *handle, int type, int state,
 
 	member_lock(member);
 	transition(member, EVT_NODE_LEFT, NULL);
-	member_unref(member);
 	member_unlock(member);
 }
 
@@ -1140,7 +1138,6 @@ step_AskMaster_start(struct election_member_s *member)
 		g_free(path);
 		if (zrc == ZOK) {
 			member_ref(member);
-			member_ref(member);
 		}
 	}
 
@@ -1161,7 +1158,6 @@ step_WatchNode_start(struct election_member_s *member)
 				step_WatchNode_completion, member);
 		g_free(path);
 		if (zrc == ZOK) {
-			member_ref(member);
 			member_ref(member);
 		}
 	}
@@ -1523,6 +1519,7 @@ on_end_USE(struct event_client_s *mc)
 
 	member_lock(member);
 	transition(member, EVT_USE_RES, &(udata->reqid));
+	member_unref(member);
 	member_unlock(member);
 
 	if (err)
@@ -1744,6 +1741,7 @@ on_end_GETVERS(struct event_client_s *mc)
 		}
 		transition(member, EVT_GETVERS_ERROR, &(udata->reqid));
 	}
+	member_unref(member);
 	member_unlock(member);
 
 	g_free(udata);
@@ -2496,3 +2494,36 @@ sqlx_config_has_peers(const struct replication_config_s *cfg, const gchar *n,
 	return sqlx_config_has_peers2(cfg, n, t, FALSE, result);
 }
 
+void
+election_manager_expire(struct election_manager_s *manager, time_t delay)
+{
+	GSList *members_to_destroy = NULL;
+
+	gboolean _traverse(gpointer k, gpointer v, gpointer u) {
+		(void) k, (void) u;
+		struct election_member_s *m = v;
+
+		time_t now = time(0);
+		if ((m->last_USE + delay) < now) {
+			if (GRID_DEBUG_ENABLED())
+				member_debug(__FUNCTION__, "EXPIRED", m);
+			if (m->refcount == 0 && m->step == STEP_NONE) {
+				/* Store already exited elections to be later
+				 * removed from the tree and destroyed */
+				members_to_destroy = g_slist_prepend(members_to_destroy, m->key);
+			}
+			else {
+				GRID_DEBUG("Exit expired election of base [%s]", m->name);
+				transition(m, EVT_EXITING, NULL);
+			}
+		}
+		return FALSE;
+	}
+
+	g_mutex_lock(manager->lock);
+	lru_tree_foreach_TREE(manager->lrutree_members, _traverse, NULL);
+	for (GSList *l = members_to_destroy; l; l = l->next)
+		lru_tree_remove(manager->lrutree_members, l->data);
+	g_mutex_unlock(manager->lock);
+	g_slist_free(members_to_destroy);
+}
