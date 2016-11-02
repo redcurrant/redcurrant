@@ -1041,54 +1041,62 @@ step_StartElection_completion(int zrc, const char *path, const void *d)
 
 /* XXX Zookeeper monitors -------------------------------------------------- */
 
+static gboolean
+_destroy_if_expired(struct election_member_s *m)
+{
+	time_t now = time(0);
+
+	if ((m->last_USE + 300) < now) {
+		if (GRID_DEBUG_ENABLED())
+			member_debug(__FUNCTION__, "EXPIRED", m);
+		if (m->refcount == 0 && m->step == STEP_NONE) {
+			GMutex *lock = member_get_lock(m);
+			lru_tree_remove(MMANAGER(m)->lrutree_members, m->key);
+			g_mutex_unlock(lock);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 static void
 step_WatchMaster_change(zhandle_t *handle, int type, int state,
 			const char *path, void *d)
 {
-	struct election_member_s *member;
-
+	struct election_member_s *member = d;
 	(void) handle;
 	(void) type;
 	(void) state;
 	(void) path;
 
-	member = d;
-	if (member && MMANAGER(member) && MMANAGER(member)->exiting) {
-		GRID_INFO("ZK 'master change' callback triggered during exit, ignored");
-		return;
-	}
-	member_trace(__FUNCTION__, "CHANGE", member);
-	MEMBER_CHECK(member);
-
 	member_lock(member);
-	transition(member, EVT_MASTER_CHANGE, NULL);
+	MEMBER_CHECK(member);
 	member_unref(member);
-	member_unlock(member);
+	member_trace(__FUNCTION__, "CHANGE", member);
+	if (!_destroy_if_expired(member)) {
+		transition(member, EVT_MASTER_CHANGE, NULL);
+		member_unlock(member);
+	}
 }
 
 static void
 step_WatchNode_change(zhandle_t *handle, int type, int state,
 		const char *path, void *d)
 {
-	struct election_member_s *member;
-
+	struct election_member_s *member = d;
 	(void) handle;
 	(void) type;
 	(void) state;
 	(void) path;
 
-	member = d;
-	if (member && MMANAGER(member) && MMANAGER(member)->exiting) {
-		GRID_INFO("ZK 'node change' callback triggered during exit, ignored");
-		return;
-	}
-	MEMBER_CHECK(member);
-	member_trace(__FUNCTION__, "CHANGE", member);
-
 	member_lock(member);
-	transition(member, EVT_NODE_LEFT, NULL);
+	MEMBER_CHECK(member);
 	member_unref(member);
-	member_unlock(member);
+	member_trace(__FUNCTION__, "CHANGE", member);
+	if (!_destroy_if_expired(member)) {
+		transition(member, EVT_NODE_LEFT, NULL);
+		member_unlock(member);
+	}
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1523,6 +1531,7 @@ on_end_USE(struct event_client_s *mc)
 
 	member_lock(member);
 	transition(member, EVT_USE_RES, &(udata->reqid));
+	member_unref(member);
 	member_unlock(member);
 
 	if (err)
@@ -1744,6 +1753,7 @@ on_end_GETVERS(struct event_client_s *mc)
 		}
 		transition(member, EVT_GETVERS_ERROR, &(udata->reqid));
 	}
+	member_unref(member);
 	member_unlock(member);
 
 	g_free(udata);
@@ -2496,3 +2506,22 @@ sqlx_config_has_peers(const struct replication_config_s *cfg, const gchar *n,
 	return sqlx_config_has_peers2(cfg, n, t, FALSE, result);
 }
 
+void
+election_manager_expire(struct election_manager_s *manager, time_t delay)
+{
+	gboolean _traverse(gpointer k, gpointer v, gpointer u) {
+		(void) k, (void) u;
+		struct election_member_s *m = v;
+
+		time_t now = time(0);
+		if ((m->last_USE + delay) < now) {
+			GRID_DEBUG("Exit expired election of base [%s]", m->name);
+			transition(m, EVT_EXITING, NULL);
+		}
+		return FALSE;
+	}
+
+	g_mutex_lock(manager->lock);
+	lru_tree_foreach_TREE(manager->lrutree_members, _traverse, NULL);
+	g_mutex_unlock(manager->lock);
+}
