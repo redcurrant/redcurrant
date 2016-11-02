@@ -139,6 +139,9 @@ struct sqlx_service_s
 
 	// Must bases be automatically upgraded after open?
 	gboolean flag_autoupgrade;
+
+	// Max delay waiting for a final status during elections
+	time_t cfg_el_timeout;
 };
 
 // Public API
