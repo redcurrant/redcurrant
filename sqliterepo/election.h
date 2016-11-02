@@ -76,6 +76,9 @@ struct replication_config_s
 		ELECTION_MODE_GROUP     /**< A master is found when the whole group
 								 * agree */
 	} mode; /**< Is replication activated */
+
+	/** Max delay waiting for a final status during elections */
+	time_t el_timeout;
 };
 
 struct election_manager_vtable_s
@@ -209,6 +212,8 @@ GError* sqlx_config_has_peers(const struct replication_config_s *cfg,
 GError* sqlx_config_has_peers2(const struct replication_config_s *cfg,
 		const gchar *n, const gchar *t, gboolean nocache, gboolean *result);
 
+/** Expire elections older than delay (in s) */
+void election_manager_expire(struct election_manager_s *manager, time_t delay);
 
 /** @} */
 
