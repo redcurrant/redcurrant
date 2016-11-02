@@ -140,6 +140,9 @@ struct election_member_s
 
 	time_t last_USE;
 
+	gboolean master_watched;
+	gboolean node_watched;
+
 	req_id_t reqid_USE;
 	req_id_t reqid_PIPEFROM;
 	req_id_t reqid_GETVERS;
@@ -532,6 +535,16 @@ member_reset(struct election_member_s *m)
 	m->myid = -1;
 }
 
+static inline gboolean
+member_is_reset(struct election_member_s *m)
+{
+	return m->master_id == -1 && m->master_url == NULL && m->myid == -1
+			&& m->sent_GETVERS == 0 && m->concurrent_GETVERS == 0
+			&& m->errors_GETVERS == 0 && m->reqid_GETVERS == 0
+			&& m->reqid_PIPEFROM == 0 && m->pending_GETVERS == 0
+			&& m->pending_PIPEFROM == 0;
+}
+
 static inline void
 member_set_id(struct election_member_s *m, gint64 id)
 {
@@ -613,6 +626,20 @@ member_dump_log(struct election_member_s *member)
 	}
 
 	return g_string_free(out, FALSE);
+}
+
+static gboolean
+_destroy_if_no_ref(struct election_member_s *m)
+{
+	if (m->refcount != 0)
+		return FALSE;
+
+	if (GRID_DEBUG_ENABLED())
+		member_debug(__FUNCTION__, "NOREF", m);
+	GMutex *lock = member_get_lock(m);
+	lru_tree_remove(MMANAGER(m)->lrutree_members, m->key);
+	g_mutex_unlock(lock);
+	return TRUE;
 }
 
 static void
@@ -909,17 +936,16 @@ static void
 step_AskMaster_completion(int zrc, const char *v, int vlen,
 		const struct Stat *s, const void *d)
 {
-	gchar *master = NULL;
-	struct election_member_s *member;
+	gchar *master = (v && vlen && *v) ? g_strndup(v, vlen) : NULL;
+	struct election_member_s *member = (struct election_member_s *)d;
 
 	(void) s;
-	member = (struct election_member_s *)d;
-	MEMBER_CHECK(member);
-	member_trace(__FUNCTION__, "DONE", member);
-
-	master = (v && vlen && *v) ? g_strndup(v, vlen) : NULL;
 
 	member_lock(member);
+	MEMBER_CHECK(member);
+	member_trace(__FUNCTION__, "DONE", member);
+	GRID_DEBUG("UNREF ASKMASTER");
+	member_unref(member);
 	if (zrc != ZOK) {
 		transition_error(member, EVT_MASTER_KO, zrc);
 	}
@@ -931,7 +957,6 @@ step_AskMaster_completion(int zrc, const char *v, int vlen,
 			transition(member, EVT_MASTER_OK, master);
 		}
 	}
-	member_unref(member);
 	member_unlock(member);
 
 	if (master)
@@ -942,14 +967,14 @@ static void
 step_ListGroup_completion(int zrc, const struct String_vector *sv,
 		const void *data)
 {
-	struct election_member_s *member;
+	struct election_member_s *member = (struct election_member_s *) data;
 
-	member = (struct election_member_s *) data;
+	member_lock(member);
 	MEMBER_CHECK(member);
 	member_trace(__FUNCTION__, "DONE", member);
 
-	member_lock(member);
-
+	GRID_DEBUG("UNREF LISTGROUP");
+	member_unref(member);
 	if (zrc != ZOK) {
 		transition_error(member, EVT_LIST_KO, zrc);
 	}
@@ -958,21 +983,22 @@ step_ListGroup_completion(int zrc, const struct String_vector *sv,
 		transition(member, EVT_LIST_OK, i64v);
 		g_array_free(i64v, TRUE);
 	}
-
-	member_unref(member);
 	member_unlock(member);
 }
 
 static void
 step_LeaveElection_completion(int zrc, const void *d)
 {
-	struct election_member_s *member;
+	struct election_member_s *member = (struct election_member_s *) d;
 
-	member = (struct election_member_s *) d;
+	member_lock(member);
 	MEMBER_CHECK(member);
 	member_trace(__FUNCTION__, "DONE", member);
 
-	member_lock(member);
+	GRID_DEBUG("UNREF LEAVE");
+	member_unref(member);
+	if (_destroy_if_no_ref(member))
+		return;
 	if (zrc != ZOK) {
 		if (zrc == ZNONODE) {
 			transition(member, EVT_LEAVE_OK, NULL);
@@ -984,22 +1010,22 @@ step_LeaveElection_completion(int zrc, const void *d)
 	else {
 		transition(member, EVT_LEAVE_OK, NULL);
 	}
-	member_unref(member);
 	member_unlock(member);
 }
 
 static void
 step_WatchNode_completion(int zrc, const struct Stat *s, const void *d)
 {
-	struct election_member_s *member;
+	struct election_member_s *member = (struct election_member_s *) d;
 
 	(void) s;
 
-	member = (struct election_member_s *) d;
+	member_lock(member);
 	MEMBER_CHECK(member);
 	member_trace(__FUNCTION__, "DONE", member);
 
-	member_lock(member);
+	GRID_DEBUG("UNREF WATCHNODE COMP");
+	member_unref(member);
 	if (zrc != ZOK) {
 		if (zrc == ZNONODE) {
 			transition(member, EVT_NODE_LEFT, &zrc);
@@ -1008,7 +1034,6 @@ step_WatchNode_completion(int zrc, const struct Stat *s, const void *d)
 			transition_error(member, EVT_NONE, zrc);
 		}
 	}
-	member_unref(member);
 	member_unlock(member);
 }
 
@@ -1016,13 +1041,14 @@ static void
 step_StartElection_completion(int zrc, const char *path, const void *d)
 {
 	gint64 i64;
-	struct election_member_s *member;
+	struct election_member_s *member = (struct election_member_s *) d;
 
-	member = (struct election_member_s *) d;
+	member_lock(member);
 	MEMBER_CHECK(member);
 	member_trace(__FUNCTION__, "DONE", member);
 
-	member_lock(member);
+	GRID_DEBUG("UNREF START");
+	member_unref(member);
 	if (zrc != ZOK) {
 		transition_error(member, EVT_CREATE_KO, zrc);
 	}
@@ -1035,7 +1061,6 @@ step_StartElection_completion(int zrc, const char *path, const void *d)
 			transition(member, EVT_CREATE_OK, &i64);
 		}
 	}
-	member_unref(member);
 	member_unlock(member);
 }
 
@@ -1045,24 +1070,22 @@ static void
 step_WatchMaster_change(zhandle_t *handle, int type, int state,
 			const char *path, void *d)
 {
-	struct election_member_s *member;
-
+	struct election_member_s *member = d;
 	(void) handle;
 	(void) type;
 	(void) state;
 	(void) path;
 
-	member = d;
-	if (member && MMANAGER(member) && MMANAGER(member)->exiting) {
-		GRID_INFO("ZK 'master change' callback triggered during exit, ignored");
-		return;
-	}
-	member_trace(__FUNCTION__, "CHANGE", member);
-	MEMBER_CHECK(member);
-
 	member_lock(member);
-	transition(member, EVT_MASTER_CHANGE, NULL);
+	MEMBER_CHECK(member);
+	member_trace(__FUNCTION__, "CHANGE", member);
+
+	GRID_DEBUG("UNREF ASKMASTER");
 	member_unref(member);
+	if (_destroy_if_no_ref(member))
+		return;
+	member->master_watched = FALSE;
+	transition(member, EVT_MASTER_CHANGE, NULL);
 	member_unlock(member);
 }
 
@@ -1070,24 +1093,23 @@ static void
 step_WatchNode_change(zhandle_t *handle, int type, int state,
 		const char *path, void *d)
 {
-	struct election_member_s *member;
-
+	struct election_member_s *member = d;
 	(void) handle;
 	(void) type;
 	(void) state;
 	(void) path;
 
-	member = d;
-	if (member && MMANAGER(member) && MMANAGER(member)->exiting) {
-		GRID_INFO("ZK 'node change' callback triggered during exit, ignored");
-		return;
-	}
 	MEMBER_CHECK(member);
 	member_trace(__FUNCTION__, "CHANGE", member);
 
 	member_lock(member);
-	transition(member, EVT_NODE_LEFT, NULL);
+
+	GRID_DEBUG("UNREF WATCHNODE");
 	member_unref(member);
+	if (_destroy_if_no_ref(member))
+		return;
+	member->node_watched = FALSE;
+	transition(member, EVT_NODE_LEFT, NULL);
 	member_unlock(member);
 }
 
@@ -1119,9 +1141,8 @@ step_StartElection_start(struct election_member_s *member)
 			step_StartElection_completion, member);
 	g_free(path);
 
-	if (zrc == ZOK) {
-		member_ref(member);
-	}
+	GRID_DEBUG("REF START zrc=%i", zrc);
+	member_ref(member);
 	return zrc;
 }
 
@@ -1134,13 +1155,24 @@ step_AskMaster_start(struct election_member_s *member)
 	member_trace(__FUNCTION__, "ACTION", member);
 
 	if (NULL != (path = member_masterpath(member))) {
+		watcher_fn cb_watcher;
+		void *cb_ctx;
+		if (member->master_watched) {
+			cb_watcher = NULL;
+			cb_ctx = NULL;
+		} else {
+			cb_watcher = step_WatchMaster_change;
+			cb_ctx = member;
+		}
 		zrc = sqlx_sync_awget(member->manager->sync, path,
-				step_WatchMaster_change, member,
+				cb_watcher, cb_ctx,
 				step_AskMaster_completion, member);
 		g_free(path);
-		if (zrc == ZOK) {
+		GRID_DEBUG("REF ASKMASTER zrc=%i", zrc);
+		member_ref(member);
+		if (zrc == ZOK && !member->master_watched) {
 			member_ref(member);
-			member_ref(member);
+			member->master_watched = TRUE;
 		}
 	}
 
@@ -1156,13 +1188,24 @@ step_WatchNode_start(struct election_member_s *member)
 	member_trace(__FUNCTION__, "ACTION", member);
 
 	if (NULL != (path = member_fullpath(member))) {
+		watcher_fn cb_watcher;
+		void *cb_ctx;
+		if (member->master_watched) {
+			cb_watcher = NULL;
+			cb_ctx = NULL;
+		} else {
+			cb_watcher = step_WatchNode_change;
+			cb_ctx = member;
+		}
 		zrc = sqlx_sync_awexists(member->manager->sync, path,
-				step_WatchNode_change, member,
+				cb_watcher, cb_ctx,
 				step_WatchNode_completion, member);
 		g_free(path);
-		if (zrc == ZOK) {
+		GRID_DEBUG("REF WATCHNODE zrc=%i", zrc);
+		member_ref(member);
+		if (zrc == ZOK && !member->node_watched) {
 			member_ref(member);
-			member_ref(member);
+			member->node_watched = TRUE;
 		}
 	}
 
@@ -1182,10 +1225,8 @@ step_ListGroup_start(struct election_member_s *member)
 			NULL, NULL,
 			step_ListGroup_completion, member);
 	g_free(path);
-
-	if (zrc == ZOK) {
-		member_ref(member);
-	}
+	GRID_DEBUG("REF LISTGROUP zrc=%i", zrc);
+	member_ref(member);
 
 	return zrc;
 }
@@ -1202,9 +1243,9 @@ step_LeaveElection_start(struct election_member_s *member)
 	zrc = sqlx_sync_adelete(member->manager->sync, path, -1,
 			step_LeaveElection_completion, member);
 	g_free(path);
+	GRID_DEBUG("REF LEAVE zrc=%i", zrc);
+	member_ref(member);
 
-	if (zrc == ZOK)
-		member_ref(member);
 	return zrc;
 }
 
@@ -1236,6 +1277,7 @@ _election_make(struct election_manager_s *m, const gchar *name,
 	}
 
 	g_mutex_lock(m->lock);
+	GRID_DEBUG("REF ELMAKE");
 	struct election_member_s *member = manager_init_member(m, name, type,
 			op != ELOP_EXIT);
 	switch (op) {
@@ -1252,8 +1294,10 @@ _election_make(struct election_manager_s *m, const gchar *name,
 				transition(member, EVT_EXITING, NULL);
 			break;
 	}
-	if (member)
+	if (member) {
+		GRID_DEBUG("UNREF ELMAKE");
 		member_unref(member);
+	}
 	g_mutex_unlock(m->lock);
 
 	return NULL;
@@ -1330,6 +1374,8 @@ wait_for_final_status(struct election_member_s *member,
 
 		g_time_val_add(&tmp, 1000000L);
 		member_wait(member, &tmp);
+		if (member->step == STEP_NONE && member_is_reset(member))
+			break;
 	}
 
 	return TRUE;
@@ -1353,6 +1399,7 @@ _election_get_status(struct election_manager_s *m, const gchar *name,
 	g_get_current_time(&max);
 	g_time_val_add(&max, 1000000L * m->delay_max_wait);
 
+	GRID_DEBUG("REF GETSTATUS");
 	member = manager_init_member(m, name, type, TRUE);
 	member_kickoff(member);
 
@@ -1366,6 +1413,7 @@ _election_get_status(struct election_manager_s *m, const gchar *name,
 		}
 	}
 
+	GRID_DEBUG("UNREF GETSTATUS");
 	member_unref(member);
 	if (rc == STEP_NONE || STATUS_FINAL(rc))
 		member_signal(member);
@@ -1401,8 +1449,8 @@ _manager_clean(struct election_manager_s *manager)
 	if (manager->pool)
 		manager->pool = NULL;
 
-	if (manager->lrutree_members)
-		lru_tree_destroy(manager->lrutree_members);
+	_manager_exit_all(manager, NULL, 0);
+	lru_tree_destroy(manager->lrutree_members);
 
 	if (manager->lock)
 		g_mutex_free(manager->lock);
@@ -1518,11 +1566,13 @@ on_end_USE(struct event_client_s *mc)
 	EXTRA_ASSERT(udata->member != NULL);
 	member = udata->member;
 
-	MEMBER_CHECK(member);
 	err = gridd_client_error(mc->client);
 
 	member_lock(member);
+	MEMBER_CHECK(member);
 	transition(member, EVT_USE_RES, &(udata->reqid));
+	GRID_DEBUG("UNREF USE %u", member->reqid_USE);
+	member_unref(member);
 	member_unlock(member);
 
 	if (err)
@@ -1575,6 +1625,7 @@ defer_USE(struct election_member_s *member, time_t now)
 			struct udata_USE_s *udata;
 			struct event_client_s *mc;
 
+			GRID_DEBUG("REF USE %u", member->reqid_USE);
 			member_ref(member);
 			udata = g_malloc0(sizeof(*udata));
 			udata->reqid = member->reqid_USE;
@@ -1612,16 +1663,18 @@ on_end_PIPEFROM(struct event_client_s *mc)
 	EXTRA_ASSERT(mc != NULL);
 	EXTRA_ASSERT(mc->udata != NULL);
 	member = mc->udata;
-	EXTRA_ASSERT(member->manager != NULL);
-	EXTRA_ASSERT(member->key != NULL);
-
 	err = gridd_client_error(mc->client);
+
+	member_lock(member);
+	MEMBER_CHECK(member);
+
 	GRID_DEBUG("PIPEFROM result [%s.%s] [%s]: (%d) %s",
 			member->name, member->type,
 			hashstr_str(member->key), err?err->code:0, err?err->message:"OK");
 
-	member_lock(member);
 	transition(member, EVT_RESYNC_DONE, &(member->reqid_PIPEFROM));
+
+	GRID_DEBUG("UNREF PIPEFROM %u", member->reqid_PIPEFROM);
 	member_unref(member);
 	member_unlock(member);
 
@@ -1654,6 +1707,7 @@ defer_PIPEFROM(struct election_member_s *member)
 		member->pending_PIPEFROM = 1;
 
 		GByteArray *req = sqlx_pack_PIPEFROM(&n, source);
+		GRID_DEBUG("REF PIPEFROM %u", member->reqid_PIPEFROM);
 		member_ref(member);
 		mc = g_malloc0(sizeof(*mc));
 		mc->client = gridd_client_create(target, req, NULL, NULL);
@@ -1744,6 +1798,8 @@ on_end_GETVERS(struct event_client_s *mc)
 		}
 		transition(member, EVT_GETVERS_ERROR, &(udata->reqid));
 	}
+	GRID_DEBUG("UNREF GETVERS %u", member->reqid_GETVERS);
+	member_unref(member);
 	member_unlock(member);
 
 	g_free(udata);
@@ -1823,6 +1879,7 @@ defer_GETVERS(struct election_member_s *member)
 		struct event_client_s *mc;
 		struct udata_GETVERS_s udata;
 
+		GRID_DEBUG("REF GETVERS %u", member->reqid_GETVERS);
 		member_ref(member);
 		udata.reqid = member->reqid_GETVERS;
 		udata.version = NULL;
@@ -1944,8 +2001,10 @@ manage_list(struct election_member_s *member, GArray *i64v)
 static gboolean
 member_concerned_by_GETVERS(struct election_member_s *member, guint *reqid)
 {
-	if (*reqid != member->reqid_GETVERS)
+	if (*reqid != member->reqid_GETVERS) {
+		GRID_DEBUG("NOTCONCERNED");
 		return FALSE;
+	}
 	if (member->pending_GETVERS > 0) {
 		if (! -- member->pending_GETVERS)
 			member->reqid_GETVERS = 0;
@@ -1964,10 +2023,9 @@ member_finish_PRELOST(struct election_member_s *member)
 	int concurrent = member->concurrent_GETVERS;
 	member->concurrent_GETVERS = 0;
 
-	// FIXME compare to the sizeof of the quorum
-	if (errors > 1) {
+	if (errors > 0) {
 		become_leaver(member);
-	} else if (concurrent > 1) {
+	} else if (concurrent > 0) {
 		member_RESYNC_if_not_pending(member);
 	} else {
 		if (member->master_url)
@@ -1986,10 +2044,9 @@ member_finish_PRELEAD(struct election_member_s *member)
 	int concurrent = member->concurrent_GETVERS;
 	member->concurrent_GETVERS = 0;
 
-	// FIXME compare to the sizeof of the quorum
-	if (errors > 1) {
+	if (errors > 0) {
 		become_leaver(member);
-	} else if (concurrent > 1) {
+	} else if (concurrent > 0) {
 		// No quorum, so become a LOSER and resync from the master.
 		become_leaver(member);
 	} else {
@@ -2496,3 +2553,79 @@ sqlx_config_has_peers(const struct replication_config_s *cfg, const gchar *n,
 	return sqlx_config_has_peers2(cfg, n, t, FALSE, result);
 }
 
+void
+election_manager_expire(struct election_manager_s *manager, time_t delay)
+{
+	guint ref0 = 0, ref1 = 0, ref2 = 0, refn = 0;
+	guint fref0 = 0, fref1 = 0, fref2 = 0, frefn = 0;
+	guint uref0 = 0, uref1 = 0, uref2 = 0, urefn = 0;
+
+	gboolean _traverse(gpointer k, gpointer v, gpointer u) {
+		(void) k, (void) u;
+		struct election_member_s *m = v;
+
+		time_t now = time(0);
+		if ((m->last_USE + delay) < now) {
+			if (!STATUS_FINAL(m->step)) {
+				GRID_DEBUG("Exit expired NONFINAL election of base [%s]", m->name);
+				switch (m->refcount) {
+				case 0:
+					ref0++;
+					break;
+				case 1:
+					ref1++;
+					break;
+				case 2:
+					ref2++;
+					break;
+				default:
+					refn++;
+					break;
+				}
+			} else {
+				GRID_DEBUG("Exit expired FINAL election of base [%s]", m->name);
+				switch (m->refcount) {
+				case 0:
+					fref0++;
+					break;
+				case 1:
+					fref1++;
+					break;
+				case 2:
+					fref2++;
+					break;
+				default:
+					frefn++;
+					break;
+				}
+			}
+			become_leaver(m);
+		} else {
+			switch (m->refcount) {
+			case 0:
+				uref0++;
+				break;
+			case 1:
+				uref1++;
+				break;
+			case 2:
+				uref2++;
+				break;
+			default:
+				urefn++;
+				break;
+			}
+		}
+		return FALSE;
+	}
+
+	g_mutex_lock(manager->lock);
+	lru_tree_foreach_TREE(manager->lrutree_members, _traverse, NULL);
+	g_mutex_unlock(manager->lock);
+	GRID_DEBUG("lru_tree bases: !final total=%u ref0=%u ref1=%u ref2=%u refn=%u",
+			ref0 + ref1 + ref2 + refn, ref0, ref1, ref2, refn);
+	GRID_DEBUG("lru_tree bases:  final total=%u ref0=%u ref1=%u ref2=%u refn=%u",
+			fref0 + fref1 + fref2 + frefn, fref0, fref1, fref2, frefn);
+	GRID_DEBUG("lru_tree bases: in-use total=%u ref0=%u ref1=%u ref2=%u refn=%u",
+			uref0 + uref1 + uref2 + urefn, uref0, uref1, uref2, urefn);
+}
