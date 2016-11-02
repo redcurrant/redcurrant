@@ -43,6 +43,7 @@ static void sqlx_service_specific_stop(void);
 // Periodic tasks & thread's workers
 static void _task_register(gpointer p);
 static void _task_expire_bases(gpointer p);
+static void _task_expire_elections(gpointer p);
 static void _task_garbage_collect(gpointer p);
 static void _task_expire_resolver(gpointer p);
 static void _task_retry_elections(gpointer p);
@@ -299,6 +300,7 @@ _configure_replication(struct sqlx_service_s *ss)
 	replication_config.get_version = _get_version;
 	replication_config.get_peers = (GError* (*)(gpointer, const gchar*,
 			const gchar*, gboolean nocache, gchar ***)) ss->service_config->get_peers;
+	replication_config.el_timeout = ss->cfg_el_timeout;
 
 	GError *err = election_manager_create(&replication_config,
 			&ss->election_manager);
@@ -363,6 +365,7 @@ _configure_tasks(struct sqlx_service_s *ss)
 	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_bases, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_resolver, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_retry_elections, NULL, ss);
+	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_elections, NULL, ss);
 	grid_task_queue_register(ss->gtq_reload, 60, _task_local_stats, NULL, ss);
 
 	return TRUE;
@@ -549,6 +552,8 @@ sqlx_service_set_defaults(void)
 	SRV.sync_mode_solo = 1;
 	SRV.sync_mode_repli = 1;
 
+	SRV.cfg_el_timeout = 5;
+
 	if (SRV.service_config->set_defaults)
 		SRV.service_config->set_defaults(&SRV);
 }
@@ -690,6 +695,8 @@ sqlx_service_get_options(void)
 			"Limits the number of worker threads" },
 		{"MaxHeapFree", OT_UINT, {.u=&SRV.cfg_max_heap_free},
 			"Amount of free memory to keep for future allocations (kB)" },
+		{"ElTimeout", OT_TIME, {.t=&SRV.cfg_el_timeout},
+			"How many seconds we accept to wait for a final status during elections" },
 
 		{"CacheEnabled", OT_BOOL, {.b = &SRV.flag_cached_bases},
 			"If set, each base will be cached in a way it won't be accessed"
@@ -866,6 +873,15 @@ _task_expire_bases(gpointer p)
 		if (count)
 			GRID_DEBUG("Expired %u bases", count);
 	}
+}
+
+static void
+_task_expire_elections(gpointer p)
+{
+	struct election_manager_s *elm = sqlx_repository_get_elections_manager(
+			PSRV(p)->repository);
+	if (elm != NULL)
+		election_manager_expire(elm, 300);
 }
 
 static void
