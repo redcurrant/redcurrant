@@ -76,18 +76,13 @@ grid_stats_holder_clean(struct grid_stats_holder_s *gsh)
 	if (!gsh)
 		return;
 
-	if (gsh->lock) {
-		GMutex *lock = gsh->lock;
-		gsh->lock = NULL;
-		g_mutex_lock(lock);
-		g_mutex_unlock(lock);
-		g_mutex_free(lock);
-	}
-
+	g_mutex_lock(gsh->lock);
 	if (gsh->hashset) {
 		g_tree_destroy(gsh->hashset);
 		gsh->hashset = NULL;
 	}
+	g_mutex_unlock(gsh->lock);
+	g_mutex_free(gsh->lock);
 
 	g_free(gsh);
 }
@@ -124,10 +119,12 @@ grid_stats_holder_increment(struct grid_stats_holder_s *gsh, ...)
 		return;
 
 	va_start(va, gsh);
+	g_mutex_lock(gsh->lock);
 	while ((n = va_arg(va, gchar*)) != NULL) {
 		v = va_arg(va, guint64);
 		_real_increment(gsh->hashset, n, v);
 	}
+	g_mutex_unlock(gsh->lock);
 	va_end(va);
 }
 

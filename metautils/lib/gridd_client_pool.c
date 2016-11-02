@@ -274,6 +274,10 @@ _manage_requests(struct gridd_client_pool_s *pool)
 
 	EXTRA_ASSERT(pool != NULL);
 
+	GRID_DEBUG("TRYPOP length=%i active_count=%i active_max=%i",
+			g_async_queue_length(pool->pending_clients),
+			pool->active_count, pool->active_max);
+
 	g_get_current_time(&start);
 	while (pool->active_count < pool->active_max) {
 		ec = g_async_queue_try_pop(pool->pending_clients);
@@ -296,19 +300,24 @@ _manage_requests(struct gridd_client_pool_s *pool)
 			}
 			event_client_free(ec);
 		}
-		else if (!event_client_monitor(pool, ec))
+		else if (!event_client_monitor(pool, ec)) {
+			GRID_DEBUG("MONITORERROR client=%p", ec);
 			event_client_free(ec);
+		} else {
+			GRID_DEBUG("MONITOROK client=%p", ec);
+		}
 	}
 
 	g_get_current_time(&end);
 	timersub(&end, &start, &diff);
-	gint qlen = g_async_queue_length(pool->pending_clients);
 	if (diff.tv_sec > 5) {
+		gint qlen = g_async_queue_length(pool->pending_clients);
 		GRID_WARN("Client pool request management took %lds!",
 				diff.tv_sec);
 		if (qlen > 1000)
 			GRID_WARN("Client pool still has %d pending requests", qlen);
 	} else if (GRID_DEBUG_ENABLED()) {
+		gint qlen = g_async_queue_length(pool->pending_clients);
 		GRID_DEBUG("Client pool request management took %ld.%06lds",
 				diff.tv_sec, diff.tv_usec);
 		GRID_DEBUG("Client pool has %d pending requests", qlen);
@@ -332,11 +341,17 @@ _manage_one_event(struct gridd_client_pool_s *pool, int fd, int evt)
 		event_client_free(ec);
 	}
 	else {
+		GRID_DEBUG("MANAGEONEEVT %i", evt);
 		gridd_client_react(ec->client);
+		GTimeVal before, after, diff;
+		g_get_current_time(&before);
 		if (gridd_client_finished(ec->client))
 			event_client_free(ec);
 		else if (!event_client_monitor(pool, ec))
 			event_client_free(ec);
+		g_get_current_time(&after);
+		timersub(&after, &before, &diff);
+		GRID_DEBUG("event_client_free took %ld.%06lds", diff.tv_sec, diff.tv_usec);
 	}
 }
 
@@ -344,12 +359,18 @@ static void
 _manage_all_events(struct gridd_client_pool_s *pool,
 		struct epoll_event *ev, int maxevt)
 {
+	GTimeVal before, after, diff;
+	g_get_current_time(&before);
 	for (int i=0; i < maxevt ;++i) {
+		GRID_DEBUG("MANAGEEVT %i %i %i", i, ev[i].data.fd, pool->fd_in);
 		if (ev[i].data.fd == pool->fd_in)
 			fd_consume_input(pool->fd_in);
 		else
 			_manage_one_event(pool, ev[i].data.fd, ev[i].events);
 	}
+	g_get_current_time(&after);
+	timersub(&after, &before, &diff);
+	GRID_DEBUG("_manage_all_events took %ld.%06lds", diff.tv_sec, diff.tv_usec);
 }
 
 static GError *
@@ -361,7 +382,12 @@ _round(struct gridd_client_pool_s *pool, time_t sec)
 
 	struct epoll_event ev[MAX_ROUND];
 	memset(ev, 0, sizeof(ev));
+	GTimeVal before, after, diff;
+	g_get_current_time(&before);
 	int rc = epoll_wait(pool->fdmon, ev, MAX_ROUND, sec * 1000L);
+	g_get_current_time(&after);
+	timersub(&after, &before, &diff);
+	GRID_DEBUG("_round took %ld.%06lds", diff.tv_sec, diff.tv_usec);
 
 	if (rc < 0 && errno != EINTR)
 		return NEWERROR(errno, "epoll_wait error: %s", strerror(errno));
@@ -388,8 +414,10 @@ _defer(struct gridd_client_pool_s *pool, struct event_client_s *ev)
 	}
 	else {
 		guint8 c = 0;
+		GRID_INFO("DEFERASYNC %i clients", g_async_queue_length(pool->pending_clients));
 		g_async_queue_push(pool->pending_clients, ev);
-		(void) metautils_syscall_write(pool->fd_out, &c, 1);
+		ssize_t s = metautils_syscall_write(pool->fd_out, &c, 1);
+		GRID_INFO("write returned: %li", s);
 	}
 }
 
