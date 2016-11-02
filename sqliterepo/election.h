@@ -209,6 +209,8 @@ GError* sqlx_config_has_peers(const struct replication_config_s *cfg,
 GError* sqlx_config_has_peers2(const struct replication_config_s *cfg,
 		const gchar *n, const gchar *t, gboolean nocache, gboolean *result);
 
+/** Expire elections older than delay (in s) */
+void election_manager_expire(struct election_manager_s *manager, time_t delay);
 
 /** @} */
 

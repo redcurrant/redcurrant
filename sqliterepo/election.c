@@ -2497,3 +2497,26 @@ sqlx_config_has_peers(const struct replication_config_s *cfg, const gchar *n,
 	return sqlx_config_has_peers2(cfg, n, t, FALSE, result);
 }
 
+void
+election_manager_expire(struct election_manager_s *manager, time_t delay)
+{
+	gboolean _traverse(gpointer k, gpointer v, gpointer u) {
+		struct election_member_s *m = v;
+		(void) k;
+		(void) u;
+		time_t now = time(0);
+		if ((m->last_USE + delay) < now) {
+			GError *err = _election_exit(manager, m->name, m->type);
+			if (err) {
+				GRID_DEBUG("Failed to exit expired election of base [%s] : %s",
+						m->name, err->message);
+				g_clear_error(&err);
+			}
+			else
+				GRID_DEBUG("Exit expired election of base [%s]", m->name);
+		}
+		return FALSE;
+	}
+
+	lru_tree_foreach_TREE(manager->lrutree_members, _traverse, NULL);
+}
