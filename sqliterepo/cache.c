@@ -670,6 +670,7 @@ retry:
 				base->owner = g_thread_self();
 				base->count_open ++;
 				*result = base->index;
+				GRID_DEBUG("Base %s opened %u times", hashstr_str(hname), base->count_open);
 				break;
 
 			case SQLX_BASE_CLOSING:
