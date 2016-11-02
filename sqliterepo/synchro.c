@@ -20,6 +20,7 @@ struct sqlx_sync_s
 	gchar *zk_prefix;
 	gchar *zk_url;
 	zhandle_t *zh;
+	GMutex *zh_lock;
 	clientid_t zk_id;
 
 	guint hash_width;
@@ -78,6 +79,7 @@ sqlx_sync_create(const char *url)
 	ss->vtable = &VTABLE;
 	ss->zk_url = g_strdup(url);
 	ss->zk_prefix = g_strdup("/NOTSET");
+	ss->zh_lock = g_mutex_new();
 	return ss;
 }
 
@@ -158,12 +160,14 @@ zk_main_watch(zhandle_t *zh, int type, int state, const char *path,
 
 	if (type == ZOO_SESSION_EVENT) {
 		if (state == ZOO_CONNECTING_STATE) {
-			if (ss->zh)
-				zookeeper_close(ss->zh);
 			if (NULL != ss->on_exit)
 				ss->on_exit(ss->on_exit_ctx);
+			g_mutex_lock(ss->zh_lock);
+			if (ss->zh)
+				zookeeper_close(ss->zh);
 			ss->zh = zookeeper_init(ss->zk_url, zk_main_watch,
 				SQLX_SYNC_DEFAULT_ZK_TIMEOUT, &ss->zk_id, ss, 0);
+			g_mutex_unlock(ss->zh_lock);
 		}
 	}
 	else {
@@ -194,7 +198,9 @@ _open(struct sqlx_sync_s *ss)
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	if (NULL != ss->zh)
 		return NEWERROR(500, "BUG : ZK connection already initiated");
+	g_mutex_lock(ss->zh_lock);
 	ss->zh = zookeeper_init(ss->zk_url, zk_main_watch, 4000, NULL, ss, 0);
+	g_mutex_unlock(ss->zh_lock);
 	if (NULL == ss->zh)
 		return NEWERROR(500, "ZK connection failure");
 	return NULL;
@@ -206,8 +212,10 @@ _close(struct sqlx_sync_s *ss)
 	EXTRA_ASSERT(ss != NULL);
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	if (ss->zh) {
+		g_mutex_lock(ss->zh_lock);
 		zookeeper_close(ss->zh);
 		ss->zh = NULL;
+		g_mutex_unlock(ss->zh_lock);
 	}
 }
 
@@ -219,6 +227,7 @@ _clear(struct sqlx_sync_s *ss)
 	_close(ss);
 	g_free(ss->zk_prefix);
 	g_free(ss->zk_url);
+	g_mutex_free(ss->zh_lock);
 	memset(ss, 0, sizeof(*ss));
 	g_free(ss);
 }
@@ -302,7 +311,7 @@ _awget_siblings (struct sqlx_sync_s *ss, const char *path,
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	gchar *p = _realdirname(ss, path);
 	int rc = zoo_awget_children(ss->zh, p, watcher, watcherCtx, completion, data);
-	GRID_TRACE("SYNC children(%s) = %d", p, rc);
+	GRID_TRACE("SYNC siblings(%s) = %d", p, rc);
 	g_free(p);
 	return rc;
 }

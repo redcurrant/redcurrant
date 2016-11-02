@@ -44,7 +44,9 @@ _close_handle(sqlite3 **pdb)
 	if (unlikely(NULL == pdb))
 		return;
 	if (NULL != *pdb) {
+		GRID_DEBUG("sqlite3_close:begin");
 		(void) sqlite3_close(*pdb);
+		GRID_DEBUG("sqlite3_close:end");
 		*pdb = NULL;
 	}
 }
@@ -721,21 +723,29 @@ label_retry:
 		if (w > 0)
 			written += w;
 	}
+	metautils_pclose(&fd);
 
 	/* Save the base admin fields */
 	do {
 		sqlite3 *h;
+		GRID_DEBUG("create_base:open");
 		if (SQLITE_OK == sqlite3_open(path, &h)) {
+			GRID_DEBUG("create_base:execbegin");
 			sqlx_exec(h, "BEGIN");
+			GRID_DEBUG("create_base:setstr:basename");
 			_admin_entry_set_str_noerror(h, "base_name", args->logical_name);
+			GRID_DEBUG("create_base:setstr:containername");
 			_admin_entry_set_str_noerror(h, "container_name", args->logical_name);
+			GRID_DEBUG("create_base:setstr:basetype");
 			_admin_entry_set_str_noerror(h, "base_type", args->logical_type);
+			GRID_DEBUG("create_base:execcommit");
 			sqlx_exec(h, "COMMIT");
+			GRID_DEBUG("create_base:close");
 			sqlite3_close(h);
 		}
+		GRID_DEBUG("create_base:save_fields:end");
 	} while (0);
 
-	metautils_pclose(&fd);
 	return NULL;
 }
 
@@ -890,11 +900,14 @@ retry:
 			return error;
 	}
 
+	GRID_DEBUG("open:com_rol_upd:begin");
 	sqlite3_commit_hook(handle, NULL, NULL);
 	sqlite3_rollback_hook(handle, NULL, NULL);
 	sqlite3_update_hook(handle, NULL, NULL);
+	GRID_DEBUG("open:com_rol_upd:end");
 
 	/* Lazy DB config */
+	GRID_DEBUG("open:exec:begin");
 	sqlite3_busy_timeout(handle, 30000);
 	if (args->is_replicated) {
 		sqlx_exec(handle, "PRAGMA journal_mode = MEMORY");
@@ -918,6 +931,7 @@ retry:
 	sqlx_admin_reload(sq3);
 
 	sqlx_exec(handle, "COMMIT");
+	GRID_DEBUG("open:exec:end");
 
 	*result = sq3;
 	return NULL;
@@ -929,13 +943,17 @@ __open_maybe_cached(struct open_args_s *args, struct sqlx_sqlite3_s **result)
 	GError *e0;
 	gint bd = -1;
 
+	GRID_DEBUG("open_cache:begin");
 	e0 = sqlx_cache_open_and_lock_base(args->repo->cache, args->realname, &bd);
+	GRID_DEBUG("open_cache:end");
 	if (e0 != NULL) {
 		g_prefix_error(&e0, "cache error: ");
 		return e0;
 	}
 
+	GRID_DEBUG("open_cache:get_handle:begin");
 	*result = sqlx_cache_get_handle(args->repo->cache, bd);
+	GRID_DEBUG("open_cache:get_handle:end");
 	GRID_TRACE("Cache slot reserved bd=%d, base [%s][%s] %s open",
 				bd, args->logical_name, args->logical_type,
 				(*result != NULL) ? "already" : "not");
@@ -943,13 +961,17 @@ __open_maybe_cached(struct open_args_s *args, struct sqlx_sqlite3_s **result)
 	if (NULL != *result)
 		return NULL;
 
+	GRID_DEBUG("open_cache:not_cached:begin");
 	if (!(e0 = __open_not_cached(args, result))) {
 		(*result)->bd = bd;
 		sqlx_cache_set_handle(args->repo->cache, bd, *result);
 		return NULL;
 	}
+	GRID_DEBUG("open_cache:not_cached:end");
 
+	GRID_DEBUG("open_cache:close:begin");
 	GError *e1 = sqlx_cache_unlock_and_close_base(args->repo->cache, bd, FALSE);
+	GRID_DEBUG("open_cache:close:end");
 	if (e1) {
 		GRID_WARN("BASE unlock/close error on bd=%d : (%d) %s",
 				bd, e1->code, e1->message);
@@ -971,8 +993,10 @@ _open_and_lock_base(struct open_args_s *args, enum election_status_e expected,
 
 	if (election_configured && !args->no_refcheck) {
 		gboolean has_peers = FALSE;
+		GRID_DEBUG("open_and_lock:has:begin");
 		err = election_has_peers(args->repo->election_manager,
 				args->logical_name, args->logical_type, &has_peers);
+		GRID_DEBUG("open_and_lock:has:end");
 		if (err != NULL) {
 			g_prefix_error(&err, "Peers resolution error: ");
 			return err;
@@ -991,8 +1015,10 @@ _open_and_lock_base(struct open_args_s *args, enum election_status_e expected,
 		enum election_status_e status;
 		gchar *url = NULL;
 
+		GRID_DEBUG("open_and_lock:get_status:begin");
 		status = election_get_status(args->repo->election_manager,
 				args->logical_name, args->logical_type, &url);
+		GRID_DEBUG("open_and_lock:get_status:begin");
 		GRID_TRACE("Status got=%d expected=%d master=%s", status, expected, url);
 
 		switch (status) {
@@ -1097,8 +1123,10 @@ sqlx_repository_open_and_lock(sqlx_repository_t *repo,
 	if (!repo->running)
 		return NEWERROR(500, "Repository being closed");
 
+	GRID_DEBUG("open_and_lock:fill:begin");
 	if (NULL != (err = _open_fill_args(&args, repo, type, name)))
 		return err;
+	GRID_DEBUG("open_and_lock:fill:end");
 	args.no_refcheck = BOOL(how & SQLX_OPEN_NOREFCHECK);
 	args.create = BOOL(how & SQLX_OPEN_CREATE);
 
@@ -1124,9 +1152,13 @@ sqlx_repository_open_and_lock(sqlx_repository_t *repo,
 	_open_clean_args(&args);
 
 	if (!err && repo->open_callback && result) {
+		GRID_DEBUG("open_and_lock:cb:begin");
 		err = repo->open_callback(*result, repo->open_callback_data);
+		GRID_DEBUG("open_and_lock:cb:end");
 		if (err) {
+			GRID_DEBUG("open_and_lock:close:begin");
 			sqlx_repository_unlock_and_close_noerror(*result);
+			GRID_DEBUG("open_and_lock:close:end");
 			if (lead && *lead) {
 				g_free(*lead);
 				*lead = NULL;
