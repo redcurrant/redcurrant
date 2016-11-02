@@ -43,6 +43,7 @@ static void sqlx_service_specific_stop(void);
 // Periodic tasks & thread's workers
 static void _task_register(gpointer p);
 static void _task_expire_bases(gpointer p);
+static void _task_expire_elections(gpointer p);
 static void _task_garbage_collect(gpointer p);
 static void _task_expire_resolver(gpointer p);
 static void _task_retry_elections(gpointer p);
@@ -363,6 +364,7 @@ _configure_tasks(struct sqlx_service_s *ss)
 	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_bases, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_resolver, NULL, ss);
 	grid_task_queue_register(ss->gtq_admin, 1, _task_retry_elections, NULL, ss);
+	grid_task_queue_register(ss->gtq_admin, 1, _task_expire_elections, NULL, ss);
 	grid_task_queue_register(ss->gtq_reload, 60, _task_local_stats, NULL, ss);
 
 	return TRUE;
@@ -866,6 +868,15 @@ _task_expire_bases(gpointer p)
 		if (count)
 			GRID_DEBUG("Expired %u bases", count);
 	}
+}
+
+static void
+_task_expire_elections(gpointer p)
+{
+	struct election_manager_s *elm = sqlx_repository_get_elections_manager(
+			PSRV(p)->repository);
+	if (elm != NULL)
+		election_manager_expire(elm, 60);
 }
 
 static void

@@ -1359,17 +1359,10 @@ sqlx_dispatch_GETVERS(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("BASE_TYPE", type);
 	reply->subject("%s.%s", base, type);
 
-	// TODO JFS : trigger an election, useful to reduce the number of
-	// messages during an election.
-	err = sqlx_repository_use_base(repo, type, base);
-	if (NULL != err) {
-		g_prefix_error(&err, "Use: ");
-		reply->send_error(0, err);
-		return TRUE;
-	}
-
+	GRID_DEBUG("GETVERS %s open:begin", base);
 	err = sqlx_repository_open_and_lock(repo, type, base,
 			SQLX_OPEN_LOCAL, &sq3, NULL);
+	GRID_DEBUG("GETVERS %s open:end", base);
 
 	if (NULL != err) {
 		g_prefix_error(&err, "Open/lock: ");
@@ -1377,7 +1370,20 @@ sqlx_dispatch_GETVERS(struct gridd_reply_ctx_s *reply,
 		return TRUE;
 	}
 
+	// TODO JFS : trigger an election, useful to reduce the number of
+	// messages during an election.
+	GRID_DEBUG("GETVERS %s use:begin", base);
+	err = sqlx_repository_use_base(repo, type, base);
+	GRID_DEBUG("GETVERS %s use:end", base);
+	if (NULL != err) {
+		g_prefix_error(&err, "Use: ");
+		reply->send_error(0, err);
+		return TRUE;
+	}
+
+	GRID_DEBUG("GETVERS %s get:begin", base);
 	err = sqlx_repository_get_version(sq3, &version);
+	GRID_DEBUG("GETVERS %s get:end", base);
 	if (NULL != err) {
 		reply->send_error(0, err);
 	}
@@ -1393,7 +1399,9 @@ sqlx_dispatch_GETVERS(struct gridd_reply_ctx_s *reply,
 		}
 	}
 
+	GRID_DEBUG("GETVERS %s close:begin", base);
 	sqlx_repository_unlock_and_close_noerror(sq3);
+	GRID_DEBUG("GETVERS %s close:end", base);
 	if (version)
 		g_tree_destroy(version);
 	return TRUE;
@@ -1422,17 +1430,21 @@ sqlx_dispatch_REPLICATE(struct gridd_reply_ctx_s *reply,
 
 	reply->send_reply(100, "received");
 
-	/* Starts an election without being an initiator ... because I receive
-	 * this request from a master, so an election is already running
-	 * somewhere else. */
-	err = sqlx_repository_use_base(repo, type, base);
+	GRID_DEBUG("sqlx_dispatch_REPLICATE %s open:begin", base);
+	err = sqlx_repository_open_and_lock(repo, type, base,
+			SQLX_OPEN_LOCAL|SQLX_OPEN_CREATE, &sq3, NULL);
+	GRID_DEBUG("sqlx_dispatch_REPLICATE %s open:end", base);
 	if (NULL != err) {
 		reply->send_error(0, err);
 		return TRUE;
 	}
 
-	err = sqlx_repository_open_and_lock(repo, type, base,
-			SQLX_OPEN_LOCAL|SQLX_OPEN_CREATE, &sq3, NULL);
+	/* Starts an election without being an initiator ... because I receive
+	 * this request from a master, so an election is already running
+	 * somewhere else. */
+	GRID_DEBUG("sqlx_dispatch_REPLICATE %s use:begin", base);
+	err = sqlx_repository_use_base(repo, type, base);
+	GRID_DEBUG("sqlx_dispatch_REPLICATE %s use:end", base);
 	if (NULL != err) {
 		reply->send_error(0, err);
 		return TRUE;
@@ -1445,7 +1457,9 @@ sqlx_dispatch_REPLICATE(struct gridd_reply_ctx_s *reply,
 	else
 		reply->send_reply(200, "OK");
 
+	GRID_DEBUG("sqlx_dispatch_REPLICATE %s close:begin", base);
 	sqlx_repository_unlock_and_close_noerror(sq3);
+	GRID_DEBUG("sqlx_dispatch_REPLICATE %s close:end", base);
 
 	return TRUE;
 }
@@ -1464,6 +1478,7 @@ sqlx_dispatch_HAS(struct gridd_reply_ctx_s *reply,
     reply->subject("%s.%s", base, type);
 
     /* Open and lock the base */
+	GRID_DEBUG("sqlx_dispatch_HAS %s has:begin", base);
     if (NULL != (err = sqlx_repository_has_base2(repo, type, base, &bddname))) {
 		reply->send_error(0, err);
 	} else {
@@ -1475,6 +1490,7 @@ sqlx_dispatch_HAS(struct gridd_reply_ctx_s *reply,
 		}
    		reply->send_reply(200, "OK");
 	}
+	GRID_DEBUG("sqlx_dispatch_HAS %s has:end", base);
 
     return TRUE;
 }
@@ -1493,11 +1509,13 @@ sqlx_dispatch_STATUS(struct gridd_reply_ctx_s *reply,
 	reply->subject("%s.%s", base, type);
 
 	/* Open and lock the base */
+	GRID_DEBUG("sqlx_dispatch_STATUS %s status:begin", base);
 	if (NULL != (err = sqlx_repository_status_base(repo, type, base)))
 		reply->send_error(0, err);
 	else
 		reply->send_reply(200, "MASTER");
 
+	GRID_DEBUG("sqlx_dispatch_STATUS %s status:end", base);
 	return TRUE;
 }
 
@@ -1514,6 +1532,7 @@ sqlx_dispatch_ISMASTER(struct gridd_reply_ctx_s *reply,
 	reply->subject("%s.%s", base, type);
 
 	/* Open and lock the base */
+	GRID_DEBUG("sqlx_dispatch_ISMASTER %s status:begin", base);
 	err = sqlx_repository_status_base(repo, type, base);
 	if (NULL == err)
 		reply->send_reply(200, "MASTER");
@@ -1525,6 +1544,7 @@ sqlx_dispatch_ISMASTER(struct gridd_reply_ctx_s *reply,
 			reply->send_error(0, err);
 		}
 	}
+	GRID_DEBUG("sqlx_dispatch_ISMASTER %s status:end", base);
 
 	return TRUE;
 }
@@ -1545,10 +1565,12 @@ sqlx_dispatch_DESCR(struct gridd_reply_ctx_s *reply,
 	/* Open and lock the base */
 	memset(descr, 0, sizeof(descr));
 	descr[0] = '?';
+	GRID_DEBUG("sqlx_dispatch_DESCR %s what:begin", base);
 	election_manager_whatabout(sqlx_repository_get_elections_manager(repo),
 			base, type, descr, sizeof(descr));
 	reply->add_body(metautils_gba_from_string(descr));
 	reply->send_reply(200, "OK");
+	GRID_DEBUG("sqlx_dispatch_DESCR %s what:end", base);
 	return TRUE;
 }
 
@@ -1565,10 +1587,12 @@ sqlx_dispatch_USE(struct gridd_reply_ctx_s *reply,
 	reply->subject("%s.%s", base, type);
 
 	/* Open and lock the base */
+	GRID_DEBUG("sqlx_dispatch_USE %s use:begin", base);
 	if (NULL != (err = sqlx_repository_use_base(repo, type, base)))
 		reply->send_error(0, err);
 	else
 		reply->send_reply(200, "OK");
+	GRID_DEBUG("sqlx_dispatch_USE %s use:end", base);
 	return TRUE;
 }
 
@@ -1583,10 +1607,12 @@ sqlx_dispatch_EXITELECTION(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("BASE_NAME", base);
 	EXTRACT_STRING("BASE_TYPE", type);
 	reply->subject("%s.%s", base, type);
+	GRID_DEBUG("sqlx_dispatch_EXIT %s exit:begin", base);
 	if (NULL != (err = sqlx_repository_exit_election(repo, type, base)))
 		reply->send_error(0, err);
 	else
 		reply->send_reply(200, "OK");
+	GRID_DEBUG("sqlx_dispatch_EXIT %s exit:end", base);
 	return TRUE;
 }
 
@@ -1604,6 +1630,7 @@ sqlx_dispatch_PIPETO(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("DST", target);
 	reply->subject("%s.%s|%s", base, type, target);
 
+	GRID_DEBUG("sqlx_dispatch_PIPETO %s pipeto:begin", base);
 	/* Dump the base in a locked manner */
 	err = _dump(repo, base, type, &dump);
 	if (NULL != err) {
@@ -1624,6 +1651,7 @@ sqlx_dispatch_PIPETO(struct gridd_reply_ctx_s *reply,
 		reply->send_error(500, err);
 	else
 		reply->send_reply(200, "OK");
+	GRID_DEBUG("sqlx_dispatch_PIPETO %s pipeto:end", base);
 	return TRUE;
 }
 
@@ -1641,6 +1669,7 @@ sqlx_dispatch_DUMP(struct gridd_reply_ctx_s *reply,
 	EXTRACT_FLAG("CHUNKED", chunked);
 	reply->subject("%s.%s", base, type);
 
+	GRID_DEBUG("sqlx_dispatch_DUMP %s dump:begin", base);
 	void _send_part(GByteArray *part, gint64 remaining)
 	{
 		gchar tmp[32] = {0};
@@ -1670,6 +1699,7 @@ sqlx_dispatch_DUMP(struct gridd_reply_ctx_s *reply,
 		reply->add_header("format", metautils_gba_from_string("sqlite3"));
 		reply->send_reply(200, "OK");
 	}
+	GRID_DEBUG("sqlx_dispatch_DUMP %s dump:end", base);
 	return TRUE;
 }
 
@@ -1686,6 +1716,7 @@ sqlx_dispatch_RESTORE(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("BASE_NAME", base);
 	EXTRACT_STRING("BASE_TYPE", type);
 	reply->subject("%s.%s", base, type);
+	GRID_DEBUG("sqlx_dispatch_RESTORE %s restore:begin", base);
 
 	/* The body is the raw base */
 	if (0 >= message_get_BODY(reply->request, (void**)&dump, &dump_size, NULL)) {
@@ -1703,6 +1734,7 @@ sqlx_dispatch_RESTORE(struct gridd_reply_ctx_s *reply,
 	else
 		reply->send_reply(200, "OK");
 
+	GRID_DEBUG("sqlx_dispatch_RESTORE %s restore:end", base);
 	return TRUE;
 }
 
@@ -1719,10 +1751,12 @@ sqlx_dispatch_PIPEFROM(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("SRC", source);
 	reply->subject("%s.%s|%s", base, type, source);
 
+	GRID_DEBUG("sqlx_dispatch_PIPEFROM %s pipefrom:begin", base);
 	if (NULL != (err = _pipe_from(source, repo, base, type)))
 		reply->send_error(0, err);
 	else
 		reply->send_reply(200, "OK");
+	GRID_DEBUG("sqlx_dispatch_PIPEFROM %s pipefrom:end", base);
 
 	return TRUE;
 }
@@ -1741,6 +1775,15 @@ sqlx_dispatch_RESYNC(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("BASE_TYPE", type);
 	reply->subject("%s.%s", base, type);
 
+	GRID_DEBUG("sqlx_dispatch_RESYNC %s resync:begin", base);
+	struct sqlx_sqlite3_s *sq3 = NULL;
+	err = sqlx_repository_open_and_lock(repo, type, base,
+			SQLX_OPEN_SLAVEONLY, &sq3, NULL);
+	if (NULL != err) {
+		reply->send_error(0, err);
+		return TRUE;
+	}
+
 	/* Force refresh of peers from meta1 */
 	em = sqlx_repository_get_elections_manager(repo);
 	err = sqlx_config_has_peers2(election_manager_get_config(em),
@@ -1754,14 +1797,6 @@ sqlx_dispatch_RESYNC(struct gridd_reply_ctx_s *reply,
 		return TRUE;
 	}
 
-	struct sqlx_sqlite3_s *sq3 = NULL;
-	err = sqlx_repository_open_and_lock(repo, type, base,
-			SQLX_OPEN_SLAVEONLY, &sq3, NULL);
-	if (NULL != err) {
-		reply->send_error(0, err);
-		return TRUE;
-	}
-
 	err = sqlx_repository_retore_from_master(sq3);
 	sqlx_repository_unlock_and_close_noerror(sq3);
 
@@ -1770,6 +1805,7 @@ sqlx_dispatch_RESYNC(struct gridd_reply_ctx_s *reply,
 		return TRUE;
 	}
 
+	GRID_DEBUG("sqlx_dispatch_RESYNC %s resync:end", base);
 	reply->send_reply(200, "resync triggered");
 	return TRUE;
 }
@@ -1816,6 +1852,8 @@ sqlx_dispatch_QUERY(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("BASE_NAME", base);
 	EXTRACT_STRING("BASE_TYPE", schema);
 	EXTRACT_FLAG("AUTOCREATE", autocreate);
+
+	GRID_DEBUG("QUERY %s pwet:begin", base);
 	if (NULL != (err = message_extract_strint64(reply->request, "BASE_SEQ", &shard))) {
 		reply->send_error(0, err);
 		return TRUE;
@@ -1872,6 +1910,8 @@ sqlx_dispatch_QUERY(struct gridd_reply_ctx_s *reply,
 		reply->send_error(0, err);
 	else
 		reply->send_reply(200, "OK");
+
+	GRID_DEBUG("QUERY %s pwet:end", base);
 	return TRUE;
 }
 
@@ -1885,6 +1925,7 @@ sqlx_dispatch_DESTROY(struct gridd_reply_ctx_s *reply,
 	gboolean local_destroy = FALSE;
 	gchar base[256], schema[256], *ename;
 
+	GRID_DEBUG("DESTROY %s destroy:begin", base);
 	EXTRACT_STRING("BASE_NAME", base);
 	EXTRACT_STRING("BASE_TYPE", schema);
 	if ((err = message_extract_strint64(reply->request, "BASE_SEQ", &shard))) {
@@ -1901,6 +1942,7 @@ sqlx_dispatch_DESTROY(struct gridd_reply_ctx_s *reply,
 		reply->send_error(0, err);
 	else
 		reply->send_reply(200, "OK");
+	GRID_DEBUG("DESTROY %s destroy:end", base);
 
 	g_free(ename);
 	return TRUE;
@@ -1924,16 +1966,20 @@ sqlx_dispatch_ADMGET(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("K", k);
 	reply->subject("%s.%s|%s|%s", base, type, flag_local?"LOC":"REP", k);
 
+	GRID_DEBUG("ADMGET %s open:begin", base);
 	err = sqlx_repository_open_and_lock(repo, type, base,
 			flag_local ? (SQLX_OPEN_LOCAL|SQLX_OPEN_NOREFCHECK) : SQLX_OPEN_MASTERSLAVE,
 			&sq3, NULL);
+	GRID_DEBUG("ADMGET %s open:end", base);
 	if (NULL != err) {
 		g_prefix_error(&err, "Open/lock: ");
 		reply->send_error(0, err);
 		return TRUE;
 	}
 
+	GRID_DEBUG("ADMGET %s getstr:begin", base);
 	gchar *v = sqlx_admin_get_str(sq3, k);
+	GRID_DEBUG("ADMGET %s getstr:end", base);
 	if (!v)
 		reply->send_error(0, NEWERROR(CODE_CONTENT_NOTFOUND, "no such value"));
 	else {
@@ -1942,7 +1988,9 @@ sqlx_dispatch_ADMGET(struct gridd_reply_ctx_s *reply,
 		g_free(v);
 	}
 
+	GRID_DEBUG("ADMGET %s close:begin", base);
 	sqlx_repository_unlock_and_close_noerror(sq3);
+	GRID_DEBUG("ADMGET %s close:end", base);
 	return TRUE;
 }
 
@@ -1964,15 +2012,18 @@ sqlx_dispatch_ADMSET(struct gridd_reply_ctx_s *reply,
 	reply->subject("%s.%s|%s|%s", base, type, flag_local?"LOC":"REP", k);
 	EXTRACT_STRING("V", v);
 
+	GRID_DEBUG("ADMSET %s open:begin", base);
 	err = sqlx_repository_open_and_lock(repo, type, base,
 			flag_local ? (SQLX_OPEN_LOCAL|SQLX_OPEN_NOREFCHECK) : SQLX_OPEN_MASTERSLAVE,
 			&sq3, NULL);
+	GRID_DEBUG("ADMSET %s open:end", base);
 	if (NULL != err) {
 		g_prefix_error(&err, "Open/lock: ");
 		reply->send_error(0, err);
 		return TRUE;
 	}
 
+	GRID_DEBUG("ADMSET %s tx:begin", base);
 	struct sqlx_repctx_s *repctx = NULL;
 	if (!flag_local)
 		err = sqlx_transaction_begin(sq3, &repctx);
@@ -1981,13 +2032,16 @@ sqlx_dispatch_ADMSET(struct gridd_reply_ctx_s *reply,
 		if (!flag_local)
 			err = sqlx_transaction_end(repctx, err);
 	}
+	GRID_DEBUG("ADMSET %s tx:end", base);
 
 	if (NULL != err)
 		reply->send_error(0, err);
 	else
 		reply->send_reply(200, "OK");
 
+	GRID_DEBUG("ADMSET %s open:begin", base);
 	sqlx_repository_unlock_and_close_noerror(sq3);
+	GRID_DEBUG("ADMSET %s open:end", base);
 	return TRUE;
 }
 
@@ -2100,6 +2154,7 @@ sqlx_dispatch_INFO(struct gridd_reply_ctx_s *reply,
 {
 	(void) ignored;
 
+	GRID_DEBUG("INFO pwet:begin");
 	GString *gstr = g_string_sized_new(1024);
 	_info_sqlite(gstr);
 	_info_repository(repo, gstr);
@@ -2110,6 +2165,7 @@ sqlx_dispatch_INFO(struct gridd_reply_ctx_s *reply,
 	g_string_free(gstr, TRUE);
 
 	reply->send_reply(200, "OK");
+	GRID_DEBUG("INFO pwet:begin");
 	return TRUE;
 }
 
@@ -2120,6 +2176,7 @@ sqlx_dispatch_LEANIFY(struct gridd_reply_ctx_s *reply,
 	(void) ignored;
 	(void) repo;
 
+	GRID_DEBUG("LEANIFY release:begin");
 	int size = sqlite3_release_memory(MALLOC_TRIM_SIZE);
 
 	gchar message[32 + sizeof("Released %d")];
@@ -2127,6 +2184,7 @@ sqlx_dispatch_LEANIFY(struct gridd_reply_ctx_s *reply,
 	malloc_trim((size_t)MALLOC_TRIM_SIZE);
 	reply->add_body(metautils_gba_from_string(message));
 	reply->send_reply(200, "OK");
+	GRID_DEBUG("LEANIFY release:end");
 	return TRUE;
 }
 
