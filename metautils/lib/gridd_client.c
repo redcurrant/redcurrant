@@ -471,7 +471,12 @@ _client_react(struct gridd_client_s *client)
 		return;
 	GError *err = NULL;
 
+	guint r = 0;
+	GTimeVal before, after, diff;
+	g_get_current_time(&before);
+
 retry:
+	r++;
 	if (!(err = _client_manage_event(client))) {
 		if (client->step == REP_READING_SIZE && client->reply
 				&& client->reply->len >= 4)
@@ -484,6 +489,10 @@ retry:
 		client->error = err;
 		client->step = STATUS_FAILED;
 	}
+
+	g_get_current_time(&after);
+	timersub(&after, &before, &diff);
+	GRID_DEBUG("_client_react %u tries, took %ld.%06lds", r, diff.tv_sec, diff.tv_usec);
 }
 
 static const gchar*
