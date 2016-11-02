@@ -28,6 +28,8 @@ struct sqlx_sync_vtable_s
 	int (*adelete) (struct sqlx_sync_s *ss, const char *path, int version,
 			void_completion_t completion, const void *data);
 
+	int (*delete) (struct sqlx_sync_s *ss, const char *path, int version);
+
 	int (*awexists) (struct sqlx_sync_s *ss, const char *path,
 			watcher_fn watcher, void* watcherCtx,
 			stat_completion_t completion, const void *data);
@@ -70,6 +72,9 @@ struct abstract_sqlx_sync_s
 #define sqlx_sync_adelete(ss, path, ver, completion, data) \
 	((struct abstract_sqlx_sync_s*)(ss))->vtable->adelete(ss, path, ver, completion, data)
 
+#define sqlx_sync_delete(ss, path, ver) \
+	((struct abstract_sqlx_sync_s*)(ss))->vtable->delete(ss, path, ver)
+
 #define sqlx_sync_awexists(ss, path, watch, watchctx, completion, data) \
 	((struct abstract_sqlx_sync_s*)(ss))->vtable->awexists(ss, path, watch, watchctx, completion, data)
 
@@ -88,6 +93,19 @@ struct abstract_sqlx_sync_s
 /** Initiates a sqlx synchronizer based on ZooKeeper.
  * @param url the Zookeeper connection string */
 struct sqlx_sync_s * sqlx_sync_create(const char *url);
+
+/**
+ * Returns whether synchronizer is connected.
+ * @param ss sync structure
+ */
+gboolean sqlx_sync_is_connected(struct sqlx_sync_s *ss);
+
+/**
+ * Returns time of last reconnection to synchronizer.
+ * @param ss sync structure
+ * @return time
+ */
+time_t sqlx_sync_get_connection_time(struct sqlx_sync_s *ss);
 
 void sqlx_sync_set_prefix(struct sqlx_sync_s *ss, const gchar *prefix);
 
