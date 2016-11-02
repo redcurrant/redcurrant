@@ -672,6 +672,34 @@ __create_directory(gchar *path)
 	return error;
 }
 
+static const gchar *
+_get_pragma_sync(register const int mode)
+{
+	switch (mode) {
+		case SQLX_SYNC_OFF:
+			return "PRAGMA synchronous = OFF";
+		case SQLX_SYNC_NORMAL:
+			return "PRAGMA synchronous = NORMAL";
+		case SQLX_SYNC_FULL:
+			return "PRAGMA synchronous = FULL";
+		default:
+			return "PRAGMA synchronous = NORMAL";
+	}
+}
+
+static void
+_init_PRAGMA(sqlite3 *handle, struct open_args_s *args)
+{
+	if (args->is_replicated) {
+		sqlx_exec(handle, "PRAGMA journal_mode = MEMORY");
+		sqlx_exec(handle, _get_pragma_sync(args->repo->sync_mode_repli));
+	} else {
+		GRID_TRACE("Using DELETE journal mode for base [%s]", args->realpath);
+		sqlx_exec(handle, _get_pragma_sync(args->repo->sync_mode_solo));
+	}
+	sqlx_exec(handle, "PRAGMA foreign_keys = OFF");
+}
+
 static GError*
 __create_base(struct open_args_s *args, gchar *path, GByteArray *raw)
 {
@@ -721,11 +749,13 @@ label_retry:
 		if (w > 0)
 			written += w;
 	}
+	metautils_pclose(&fd);
 
 	/* Save the base admin fields */
 	do {
 		sqlite3 *h;
 		if (SQLITE_OK == sqlite3_open(path, &h)) {
+			_init_PRAGMA(h, args);
 			sqlx_exec(h, "BEGIN");
 			_admin_entry_set_str_noerror(h, "base_name", args->logical_name);
 			_admin_entry_set_str_noerror(h, "container_name", args->logical_name);
@@ -735,7 +765,6 @@ label_retry:
 		}
 	} while (0);
 
-	metautils_pclose(&fd);
 	return NULL;
 }
 
@@ -771,21 +800,6 @@ _open_clean_args(struct open_args_s *args)
 		g_free(args->realname);
 	if (args->realpath)
 		g_free(args->realpath);
-}
-
-static const gchar *
-_get_pragma_sync(register const int mode)
-{
-	switch (mode) {
-		case SQLX_SYNC_OFF:
-			return "PRAGMA synchronous = OFF";
-		case SQLX_SYNC_NORMAL:
-			return "PRAGMA synchronous = NORMAL";
-		case SQLX_SYNC_FULL:
-			return "PRAGMA synchronous = FULL";
-		default:
-			return "PRAGMA synchronous = NORMAL";
-	}
 }
 
 static void
@@ -896,14 +910,7 @@ retry:
 
 	/* Lazy DB config */
 	sqlite3_busy_timeout(handle, 30000);
-	if (args->is_replicated) {
-		sqlx_exec(handle, "PRAGMA journal_mode = MEMORY");
-		sqlx_exec(handle, _get_pragma_sync(args->repo->sync_mode_repli));
-	} else {
-		GRID_TRACE("Using DELETE journal mode for base [%s]", args->realpath);
-		sqlx_exec(handle, _get_pragma_sync(args->repo->sync_mode_solo));
-	}
-	sqlx_exec(handle, "PRAGMA foreign_keys = OFF");
+	_init_PRAGMA(handle, args);
 	sqlx_exec(handle, "BEGIN");
 
 	sq3 = g_malloc0(sizeof(*sq3));
