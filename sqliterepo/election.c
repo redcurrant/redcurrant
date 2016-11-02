@@ -2496,3 +2496,43 @@ sqlx_config_has_peers(const struct replication_config_s *cfg, const gchar *n,
 	return sqlx_config_has_peers2(cfg, n, t, FALSE, result);
 }
 
+void
+election_manager_expire(struct election_manager_s *manager, time_t delay)
+{
+	GSList *members_to_destroy = NULL;
+
+	gboolean _traverse(gpointer k, gpointer v, gpointer u) {
+		(void) k, (void) u;
+		struct election_member_s *m = v;
+
+		time_t now = time(0);
+		if ((m->last_USE + delay) < now) {
+			if (m->refcount == 0 && m->step == STEP_NONE) {
+				/* Store already exited elections to be later
+				 * removed from the tree and destroyed */
+				members_to_destroy = g_slist_prepend(members_to_destroy, m->key);
+			}
+			else {
+				GError *err = _election_exit(manager, m->name, m->type);
+				if (err) {
+					GRID_DEBUG("Failed to exit expired election of base [%s] : %s",
+							m->name, err->message);
+					g_clear_error(&err);
+				}
+				else
+					GRID_DEBUG("Exit expired election of base [%s]", m->name);
+			}
+		}
+		return FALSE;
+	}
+
+	g_mutex_lock(manager->lock);
+	lru_tree_foreach_TREE(manager->lrutree_members, _traverse, NULL);
+	for (GSList *l = members_to_destroy; l; l = l->next) {
+		struct election_member_s *em = l->data;
+		lru_tree_remove(manager->lrutree_members, em->key);
+		member_destroy(em);
+	}
+	g_mutex_unlock(manager->lock);
+	g_slist_free(members_to_destroy);
+}
