@@ -296,19 +296,21 @@ _manage_requests(struct gridd_client_pool_s *pool)
 			}
 			event_client_free(ec);
 		}
-		else if (!event_client_monitor(pool, ec))
+		else if (!event_client_monitor(pool, ec)) {
 			event_client_free(ec);
+		}
 	}
 
 	g_get_current_time(&end);
 	timersub(&end, &start, &diff);
-	gint qlen = g_async_queue_length(pool->pending_clients);
 	if (diff.tv_sec > 5) {
+		gint qlen = g_async_queue_length(pool->pending_clients);
 		GRID_WARN("Client pool request management took %lds!",
 				diff.tv_sec);
 		if (qlen > 1000)
 			GRID_WARN("Client pool still has %d pending requests", qlen);
 	} else if (GRID_DEBUG_ENABLED()) {
+		gint qlen = g_async_queue_length(pool->pending_clients);
 		GRID_DEBUG("Client pool request management took %ld.%06lds",
 				diff.tv_sec, diff.tv_usec);
 		GRID_DEBUG("Client pool has %d pending requests", qlen);
