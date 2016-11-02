@@ -20,6 +20,7 @@ struct sqlx_sync_s
 	gchar *zk_prefix;
 	gchar *zk_url;
 	zhandle_t *zh;
+	GMutex *zh_lock;
 	clientid_t zk_id;
 
 	guint hash_width;
@@ -78,6 +79,7 @@ sqlx_sync_create(const char *url)
 	ss->vtable = &VTABLE;
 	ss->zk_url = g_strdup(url);
 	ss->zk_prefix = g_strdup("/NOTSET");
+	ss->zh_lock = g_mutex_new();
 	return ss;
 }
 
@@ -150,6 +152,54 @@ _realdirname(const struct sqlx_sync_s *ss, const gchar *path)
 
 static void
 zk_main_watch(zhandle_t *zh, int type, int state, const char *path,
+		void *watcherCtx);
+
+static const gchar*
+_zk_type_to_str(int type)
+{
+	if (type == ZOO_CREATED_EVENT)
+		return "created";
+	if (type == ZOO_DELETED_EVENT)
+		return "deleted";
+	if (type == ZOO_CHANGED_EVENT)
+		return "changed";
+	if (type == ZOO_CHILD_EVENT)
+		return "child";
+	if (type == ZOO_SESSION_EVENT)
+		return "session";
+	if (type == ZOO_NOTWATCHING_EVENT)
+		return "notwatching";
+	return "unknown";
+}
+
+static void
+_zk_reconnect(struct sqlx_sync_s *ss, gboolean reuse_session)
+{
+	const clientid_t *session_id;
+
+	GRID_WARN("Zookeeper: (re)connecting to [%s]", ss->zk_url);
+
+	if (reuse_session) {
+		session_id = &ss->zk_id;
+	} else {
+		if (NULL != ss->on_exit)
+			ss->on_exit(ss->on_exit_ctx);
+		session_id = NULL;
+		memset(&(ss->zk_id), 0, sizeof(ss->zk_id));
+	}
+
+	g_mutex_lock(ss->zh_lock);
+	if (ss->zh) {
+		zookeeper_close(ss->zh);
+		ss->zh = NULL;
+	}
+	ss->zh = zookeeper_init(ss->zk_url, zk_main_watch,
+			SQLX_SYNC_DEFAULT_ZK_TIMEOUT, session_id, ss, 0);
+	g_mutex_unlock(ss->zh_lock);
+}
+
+static void
+zk_main_watch(zhandle_t *zh, int type, int state, const char *path,
 		void *watcherCtx)
 {
 	struct sqlx_sync_s *ss = watcherCtx;
@@ -158,32 +208,30 @@ zk_main_watch(zhandle_t *zh, int type, int state, const char *path,
 
 	if (type == ZOO_SESSION_EVENT) {
 		if (state == ZOO_CONNECTING_STATE) {
-			if (ss->zh)
-				zookeeper_close(ss->zh);
-			if (NULL != ss->on_exit)
-				ss->on_exit(ss->on_exit_ctx);
-			ss->zh = zookeeper_init(ss->zk_url, zk_main_watch,
-				SQLX_SYNC_DEFAULT_ZK_TIMEOUT, &ss->zk_id, ss, 0);
+			_zk_reconnect(ss, TRUE);
 		}
-	}
-	else {
-		if (state == ZOO_EXPIRED_SESSION_STATE) {
+		else if (state == ZOO_EXPIRED_SESSION_STATE) {
 			GRID_WARN("Zookeeper: expired session to [%s]", ss->zk_url);
+			_zk_reconnect(ss, FALSE);
 		}
 		else if (state == ZOO_AUTH_FAILED_STATE) {
 			GRID_WARN("Zookeeper: auth problem to [%s]", ss->zk_url);
-		}
-		else if (state == ZOO_CONNECTING_STATE) {
-			GRID_WARN("Zookeeper: (re)connecting to [%s]", ss->zk_url);
 		}
 		else if (state == ZOO_ASSOCIATING_STATE) {
 			GRID_DEBUG("Zookeeper: associating to [%s]", ss->zk_url);
 		}
 		else if (state == ZOO_CONNECTED_STATE) {
+			g_mutex_lock(ss->zh_lock);
 			memcpy(&(ss->zk_id), zoo_client_id(ss->zh), sizeof(clientid_t));
+			g_mutex_unlock(ss->zh_lock);
 			GRID_INFO("Zookeeper: connected to [%s] id=%"G_GINT64_FORMAT,
 					ss->zk_url, ss->zk_id.client_id);
 		}
+		else {
+			GRID_WARN("Unknown state received from Zookeeper: %i", state);
+		}
+	} else {
+		GRID_WARN("Got event from Zookeeper: %s", _zk_type_to_str(type));
 	}
 }
 
@@ -194,7 +242,9 @@ _open(struct sqlx_sync_s *ss)
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	if (NULL != ss->zh)
 		return NEWERROR(500, "BUG : ZK connection already initiated");
+	g_mutex_lock(ss->zh_lock);
 	ss->zh = zookeeper_init(ss->zk_url, zk_main_watch, 4000, NULL, ss, 0);
+	g_mutex_unlock(ss->zh_lock);
 	if (NULL == ss->zh)
 		return NEWERROR(500, "ZK connection failure");
 	return NULL;
@@ -206,8 +256,10 @@ _close(struct sqlx_sync_s *ss)
 	EXTRA_ASSERT(ss != NULL);
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	if (ss->zh) {
+		g_mutex_lock(ss->zh_lock);
 		zookeeper_close(ss->zh);
 		ss->zh = NULL;
+		g_mutex_unlock(ss->zh_lock);
 	}
 }
 
@@ -219,6 +271,7 @@ _clear(struct sqlx_sync_s *ss)
 	_close(ss);
 	g_free(ss->zk_prefix);
 	g_free(ss->zk_url);
+	g_mutex_free(ss->zh_lock);
 	memset(ss, 0, sizeof(*ss));
 	g_free(ss);
 }
@@ -230,8 +283,10 @@ _acreate (struct sqlx_sync_s *ss, const char *path, const char *v,
 	EXTRA_ASSERT(ss != NULL);
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	gchar *p = _realpath(ss, path);
+	g_mutex_lock(ss->zh_lock);
 	int rc = zoo_acreate(ss->zh, p, v, vlen, &ZOO_OPEN_ACL_UNSAFE,
 			flags, completion, data);
+	g_mutex_unlock(ss->zh_lock);
 	GRID_TRACE2("SYNC create(%p) = %d", p, rc);
 	g_free(p);
 	return rc;
@@ -244,7 +299,10 @@ _adelete (struct sqlx_sync_s *ss, const char *path, int version,
 	EXTRA_ASSERT(ss != NULL);
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	gchar *p = _realpath(ss, path);
+	g_mutex_lock(ss->zh_lock);
+	GRID_DEBUG("DELETE ZH=%p", ss->zh);
 	int rc = zoo_adelete(ss->zh, p, version, completion, data);
+	g_mutex_unlock(ss->zh_lock);
 	GRID_TRACE2("SYNC delete(%s) = %d", p, rc);
 	g_free(p);
 	return rc;
@@ -258,7 +316,9 @@ _awexists (struct sqlx_sync_s *ss, const char *path,
 	EXTRA_ASSERT(ss != NULL);
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	gchar *p = _realpath(ss, path);
+	g_mutex_lock(ss->zh_lock);
 	int rc = zoo_awexists(ss->zh, p, watcher, watcherCtx, completion, data);
+	g_mutex_unlock(ss->zh_lock);
 	GRID_TRACE2("SYNC exists(%s) = %d", p, rc);
 	g_free(p);
 	return rc;
@@ -272,7 +332,9 @@ _awget (struct sqlx_sync_s *ss, const char *path,
 	EXTRA_ASSERT(ss != NULL);
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	gchar *p = _realpath(ss, path);
+	g_mutex_lock(ss->zh_lock);
 	int rc = zoo_awget(ss->zh, p, watcher, watcherCtx, completion, data);
+	g_mutex_unlock(ss->zh_lock);
 	GRID_TRACE2("SYNC get(%s) = %d", p, rc);
 	g_free(p);
 	return rc;
@@ -286,8 +348,10 @@ _awget_children (struct sqlx_sync_s *ss, const char *path,
 	EXTRA_ASSERT(ss != NULL);
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	gchar *p = _realpath(ss, path);
+	g_mutex_lock(ss->zh_lock);
 	int rc = zoo_awget_children(ss->zh, p, watcher, watcherCtx, completion,
 			data);
+	g_mutex_unlock(ss->zh_lock);
 	GRID_TRACE2("SYNC children(%s) = %d", p, rc);
 	g_free(p);
 	return rc;
@@ -301,8 +365,10 @@ _awget_siblings (struct sqlx_sync_s *ss, const char *path,
 	EXTRA_ASSERT(ss != NULL);
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	gchar *p = _realdirname(ss, path);
+	g_mutex_lock(ss->zh_lock);
 	int rc = zoo_awget_children(ss->zh, p, watcher, watcherCtx, completion, data);
-	GRID_TRACE("SYNC children(%s) = %d", p, rc);
+	g_mutex_unlock(ss->zh_lock);
+	GRID_TRACE("SYNC siblings(%s) = %d", p, rc);
 	g_free(p);
 	return rc;
 }

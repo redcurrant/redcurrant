@@ -21,6 +21,7 @@ struct zk_manager_s
 {
 	gchar *zk_url;
 	zhandle_t *zh;
+	GMutex *zh_lock;
 	gchar zk_dir[256];
 };
 
@@ -58,6 +59,47 @@ free_string_vector(struct String_vector * sv)
 	sv->count=0;
 }
 
+static void zk_main_watch(zhandle_t *zh, int type, int state, const char *path,
+		void *watcherCtx);
+
+static const gchar*
+_zk_type_to_str(int type)
+{
+	if (type == ZOO_CREATED_EVENT)
+		return "created";
+	if (type == ZOO_DELETED_EVENT)
+		return "deleted";
+	if (type == ZOO_CHANGED_EVENT)
+		return "changed";
+	if (type == ZOO_CHILD_EVENT)
+		return "child";
+	if (type == ZOO_SESSION_EVENT)
+		return "session";
+	if (type == ZOO_NOTWATCHING_EVENT)
+		return "notwatching";
+	return "unknown";
+}
+
+static void
+_zk_reconnect(struct zk_manager_s *manager)
+{
+	GRID_WARN("Zookeeper: (re)connecting to [%s]", manager->zk_url);
+
+	g_mutex_lock(manager->zh_lock);
+	if (manager->zh) {
+		zookeeper_close(manager->zh);
+		manager->zh = NULL;
+	}
+	manager->zh = zookeeper_init(manager->zk_url, zk_main_watch,
+			4000, NULL, manager, 0);
+	g_mutex_unlock(manager->zh_lock);
+	if (!manager->zh) {
+		GRID_ERROR("ZooKeeper init failure: (%d) %s",
+				errno, strerror(errno));
+		abort();
+	}
+}
+
 static void
 zk_main_watch(zhandle_t *zh, int type, int state, const char *path,
 		void *watcherCtx)
@@ -73,29 +115,29 @@ zk_main_watch(zhandle_t *zh, int type, int state, const char *path,
 
 	if (type == ZOO_SESSION_EVENT) {
 		if (state == ZOO_CONNECTING_STATE) {
-			zookeeper_close(manager->zh);
-			manager->zh = zookeeper_init(manager->zk_url, zk_main_watch,
-					4000, NULL, manager, 0);
-			if (!manager->zh) {
-				GRID_ERROR("ZooKeeper init failure: (%d) %s",
-						errno, strerror(errno));
-				abort();
-			}
+			_zk_reconnect(manager);
 		}
-	}
-	else {
-		if (state == ZOO_EXPIRED_SESSION_STATE) {
+		else if (state == ZOO_EXPIRED_SESSION_STATE) {
+			// This should never happen because we never try to reconnect to
+			// a previous session. Keeping this case anyway as this is the way
+			// to handle such errors.
 			GRID_WARN("Zookeeper: expired session to [%s]", zkurl);
+			_zk_reconnect(manager);
 		}
 		else if (state == ZOO_AUTH_FAILED_STATE) {
 			GRID_WARN("Zookeeper: auth problem to [%s]", zkurl);
 		}
-		else if (state == ZOO_CONNECTING_STATE) {
-			GRID_WARN("Zookeeper: (re)connecting to [%s]", zkurl);
-		}
 		else if (state == ZOO_ASSOCIATING_STATE) {
 			GRID_DEBUG("Zookeeper: associating to [%s]", zkurl);
 		}
+		else if (state == ZOO_CONNECTED_STATE) {
+			GRID_INFO("Zookeeper: connected to [%s]", zkurl);
+		}
+		else {
+			GRID_WARN("Unknown state received from Zookeeper: %i", state);
+		}
+	} else {
+		GRID_WARN("Got event from Zookeeper: %s", _zk_type_to_str(type));
 	}
 }
 
@@ -116,6 +158,7 @@ zk_srv_manager_create(gchar *namespace, gchar *url, gchar *srvType,
 	manager = g_malloc0(sizeof(*manager));
 
 	manager->zk_url = g_strdup(url);
+	manager->zh_lock = g_mutex_new();
 	g_snprintf(manager->zk_dir, sizeof(manager->zk_dir),
 		"/hc/ns/%s/srv/%s", namespace,srvType);
 
@@ -124,7 +167,9 @@ zk_srv_manager_create(gchar *namespace, gchar *url, gchar *srvType,
 		return NEWERROR(errno, "ZooKeeper init failure: %s", strerror(errno));
 
 	//check if zk_dir node exist . zk_dir Node should be created by zk-boostrap.py
+	g_mutex_lock(manager->zh_lock);
 	rc = zoo_exists(manager->zh, manager->zk_dir, 0, &my_stat);
+	g_mutex_unlock(manager->zh_lock);
 	if ( rc == ZNONODE ) {
 		return NEWERROR(0, "zk base node [%s] doesn't exist, zk code [%d]",
 				manager->zk_dir, rc);
@@ -143,8 +188,12 @@ zk_manager_clean(struct zk_manager_s *manager)
 {
 	EXTRA_ASSERT(manager != NULL);
 
+	g_mutex_lock(manager->zh_lock);
 	if (manager->zh)
 		zookeeper_close(manager->zh);
+	g_mutex_unlock(manager->zh_lock);
+
+	g_mutex_free(manager->zh_lock);
 
 	memset(manager, 0, sizeof(*manager));
 	g_free(manager);
@@ -173,8 +222,10 @@ create_zk_node(struct zk_manager_s *manager, gchar *subdir, gchar *name, gchar *
 	path = get_fullpath(manager, subdir, name);
 	GRID_TRACE("create node %s , full path [%s]", name, path);
 
+	g_mutex_lock(manager->zh_lock);
 	rc = zoo_create(manager->zh, path, data, strlen(data),
 			&ZOO_OPEN_ACL_UNSAFE, 0, buffer, sizeof(buffer)-1);
+	g_mutex_unlock(manager->zh_lock);
 	g_free(path);
 
 	if (rc != ZOK && rc != ZNODEEXISTS)
@@ -199,7 +250,9 @@ list_zk_children_node(struct zk_manager_s *manager, gchar *sub_dir, GSList **res
 
 	memset(&sv, '\0', sizeof(struct String_vector));
 	dirpath = get_fullpath(manager,sub_dir,NULL);
+	g_mutex_lock(manager->zh_lock);
 	rc = zoo_get_children(manager->zh, dirpath, 0, &sv);
+	g_mutex_unlock(manager->zh_lock);
 
 	if ( rc != ZOK ) {
 		err = NEWERROR(0, "Failed to find zk children node [%s] , zk code [%d]",
@@ -212,7 +265,9 @@ list_zk_children_node(struct zk_manager_s *manager, gchar *sub_dir, GSList **res
 		buflen= sizeof(buffer)-1;
 		zknode = g_malloc0(sizeof(struct zk_node_s));
 		fullpath = g_strdup_printf("%s/%s",dirpath,sv.data[i]);
+		g_mutex_lock(manager->zh_lock);
 		rc = zoo_get(manager->zh, fullpath, 1, buffer , &buflen, &my_stat);
+		g_mutex_unlock(manager->zh_lock);
 		if ( rc != ZOK ) {
 			err =  NEWERROR(0, "Failed to get node [%s] , zk code [%d]",fullpath,rc);
 			goto end_error;
@@ -248,7 +303,9 @@ delete_zk_node(struct zk_manager_s *manager, gchar *subdir, gchar *name)
 	GRID_TRACE("create node %s , full path [%s]", name,
 			get_fullpath(manager,subdir,name));
 
+	g_mutex_lock(manager->zh_lock);
 	rc = zoo_delete(manager->zh,get_fullpath(manager,subdir,name),-1);
+	g_mutex_unlock(manager->zh_lock);
 
 	if ( rc != ZOK && rc != ZNONODE )
 		return  NEWERROR(0, "Failed to delete zk  node [%s], zk code [%d]", name, rc);
