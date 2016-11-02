@@ -302,7 +302,7 @@ _awget_siblings (struct sqlx_sync_s *ss, const char *path,
 	EXTRA_ASSERT(ss->vtable == &VTABLE);
 	gchar *p = _realdirname(ss, path);
 	int rc = zoo_awget_children(ss->zh, p, watcher, watcherCtx, completion, data);
-	GRID_TRACE("SYNC children(%s) = %d", p, rc);
+	GRID_TRACE("SYNC siblings(%s) = %d", p, rc);
 	g_free(p);
 	return rc;
 }
