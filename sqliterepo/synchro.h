@@ -89,6 +89,19 @@ struct abstract_sqlx_sync_s
  * @param url the Zookeeper connection string */
 struct sqlx_sync_s * sqlx_sync_create(const char *url);
 
+/**
+ * Returns whether synchronizer is connected.
+ * @param ss sync structure
+ */
+gboolean sqlx_sync_is_connected(struct sqlx_sync_s *ss);
+
+/**
+ * Returns time of last reconnection to synchronizer.
+ * @param ss sync structure
+ * @return time
+ */
+time_t sqlx_sync_get_connection_time(struct sqlx_sync_s *ss);
+
 void sqlx_sync_set_prefix(struct sqlx_sync_s *ss, const gchar *prefix);
 
 void sqlx_sync_set_hash(struct sqlx_sync_s *ss, guint witdth, guint depth);
