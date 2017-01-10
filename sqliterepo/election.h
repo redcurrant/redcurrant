@@ -93,7 +93,7 @@ struct election_manager_vtable_s
 	void (*exit_all) (struct election_manager_s *, GTimeVal *max, gboolean persist);
 
 	/** Run all the elections and count them, grouped by status */
-	struct election_counts_s (*count) (struct election_manager_s *);
+	void (*count) (struct election_manager_s *, struct election_counts_s *count);
 
 	/** Prepare the internal memory for the election context, but without
 	 * starting the election. Usefull to prepare. */
@@ -149,8 +149,8 @@ struct abstract_election_manager_s {
 #define election_manager_exit_all(m,max,persist) \
 	((struct abstract_election_manager_s*)m)->vtable->exit_all(m,max,persist)
 
-#define election_manager_count(m) \
-	((struct abstract_election_manager_s*)m)->vtable->count(m);
+#define election_manager_count(m, c) \
+	((struct abstract_election_manager_s*)m)->vtable->count(m, c);
 
 #define election_init(m,name,type) \
 	((struct abstract_election_manager_s*)m)->vtable->election_init(m,name,type)
@@ -209,6 +209,8 @@ GError* sqlx_config_has_peers(const struct replication_config_s *cfg,
 GError* sqlx_config_has_peers2(const struct replication_config_s *cfg,
 		const gchar *n, const gchar *t, gboolean nocache, gboolean *result);
 
+/** Expire elections older than delay (in s) */
+void election_manager_expire(struct election_manager_s *manager, time_t delay);
 
 /** @} */
 
