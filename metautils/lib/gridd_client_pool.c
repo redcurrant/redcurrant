@@ -49,13 +49,16 @@ static void _defer (struct gridd_client_pool_s *p, struct event_client_s *ev);
 
 static GError* _round (struct gridd_client_pool_s *p, time_t sec);
 
+static GHashTable* _get_stats (struct gridd_client_pool_s *p);
+
 static struct gridd_client_pool_vtable_s VTABLE =
 {
 	_destroy,
 	_get_max,
 	_set_max,
 	_defer,
-	_round
+	_round,
+	_get_stats
 };
 
 struct gridd_client_pool_s *
@@ -293,19 +296,21 @@ _manage_requests(struct gridd_client_pool_s *pool)
 			}
 			event_client_free(ec);
 		}
-		else if (!event_client_monitor(pool, ec))
+		else if (!event_client_monitor(pool, ec)) {
 			event_client_free(ec);
+		}
 	}
 
 	g_get_current_time(&end);
 	timersub(&end, &start, &diff);
-	gint qlen = g_async_queue_length(pool->pending_clients);
 	if (diff.tv_sec > 5) {
+		gint qlen = g_async_queue_length(pool->pending_clients);
 		GRID_WARN("Client pool request management took %lds!",
 				diff.tv_sec);
 		if (qlen > 1000)
 			GRID_WARN("Client pool still has %d pending requests", qlen);
 	} else if (GRID_DEBUG_ENABLED()) {
+		gint qlen = g_async_queue_length(pool->pending_clients);
 		GRID_DEBUG("Client pool request management took %ld.%06lds",
 				diff.tv_sec, diff.tv_usec);
 		GRID_DEBUG("Client pool has %d pending requests", qlen);
@@ -412,3 +417,26 @@ _set_max(struct gridd_client_pool_s *pool, guint max)
 		GRID_INFO("Max active connections set to %u", max);
 }
 
+static GHashTable*
+_get_stats(struct gridd_client_pool_s *pool)
+{
+	GHashTable* hash = NULL;
+	guint64 v;
+
+	EXTRA_ASSERT(pool != NULL);
+	EXTRA_ASSERT(pool->vtable == &VTABLE);
+
+	hash = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+	gint qlen = g_async_queue_length(pool->pending_clients);
+	v = qlen < 0 ? 0 : (guint64)qlen;
+	g_hash_table_insert(hash, g_strdup("queuesize"),
+			g_memdup(&v, sizeof(v)));
+	v = (guint64)pool->active_count;
+	g_hash_table_insert(hash, g_strdup("active"),
+			g_memdup(&v, sizeof(v)));
+	v = (guint64)pool->active_max;
+	g_hash_table_insert(hash, g_strdup("active_max"),
+			g_memdup(&v, sizeof(v)));
+
+	return hash;
+}
