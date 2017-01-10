@@ -1359,20 +1359,20 @@ sqlx_dispatch_GETVERS(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("BASE_TYPE", type);
 	reply->subject("%s.%s", base, type);
 
-	// TODO JFS : trigger an election, useful to reduce the number of
-	// messages during an election.
-	err = sqlx_repository_use_base(repo, type, base);
-	if (NULL != err) {
-		g_prefix_error(&err, "Use: ");
-		reply->send_error(0, err);
-		return TRUE;
-	}
-
 	err = sqlx_repository_open_and_lock(repo, type, base,
 			SQLX_OPEN_LOCAL, &sq3, NULL);
 
 	if (NULL != err) {
 		g_prefix_error(&err, "Open/lock: ");
+		reply->send_error(0, err);
+		return TRUE;
+	}
+
+	// TODO JFS : trigger an election, useful to reduce the number of
+	// messages during an election.
+	err = sqlx_repository_use_base(repo, type, base);
+	if (NULL != err) {
+		g_prefix_error(&err, "Use: ");
 		reply->send_error(0, err);
 		return TRUE;
 	}
@@ -1422,17 +1422,17 @@ sqlx_dispatch_REPLICATE(struct gridd_reply_ctx_s *reply,
 
 	reply->send_reply(100, "received");
 
-	/* Starts an election without being an initiator ... because I receive
-	 * this request from a master, so an election is already running
-	 * somewhere else. */
-	err = sqlx_repository_use_base(repo, type, base);
+	err = sqlx_repository_open_and_lock(repo, type, base,
+			SQLX_OPEN_LOCAL|SQLX_OPEN_CREATE, &sq3, NULL);
 	if (NULL != err) {
 		reply->send_error(0, err);
 		return TRUE;
 	}
 
-	err = sqlx_repository_open_and_lock(repo, type, base,
-			SQLX_OPEN_LOCAL|SQLX_OPEN_CREATE, &sq3, NULL);
+	/* Starts an election without being an initiator ... because I receive
+	 * this request from a master, so an election is already running
+	 * somewhere else. */
+	err = sqlx_repository_use_base(repo, type, base);
 	if (NULL != err) {
 		reply->send_error(0, err);
 		return TRUE;
@@ -1741,6 +1741,14 @@ sqlx_dispatch_RESYNC(struct gridd_reply_ctx_s *reply,
 	EXTRACT_STRING("BASE_TYPE", type);
 	reply->subject("%s.%s", base, type);
 
+	struct sqlx_sqlite3_s *sq3 = NULL;
+	err = sqlx_repository_open_and_lock(repo, type, base,
+			SQLX_OPEN_SLAVEONLY, &sq3, NULL);
+	if (NULL != err) {
+		reply->send_error(0, err);
+		return TRUE;
+	}
+
 	/* Force refresh of peers from meta1 */
 	em = sqlx_repository_get_elections_manager(repo);
 	err = sqlx_config_has_peers2(election_manager_get_config(em),
@@ -1749,14 +1757,6 @@ sqlx_dispatch_RESYNC(struct gridd_reply_ctx_s *reply,
 
 	/* Open and lock the base */
 	err = sqlx_repository_use_base(repo, type, base);
-	if (NULL != err) {
-		reply->send_error(0, err);
-		return TRUE;
-	}
-
-	struct sqlx_sqlite3_s *sq3 = NULL;
-	err = sqlx_repository_open_and_lock(repo, type, base,
-			SQLX_OPEN_SLAVEONLY, &sq3, NULL);
 	if (NULL != err) {
 		reply->send_error(0, err);
 		return TRUE;
@@ -2035,8 +2035,8 @@ _info_repository(struct sqlx_repository_s *r, GString *gstr)
 static void
 _info_elections(struct sqlx_repository_s *repo, GString *gstr)
 {
-	struct election_counts_s count = election_manager_count(
-			sqlx_repository_get_elections_manager(repo));
+	struct election_counts_s count;
+	election_manager_count(sqlx_repository_get_elections_manager(repo), &count);
 	g_string_append(gstr, "Elections count:\n");
 	g_string_append_printf(gstr, "\ttotal: %u\n", count.total);
 	g_string_append_printf(gstr, "\tnone: %u\n", count.none);
@@ -2085,8 +2085,8 @@ _info_replication(struct sqlx_repository_s *repo, GString *gstr)
 static void
 _info_cache(struct sqlx_repository_s *repo, GString *gstr)
 {
-	struct cache_counts_s count = sqlx_cache_count(
-			sqlx_repository_get_cache(repo));
+	struct cache_counts_s count;
+	sqlx_cache_count(sqlx_repository_get_cache(repo), &count);
 	g_string_append(gstr, "Cache count:\n");
 	g_string_append_printf(gstr, "\tmax: %u\n", count.max);
 	g_string_append_printf(gstr, "\thot: %u\n", count.hot);
