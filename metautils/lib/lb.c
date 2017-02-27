@@ -1024,31 +1024,82 @@ _get_iteration_limit(struct grid_lb_iterator_s *it, gboolean shorten)
 }
 
 static gboolean
-_distance_fits(guint reqdist, GTree *set, struct service_info_s *si)
+_distance_fits(guint reqdist, GPtrArray *set, struct service_info_s *si)
 {
-	guint mindist = G_MAXUINT;
-	gboolean runner(gpointer k, gpointer v, gpointer u) {
-		(void) k;
-		register guint d = distance_between_location(u,
-				service_info_get_rawx_location(v, NULL));
-		if (mindist > d)
-			mindist = d;
-		return mindist < reqdist;
-	}
+	const gchar *loc0 = service_info_get_rawx_location(si, NULL);
+	guint i;
 
-	if (!reqdist)
+	if (!reqdist || !loc0)
 		return TRUE;
 
-	const gchar *loc0 = service_info_get_rawx_location(si, NULL);
-	if (NULL != loc0)
-		g_tree_foreach(set, runner, (gpointer)loc0);
-	return mindist >= reqdist;
+	for (i = 0; i < set->len; i++) {
+		if (!g_ptr_array_index(set, i))
+			continue;
+		register guint d = distance_between_location(loc0,
+				service_info_get_rawx_location(g_ptr_array_index(set, i), NULL));
+		if (d < reqdist)
+			return FALSE;
+	}
+
+	return TRUE;
 }
 
 static inline gboolean
 _filter_matches(struct lb_next_opt_filter_s *f, struct service_info_s *si)
 {
 	return !f->hook || f->hook(si, f->data);
+}
+
+static guint
+_gpa_count_notnull(GPtrArray *a)
+{
+	guint count = 0;
+
+	void _count_notnull(gpointer p, gpointer udata) {
+		(void) udata;
+		if (p)
+			count++;
+	}
+
+	g_ptr_array_foreach(a, _count_notnull, NULL);
+	return count;
+}
+
+static struct service_info_s *
+_get_service_with_same_addr(GPtrArray *services, struct addr_info_s *addr)
+{
+	struct service_info_s *cur;
+	for (guint i = 0; i < services->len; i++) {
+		if (!(cur = g_ptr_array_index(services, i)))
+			continue;
+		if (addr_info_equal(&(cur->addr), addr))
+			return cur;
+	}
+	return NULL;
+}
+
+static void
+_gpa_replace_first_null_found(GPtrArray *a, gpointer p, guint start)
+{
+	guint idx, i;
+	for (i = 0; i < a->len; i++) {
+		idx = (start + i) % a->len;
+		if (!g_ptr_array_index(a, idx)) {
+			g_ptr_array_index(a, idx) = p;
+			return;
+		}
+	}
+	GRID_WARN("No empty slot found in array of size %u", a->len);
+}
+
+static gboolean
+_gpa_has_pointer(GPtrArray *a, gpointer p)
+{
+	for (guint i = 0; i < a->len; i++) {
+		if (p == g_ptr_array_index(a, i))
+			return TRUE;
+	}
+	return FALSE;
 }
 
 /**
@@ -1064,19 +1115,21 @@ _filter_matches(struct lb_next_opt_filter_s *f, struct service_info_s *si)
  */
 static void
 _search_servers(struct grid_lb_iterator_s *iter, struct lb_next_opt_s *opt,
-		const gchar *stgclass, GTree *polled, gboolean shorten)
+		const gchar *stgclass, GPtrArray *polled, gboolean shorten)
 {
 	gsize limit = _get_iteration_limit(iter, shorten);
+	guint found = _gpa_count_notnull(polled);
+	guint store_start = g_random_int_range(0,  polled->len);
 
 	if (GRID_DEBUG_ENABLED()) {
 		GRID_DEBUG("SEARCH max=%u/%u dup=%d dist=%d stgclass=%s pool=%u"
 				" shorten=%f filter=%p",
-				(guint)g_tree_nnodes(polled), opt->req.max,
+				found, opt->req.max,
 				opt->req.duplicates, opt->req.distance,
 				stgclass, (guint)limit, iter->lb->shorten_ratio, opt->filter.hook);
 	}
 
-	while (limit > 0 && opt->req.max > (guint)g_tree_nnodes(polled)) {
+	while (limit > 0 && opt->req.max > found) {
 
 		struct service_info_s *si = NULL;
 		if (!_iterator_next_shorten(iter, &si, shorten))
@@ -1090,40 +1143,26 @@ _search_servers(struct grid_lb_iterator_s *iter, struct lb_next_opt_s *opt,
 			--limit;
 		}
 		else {
-			struct service_info_s *old = g_tree_lookup(polled, &(si->addr));
+			found++;
+			struct service_info_s *old = NULL;
+			if (!opt->req.duplicates) {
+				old = _get_service_with_same_addr(polled, &(si->addr));
+			} else if (_gpa_has_pointer(polled, si)) {
+				old = si;
+			}
 			if (NULL == old) {
 				// Ok, store the service
-				g_tree_replace(polled, &(si->addr), si);
+				_gpa_replace_first_null_found(polled, si, store_start);
 			}
 			else {
-				service_info_swap(si, old);
-				service_info_clean(si);
+				if (si != old) {
+					service_info_swap(si, old);
+					service_info_clean(si);
+				}
 				--limit;
 			}
 		}
 	}
-}
-
-static gboolean
-run_clean(gpointer k, gpointer v, gpointer u)
-{
-	(void) k, (void) u;
-	service_info_clean(v);
-	return FALSE;
-}
-
-static gint
-cmp_addr(gconstpointer a, gconstpointer b, gpointer user_data)
-{
-	(void) user_data;
-	return addr_info_compare(a, b);
-}
-
-static gint
-cmp_ptr(gconstpointer a, gconstpointer b, gpointer user_data)
-{
-	(void) user_data;
-	return CMP(a,b);
 }
 
 /* First search for servers matching the exact criterions.
@@ -1132,7 +1171,7 @@ cmp_ptr(gconstpointer a, gconstpointer b, gpointer user_data)
  * storage classes. */
 static void
 _next_set(struct grid_lb_iterator_s *it, struct lb_next_opt_s *opt,
-		const gchar *stgclass, GTree *polled, GSList *fallbacks)
+		const gchar *stgclass, GPtrArray *polled, GSList *fallbacks)
 {
 	_search_servers(it, opt, stgclass, polled, TRUE);
 
@@ -1140,12 +1179,12 @@ _next_set(struct grid_lb_iterator_s *it, struct lb_next_opt_s *opt,
 	// to same position as before our research (we won't use the
 	// polled services, so pointer should not move).
 
-	if (opt->req.max > (guint)g_tree_nnodes(polled)) {
+	if (opt->req.max > _gpa_count_notnull(polled)) {
 		GRID_DEBUG("Shorten ratio bypass");
 		_search_servers(it, opt, stgclass, polled, FALSE);
 	}
 
-	while (opt->req.max > (guint)g_tree_nnodes(polled) && fallbacks) {
+	while (opt->req.max > _gpa_count_notnull(polled) && fallbacks) {
 		GRID_DEBUG("Fallback STGPOL");
 		if (NULL != fallbacks->data)
 			_search_servers(it, opt, fallbacks->data, polled, FALSE);
@@ -1166,11 +1205,8 @@ grid_lb_iterator_next_set(struct grid_lb_iterator_s *iter,
 		iter->lb->use_hook();
 
 	// Manage the duplication cases with a well chosen set
-	GTree *polled = NULL;
-	if (!opt->req.duplicates)
-		polled = g_tree_new_full(cmp_addr, NULL, NULL, NULL);
-	else
-		polled = g_tree_new_full(cmp_ptr, NULL, NULL, NULL);
+	GPtrArray *polled = g_ptr_array_new_with_free_func((GDestroyNotify)service_info_clean);
+	g_ptr_array_set_size(polled, opt->req.max);
 
 	const gchar *stgclass_name = storage_class_get_name(opt->req.stgclass);
 	GSList *fallbacks = NULL;
@@ -1184,22 +1220,13 @@ grid_lb_iterator_next_set(struct grid_lb_iterator_s *iter,
 	grid_lb_unlock(iter->lb);
 
 	// Not enough servers found, fail
-	if (opt->req.max > (guint)g_tree_nnodes(polled)) {
-		g_tree_foreach(polled, run_clean, NULL);
-		g_tree_destroy(polled);
+	if (opt->req.max > _gpa_count_notnull(polled)) {
+		g_ptr_array_free(polled, TRUE);
 		return FALSE;
 	}
 
-	GPtrArray *pre_result = metautils_gtree_to_gpa(polled, TRUE);
-	if (opt->req.shuffle) {
-		for (guint i = 0; i < pre_result->len - 1; i++) {
-			gpointer element = g_ptr_array_remove_index_fast(pre_result,
-					g_random_int_range(0, pre_result->len - 1));
-			g_ptr_array_add(pre_result, element);
-		}
-	}
 	*result = (struct service_info_s**) metautils_gpa_to_array(
-			pre_result, TRUE);
+			polled, TRUE);
 	return TRUE;
 }
 
