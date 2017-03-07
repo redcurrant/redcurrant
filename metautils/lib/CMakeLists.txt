@@ -429,6 +429,11 @@ target_link_libraries(test_gba
 		metautils 
 		${GLIB2_LIBRARIES})
 
+add_executable(test_distance test_distance.c)
+target_link_libraries(test_distance
+		metautils 
+		${GLIB2_LIBRARIES})
+		
 install(TARGETS metacomm metautils gs_oid2cid gs_dump_addr
 		LIBRARY DESTINATION ${LD_LIBDIR}
 		RUNTIME DESTINATION bin
@@ -508,4 +513,5 @@ add_test(NAME metautils/gridd_client COMMAND test_gridd_client)
 #add_test(NAME metautils/sigfpe COMMAND test_sigfpe)
 add_test(NAME metautils/strings COMMAND test_str)
 add_test(NAME metautils/gba COMMAND test_gba)
+add_test(NAME metautils/dist COMMAND test_distance)
 
