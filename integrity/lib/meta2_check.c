@@ -34,7 +34,7 @@ meta2_sqlite_maintenance(const gchar* meta2_db_path, GError **error)
 
 	rc = sqlite3_exec(db, "VACUUM;", NULL, 0, &sqlite_error);
 	if (rc) {
-		GSETERROR(error, "Failed to vacuum databse [%s] : %s", meta2_db_path, sqlite_error);
+		GSETERROR(error, "Failed to vacuum database [%s] : %s", meta2_db_path, sqlite_error);
 		sqlite3_free(sqlite_error);
 		sqlite3_close(db);
 		return FALSE;
