@@ -88,7 +88,13 @@ distance_between_location(const gchar *loc1, const gchar *loc2)
 	/* Distance between 2 tokens. */
 	guint token_dist;
 
-	if ((!loc1 || !*loc1) && (!loc2 || !*loc2))
+	if (!loc1)
+		loc1 = "";
+
+	if (!loc2)
+		loc2 = "";
+
+	if (!*loc1 && !*loc2)
 		return 1U;
 
 	split_loc1 = g_strsplit(loc1, ".", 0);
