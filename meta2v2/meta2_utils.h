@@ -102,7 +102,7 @@ typedef gboolean (*m2_onprop_cb) (gpointer u, const gchar *k,
 /**
  * Get the cumulated size of contents in the database.
  */
-guint64 m2db_get_container_size(sqlite3 *db, gboolean check_alias);
+gint64 m2db_get_container_size(sqlite3 *db, gboolean check_alias);
 
 /**
  * @param sq3 A pointer to the database.
