@@ -400,7 +400,6 @@ _duplicate_and_ref(struct policy_check_s *pc, struct m2v2_check_error_s *flaw)
 
 	if (e == NULL) {
 		/* We need the entire content */
-		beans = g_slist_prepend(beans, flaw->header);
 		beans = g_slist_prepend(beans, flaw->alias);
 		/* Send reconstruction informations to the META-2 */
 		m2u = meta1_unpack_url(pc->m2urlv[0]);
@@ -627,8 +626,7 @@ _move_chunks(struct policy_check_s *pc, struct m2v2_check_error_s *flaw,
 		old_contents = g_slist_prepend(old_contents, old->content);
 	}
 
-	// Add alias and content header to the all beans list
-	all_beans = g_slist_prepend(all_beans, flaw->header);
+	// Add alias to beans list
 	all_beans = g_slist_prepend(all_beans, flaw->alias);
 
 	// Update alias with new chunk beans
