@@ -187,10 +187,10 @@ m2v2_parse_chunk_position(const gchar *s, gint *pos, gboolean *par, gint *sub)
 	return TRUE;
 }
 
-guint64
+gint64
 m2db_get_container_size(sqlite3 *db, gboolean check_alias)
 {
-	guint64 size = 0;
+	gint64 size = 0;
 	gchar tmp[512];
 	memset(tmp,'\0', 512);
 	g_snprintf(tmp, 512, "%s%s", "SELECT SUM(size) FROM content_header_v2",
@@ -2879,8 +2879,8 @@ m2db_purge(struct sqlx_sqlite3_s *sq3, gint64 max_versions, gint64 retention_del
 	}
 
 	if (!dry_run) {
-		guint64 size = m2db_get_container_size(sq3->db, FALSE);
-		m2db_set_size(sq3, (gint64)size);
+		gint64 size = m2db_get_container_size(sq3->db, FALSE);
+		m2db_set_size(sq3, size);
 	}
 
 	return NULL;
@@ -2958,9 +2958,9 @@ m2db_deduplicate_contents(struct sqlx_sqlite3_s *sq3, struct hc_url_s *url,
 	GError *err = NULL;
 	GSList *impacted_aliases = NULL;
 	gboolean dry_run = flags & M2V2_MODE_DRYRUN;
-	guint64 size_before = m2db_get_container_size(sq3->db, TRUE);
+	gint64 size_before = m2db_get_container_size(sq3->db, TRUE);
 	guint64 saved_space = dedup_aliases(sq3->db, url, dry_run, &impacted_aliases, &err);
-	guint64 size_after = m2db_get_container_size(sq3->db, TRUE);
+	gint64 size_after = m2db_get_container_size(sq3->db, TRUE);
 	if (status_message != NULL) {
 		if (*status_message == NULL) {
 			*status_message = g_string_new(NULL);
@@ -2968,7 +2968,7 @@ m2db_deduplicate_contents(struct sqlx_sqlite3_s *sq3, struct hc_url_s *url,
 		g_string_printf(*status_message,
 				"%"G_GUINT64_FORMAT" bytes saved "
 				"by deduplication of %u contents "
-				"(%"G_GUINT64_FORMAT" -> %"G_GUINT64_FORMAT" bytes)",
+				"(%"G_GINT64_FORMAT" -> %"G_GINT64_FORMAT" bytes)",
 				saved_space, g_slist_length(impacted_aliases),
 				size_before, size_after);
 	}

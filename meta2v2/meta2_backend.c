@@ -1175,20 +1175,24 @@ GError*
 meta2_backend_refresh_container_size(struct meta2_backend_s *m2b,
 		struct hc_url_s *url, gboolean bRecalc)
 {
-    GError *err = NULL;
+    GError *err = NULL, *err2 = NULL;
     struct sqlx_sqlite3_s *sq3 = NULL;
+	struct sqlx_repctx_s *repctx = NULL;
 
 	g_assert(m2b != NULL);
 	g_assert(url != NULL);
 
 	if (!(err = m2b_open(m2b, url, M2V2_OPEN_MASTERONLY, &sq3))) {
-		guint64 sizeOrg = m2db_get_size(sq3);
-		guint64 sizeNew = sizeOrg;
+		gint64 sizeOrg = m2db_get_size(sq3);
+		gint64 sizeNew = sizeOrg;
 		if (bRecalc) {
-			sizeNew = m2db_get_container_size(sq3->db, FALSE);
-			GRID_DEBUG("sizeNew: F=%ld, T=%ld", sizeNew,
-					m2db_get_container_size(sq3->db, TRUE));
-			m2db_set_size(sq3, (gint64)sizeNew);
+			sizeNew = m2db_get_container_size(sq3->db, TRUE);
+			GRID_DEBUG("sizeOrg=%"G_GINT64_FORMAT" sizeNew=%"G_GINT64_FORMAT,
+					sizeOrg, sizeNew);
+			err = sqlx_transaction_begin(sq3, &repctx);
+			if (!err)
+				m2db_set_size(sq3, sizeNew);
+			sqlx_transaction_end(repctx, err2);
 		}
 
 		if (!err)
@@ -1197,7 +1201,15 @@ meta2_backend_refresh_container_size(struct meta2_backend_s *m2b,
 		m2b_close(sq3);
 	}
 
-	return err;
+	if (err) {
+		if (err2) {
+			GRID_WARN("Error on transaction end: %s", err2->message);
+			g_error_free(err2);
+		}
+		return err;
+	}
+
+	return err2;
 }
 
 
